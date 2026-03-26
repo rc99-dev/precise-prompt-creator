@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Package } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -26,26 +26,25 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
+      email, password,
       options: { data: { full_name: fullName }, emailRedirectTo: window.location.origin },
     });
     if (error) toast.error(error.message);
-    else toast.success("Conta criada! Verifique seu e-mail para confirmar.");
+    else toast.success("Conta criada com sucesso!");
     setLoading(false);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-2">
+      <Card className="w-full max-w-md border-border">
+        <CardHeader className="text-center space-y-3">
           <div className="flex justify-center">
-            <div className="rounded-lg bg-primary p-2.5">
-              <Package className="h-6 w-6 text-primary-foreground" />
+            <div className="rounded-xl bg-primary p-3">
+              <ShoppingCart className="h-7 w-7 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Gestão de Compras</CardTitle>
-          <CardDescription>Sistema interno de compras e cotação</CardDescription>
+          <CardTitle className="text-2xl font-bold">Point do Açaí D'Amazônia</CardTitle>
+          <CardDescription>Sistema de Gestão de Compras</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login">
@@ -57,7 +56,7 @@ export default function LoginPage() {
               <form onSubmit={handleLogin} className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="login-email">E-mail</Label>
-                  <Input id="login-email" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                  <Input id="login-email" type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="seu@email.com" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="login-password">Senha</Label>

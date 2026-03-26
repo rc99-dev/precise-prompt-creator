@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { getUserRole } from "@/lib/helpers";
+import { getUserRole, AppRole } from "@/lib/helpers";
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
-  role: 'admin' | 'comprador' | null;
+  role: AppRole | null;
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -17,7 +17,7 @@ const AuthContext = createContext<AuthContextType>({
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [role, setRole] = useState<'admin' | 'comprador' | null>(null);
+  const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

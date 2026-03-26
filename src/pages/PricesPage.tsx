@@ -23,7 +23,7 @@ type SupplierPrice = {
 
 export default function PricesPage() {
   const { role } = useAuth();
-  const isAdmin = role === 'admin';
+  const canEdit = role === 'master' || role === 'comprador';
   const [prices, setPrices] = useState<SupplierPrice[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; razao_social: string }[]>([]);
   const [products, setProducts] = useState<{ id: string; nome: string }[]>([]);
@@ -114,7 +114,7 @@ export default function PricesPage() {
           <h1 className="text-2xl font-bold">Preços por Fornecedor</h1>
           <p className="text-muted-foreground text-sm mt-1">Gerencie os preços de cada fornecedor</p>
         </div>
-        {isAdmin && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo Preço</Button>}
+        {canEdit && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo Preço</Button>}
       </div>
 
       <div className="flex gap-3 flex-wrap">
@@ -142,7 +142,7 @@ export default function PricesPage() {
                   <th className="text-right py-3 px-4 font-medium text-muted-foreground">Preço Unitário</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Prazo Entrega</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Atualizado em</th>
-                  {isAdmin && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>}
+                  {canEdit && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>}
                 </tr>
               </thead>
               <tbody>
@@ -155,7 +155,7 @@ export default function PricesPage() {
                       <td className="py-3 px-4 font-medium">{p.products?.nome}</td>
                       <td className="py-3 px-4 text-muted-foreground">{p.suppliers?.razao_social}</td>
                       <td className="py-3 px-4 text-right">
-                        {isAdmin && inlineEdit?.id === p.id ? (
+                        {canEdit && inlineEdit?.id === p.id ? (
                           <div className="flex items-center justify-end gap-1">
                             <Input className="w-28 text-right" value={inlineEdit.value}
                               onChange={e => setInlineEdit({ id: p.id, value: e.target.value })}
@@ -164,7 +164,7 @@ export default function PricesPage() {
                           </div>
                         ) : (
                           <span className={`currency font-medium cursor-pointer ${isMin ? 'text-success' : ''}`}
-                            onClick={() => isAdmin && setInlineEdit({ id: p.id, value: p.preco_unitario.toString() })}>
+                            onClick={() => canEdit && setInlineEdit({ id: p.id, value: p.preco_unitario.toString() })}>
                             {isMin && <TrendingDown className="h-3 w-3 inline mr-1" />}
                             {formatCurrency(p.preco_unitario)}
                           </span>
@@ -172,7 +172,7 @@ export default function PricesPage() {
                       </td>
                       <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{p.prazo_entrega || '—'}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{formatDate(p.updated_at)}</td>
-                      {isAdmin && (
+                      {canEdit && (
                         <td className="py-3 px-4 text-right">
                           <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />

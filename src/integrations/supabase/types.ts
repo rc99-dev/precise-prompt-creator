@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      approval_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          motivo: string | null
+          order_id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          motivo?: string | null
+          order_id: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          motivo?: string | null
+          order_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          lida: boolean
+          link: string | null
+          mensagem: string | null
+          tipo: string
+          titulo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lida?: boolean
+          link?: string | null
+          mensagem?: string | null
+          tipo: string
+          titulo: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lida?: boolean
+          link?: string | null
+          mensagem?: string | null
+          tipo?: string
+          titulo?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       price_history: {
         Row: {
           changed_at: string
@@ -48,6 +116,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      product_categories: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+        }
+        Relationships: []
       }
       products: {
         Row: {
@@ -94,6 +180,7 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
+          unidade_setor: string | null
           updated_at: string
           user_id: string
         }
@@ -102,6 +189,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          unidade_setor?: string | null
           updated_at?: string
           user_id: string
         }
@@ -110,6 +198,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          unidade_setor?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -175,39 +264,324 @@ export type Database = {
       }
       purchase_orders: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
+          emitted_at: string | null
           id: string
           modo: string
           numero: string
           observacoes: string | null
+          rejected_reason: string | null
           status: string
+          total: number
+          unidade_setor: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          emitted_at?: string | null
+          id?: string
+          modo?: string
+          numero: string
+          observacoes?: string | null
+          rejected_reason?: string | null
+          status?: string
+          total?: number
+          unidade_setor?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          emitted_at?: string | null
+          id?: string
+          modo?: string
+          numero?: string
+          observacoes?: string | null
+          rejected_reason?: string | null
+          status?: string
+          total?: number
+          unidade_setor?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      quotation_items: {
+        Row: {
+          created_at: string
+          id: string
+          preco_unitario: number
+          product_id: string
+          quantidade: number
+          quotation_id: string
+          subtotal: number
+          supplier_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          preco_unitario?: number
+          product_id: string
+          quantidade?: number
+          quotation_id: string
+          subtotal?: number
+          supplier_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          preco_unitario?: number
+          product_id?: string
+          quantidade?: number
+          quotation_id?: string
+          subtotal?: number
+          supplier_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotation_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_items_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_items_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotations: {
+        Row: {
+          created_at: string
+          estrategia: string
+          id: string
+          numero: string
+          observacoes: string | null
           total: number
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          estrategia?: string
           id?: string
-          modo?: string
           numero: string
           observacoes?: string | null
-          status?: string
           total?: number
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          estrategia?: string
           id?: string
-          modo?: string
           numero?: string
           observacoes?: string | null
-          status?: string
           total?: number
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      receipt_items: {
+        Row: {
+          created_at: string
+          id: string
+          observacoes: string | null
+          order_item_id: string
+          quantidade_recebida: number | null
+          receipt_id: string
+          status: string
+          tipo_ocorrencia: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          order_item_id: string
+          quantidade_recebida?: number | null
+          receipt_id: string
+          status?: string
+          tipo_ocorrencia?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          order_item_id?: string
+          quantidade_recebida?: number | null
+          receipt_id?: string
+          status?: string
+          tipo_ocorrencia?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipt_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipt_items_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      receipts: {
+        Row: {
+          created_at: string
+          id: string
+          numero: string
+          numero_nf: string | null
+          observacoes: string | null
+          order_id: string
+          received_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          numero: string
+          numero_nf?: string | null
+          observacoes?: string | null
+          order_id: string
+          received_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          numero?: string
+          numero_nf?: string | null
+          observacoes?: string | null
+          order_id?: string
+          received_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reports: {
+        Row: {
+          created_at: string
+          dados: Json | null
+          id: string
+          numero: string
+          tipo: string
+          titulo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dados?: Json | null
+          id?: string
+          numero: string
+          tipo: string
+          titulo: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dados?: Json | null
+          id?: string
+          numero?: string
+          tipo?: string
+          titulo?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      requisitions: {
+        Row: {
+          created_at: string
+          id: string
+          motivo_recusa: string | null
+          observacoes: string | null
+          order_id: string | null
+          product_id: string
+          saldo_atual: number
+          status: string
+          unidade_medida: string
+          unidade_setor: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          motivo_recusa?: string | null
+          observacoes?: string | null
+          order_id?: string | null
+          product_id: string
+          saldo_atual?: number
+          status?: string
+          unidade_medida?: string
+          unidade_setor?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          motivo_recusa?: string | null
+          observacoes?: string | null
+          order_id?: string | null
+          product_id?: string
+          saldo_atual?: number
+          status?: string
+          unidade_medida?: string
+          unidade_setor?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "requisitions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requisitions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       supplier_prices: {
         Row: {
@@ -265,11 +639,13 @@ export type Database = {
       }
       suppliers: {
         Row: {
+          cidade: string | null
           cnpj: string | null
           contato_principal: string | null
           created_at: string
           email: string | null
           endereco: string | null
+          grupo: string | null
           id: string
           nome_fantasia: string | null
           observacoes: string | null
@@ -280,11 +656,13 @@ export type Database = {
           whatsapp: string | null
         }
         Insert: {
+          cidade?: string | null
           cnpj?: string | null
           contato_principal?: string | null
           created_at?: string
           email?: string | null
           endereco?: string | null
+          grupo?: string | null
           id?: string
           nome_fantasia?: string | null
           observacoes?: string | null
@@ -295,11 +673,13 @@ export type Database = {
           whatsapp?: string | null
         }
         Update: {
+          cidade?: string | null
           cnpj?: string | null
           contato_principal?: string | null
           created_at?: string
           email?: string | null
           endereco?: string | null
+          grupo?: string | null
           id?: string
           nome_fantasia?: string | null
           observacoes?: string | null
@@ -338,6 +718,8 @@ export type Database = {
     }
     Functions: {
       generate_order_number: { Args: never; Returns: string }
+      generate_quotation_number: { Args: never; Returns: string }
+      generate_receipt_number: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -347,7 +729,13 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "comprador"
+      app_role:
+        | "admin"
+        | "comprador"
+        | "solicitante"
+        | "aprovador"
+        | "estoquista"
+        | "master"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -475,7 +863,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "comprador"],
+      app_role: [
+        "admin",
+        "comprador",
+        "solicitante",
+        "aprovador",
+        "estoquista",
+        "master",
+      ],
     },
   },
 } as const

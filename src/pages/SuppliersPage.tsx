@@ -25,7 +25,7 @@ const emptySupplier = {
 
 export default function SuppliersPage() {
   const { role } = useAuth();
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'master';
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");

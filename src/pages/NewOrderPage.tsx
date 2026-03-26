@@ -155,12 +155,11 @@ export default function NewOrderPage() {
   }, 0);
   const economy = totalMaxPrice - total;
 
-  const handleSave = async (status: 'rascunho' | 'finalizado') => {
+  const handleSave = async (status: 'rascunho' | 'aguardando_aprovacao') => {
     if (items.length === 0) { toast.error("Adicione pelo menos um item."); return; }
     setSaving(true);
-    // Generate order number
     const { data: numData } = await supabase.rpc('generate_order_number');
-    const numero = numData || `OC-${Date.now()}`;
+    const numero = numData || `PED-${Date.now()}`;
 
     const { data: order, error: orderError } = await supabase.from('purchase_orders').insert({
       numero, user_id: user!.id, modo, status, observacoes, total,
@@ -177,7 +176,7 @@ export default function NewOrderPage() {
     const { error: itemsError } = await supabase.from('purchase_order_items').insert(orderItems);
     if (itemsError) { toast.error(itemsError.message); setSaving(false); return; }
 
-    toast.success(status === 'rascunho' ? "Rascunho salvo!" : "Ordem finalizada!");
+    toast.success(status === 'rascunho' ? "Rascunho salvo!" : "Enviado para aprovação!");
     setSaving(false);
     navigate('/historico');
   };
@@ -195,8 +194,8 @@ export default function NewOrderPage() {
           <Button variant="outline" onClick={() => handleSave('rascunho')} disabled={saving}>
             <Save className="h-4 w-4 mr-2" />Salvar Rascunho
           </Button>
-          <Button onClick={() => handleSave('finalizado')} disabled={saving}>
-            <ShoppingCart className="h-4 w-4 mr-2" />Finalizar Pedido
+          <Button onClick={() => handleSave('aguardando_aprovacao')} disabled={saving}>
+            <ShoppingCart className="h-4 w-4 mr-2" />Enviar para Aprovação
           </Button>
         </div>
       </div>
