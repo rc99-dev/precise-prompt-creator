@@ -23,7 +23,7 @@ type SupplierPrice = {
 
 export default function PricesPage() {
   const { role } = useAuth();
-  const isAdmin = role === 'admin';
+  const canEdit = role === 'master' || role === 'comprador';
   const [prices, setPrices] = useState<SupplierPrice[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; razao_social: string }[]>([]);
   const [products, setProducts] = useState<{ id: string; nome: string }[]>([]);

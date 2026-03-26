@@ -22,7 +22,7 @@ const emptyProduct = { nome: "", codigo_interno: "", categoria: "", unidade_medi
 
 export default function ProductsPage() {
   const { role } = useAuth();
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'master';
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
