@@ -37,7 +37,7 @@ export default function OrderHistoryPage() {
   const fetchOrders = async () => {
     const { data } = await supabase
       .from('purchase_orders')
-      .select('*, profiles!purchase_orders_user_id_fkey(full_name)')
+      .select('*')
       .order('created_at', { ascending: false });
     setOrders((data || []) as unknown as Order[]);
   };
