@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Eye, Copy, Download } from "lucide-react";
+import { Search, Eye, Copy, Download, FileText } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/helpers";
+import { generateOrderPDF } from "@/lib/pdfGenerator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
@@ -84,7 +85,7 @@ export default function OrderHistoryPage() {
   const exportCSV = async (order: Order) => {
     const { data: items } = await supabase
       .from('purchase_order_items')
-      .select('*, products(nome, unidade_medida), suppliers(razao_social)')
+      .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social)')
       .eq('order_id', order.id) as { data: OrderItem[] | null };
     if (!items) return;
     const header = "Produto;Unidade;Quantidade;Fornecedor;Preço Unitário;Subtotal\n";
@@ -97,6 +98,56 @@ export default function OrderHistoryPage() {
     a.href = url; a.download = `${order.numero}.csv`; a.click();
     URL.revokeObjectURL(url);
     toast.success("CSV exportado!");
+  };
+
+  const exportPDF = async (order: Order) => {
+    // Fetch items with product details
+    const { data: items } = await supabase
+      .from('purchase_order_items')
+      .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social, cnpj, telefone, cidade)')
+      .eq('order_id', order.id);
+    if (!items || items.length === 0) { toast.error("Sem itens para exportar."); return; }
+
+    // Get buyer profile
+    const { data: buyerProfile } = await supabase.from('profiles').select('full_name').eq('user_id', order.user_id).single();
+
+    // Get approver name if approved
+    let aprovadorName: string | null = null;
+    if (order.status === 'aprovado' || order.status === 'emitido' || order.status === 'recebido') {
+      const { data: log } = await supabase.from('approval_log').select('user_id').eq('order_id', order.id).eq('action', 'aprovado').limit(1).single();
+      if (log) {
+        const { data: ap } = await supabase.from('profiles').select('full_name').eq('user_id', log.user_id).single();
+        aprovadorName = ap?.full_name || null;
+      }
+    }
+
+    // Use the first supplier from items as main supplier
+    const mainSupplier = items[0]?.suppliers as any;
+
+    generateOrderPDF({
+      numero: order.numero,
+      created_at: order.created_at,
+      observacoes: order.observacoes,
+      total: order.total,
+      supplier: mainSupplier ? {
+        razao_social: mainSupplier.razao_social,
+        cnpj: mainSupplier.cnpj,
+        telefone: mainSupplier.telefone,
+        cidade: mainSupplier.cidade,
+      } : null,
+      items: items.map(i => ({
+        codigo: (i.products as any)?.codigo_interno,
+        descricao: (i.products as any)?.nome || "",
+        unidade: (i.products as any)?.unidade_medida || "",
+        quantidade: i.quantidade,
+        preco_unitario: i.preco_unitario,
+        subtotal: i.subtotal,
+      })),
+      comprador: buyerProfile?.full_name,
+      aprovador: aprovadorName,
+      approved_at: (order as any).approved_at,
+    });
+    toast.success("PDF gerado!");
   };
 
   const statusLabel = (s: string) => s === 'rascunho' ? 'Rascunho' : s === 'finalizado' ? 'Finalizado' : 'Enviado';
@@ -151,9 +202,10 @@ export default function OrderHistoryPage() {
                     <td className="py-3 px-4 text-right currency font-medium">{formatCurrency(o.total)}</td>
                     <td className="py-3 px-4 text-center"><Badge variant={statusVariant(o.status)}>{statusLabel(o.status)}</Badge></td>
                     <td className="py-3 px-4 text-right space-x-1">
-                      <Button variant="ghost" size="icon" onClick={() => viewOrder(o)}><Eye className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)}><Copy className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => exportCSV(o)}><Download className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => viewOrder(o)} title="Visualizar"><Eye className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => exportPDF(o)} title="PDF"><FileText className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)} title="Duplicar"><Copy className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => exportCSV(o)} title="CSV"><Download className="h-4 w-4" /></Button>
                     </td>
                   </tr>
                 ))}
