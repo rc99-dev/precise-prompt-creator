@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react";
+import CsvImportModal from "@/components/CsvImportModal";
+import { productsImportConfig } from "@/lib/csvConfigs";
 
 type Product = {
   id: string; nome: string; codigo_interno: string | null; categoria: string | null;
@@ -30,6 +32,7 @@ export default function ProductsPage() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyProduct);
   const [loading, setLoading] = useState(false);
+  const [csvOpen, setCsvOpen] = useState(false);
 
   const fetchProducts = async () => {
     let query = supabase.from('products').select('*').order('nome');
@@ -82,7 +85,12 @@ export default function ProductsPage() {
           <h1 className="text-2xl font-bold">Produtos</h1>
           <p className="text-muted-foreground text-sm mt-1">Cadastro de produtos</p>
         </div>
-        {isAdmin && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo Produto</Button>}
+        {isAdmin && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setCsvOpen(true)}><Upload className="h-4 w-4 mr-2" />Importar CSV</Button>
+            <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo Produto</Button>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3 flex-wrap">
@@ -192,6 +200,8 @@ export default function ProductsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <CsvImportModal config={productsImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={fetchProducts} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Search, Pencil, Trash2, TrendingDown } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, TrendingDown, Upload } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/helpers";
+import CsvImportModal from "@/components/CsvImportModal";
+import { createPricesImportConfig } from "@/lib/csvConfigs";
 
 type SupplierPrice = {
   id: string; supplier_id: string; product_id: string;
@@ -34,6 +36,7 @@ export default function PricesPage() {
   const [form, setForm] = useState({ supplier_id: "", product_id: "", preco_unitario: "", unidade_medida: "", quantidade_minima: "", prazo_entrega: "", observacoes: "" });
   const [loading, setLoading] = useState(false);
   const [minPrices, setMinPrices] = useState<Record<string, number>>({});
+  const [csvOpen, setCsvOpen] = useState(false);
 
   const fetchAll = async () => {
     const [{ data: pricesData }, { data: suppData }, { data: prodData }] = await Promise.all([
@@ -57,6 +60,12 @@ export default function PricesPage() {
   };
 
   useEffect(() => { fetchAll(); }, []);
+
+  const pricesImportConfig = useMemo(() => {
+    const productsMap = new Map(products.map(p => [p.nome.toLowerCase(), p.id]));
+    const suppliersMap = new Map(suppliers.map(s => [s.razao_social.toLowerCase(), s.id]));
+    return createPricesImportConfig(productsMap, suppliersMap);
+  }, [products, suppliers]);
 
   const filtered = prices.filter(p => {
     const matchSearch = (p.suppliers?.razao_social || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -114,7 +123,12 @@ export default function PricesPage() {
           <h1 className="text-2xl font-bold">Preços por Fornecedor</h1>
           <p className="text-muted-foreground text-sm mt-1">Gerencie os preços de cada fornecedor</p>
         </div>
-        {canEdit && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo Preço</Button>}
+        {canEdit && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setCsvOpen(true)}><Upload className="h-4 w-4 mr-2" />Importar CSV</Button>
+            <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo Preço</Button>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3 flex-wrap">
@@ -235,6 +249,8 @@ export default function PricesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <CsvImportModal config={pricesImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={fetchAll} />
     </div>
   );
 }
