@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react";
+import CsvImportModal from "@/components/CsvImportModal";
+import { suppliersImportConfig } from "@/lib/csvConfigs";
 
 type Supplier = {
   id: string; razao_social: string; nome_fantasia: string | null; cnpj: string | null;
@@ -33,6 +35,7 @@ export default function SuppliersPage() {
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState(emptySupplier);
   const [loading, setLoading] = useState(false);
+  const [csvOpen, setCsvOpen] = useState(false);
 
   const fetchSuppliers = async () => {
     let query = supabase.from('suppliers').select('*').order('razao_social');
@@ -94,7 +97,10 @@ export default function SuppliersPage() {
           <p className="text-muted-foreground text-sm mt-1">Gerencie seus fornecedores</p>
         </div>
         {isAdmin && (
-          <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo Fornecedor</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setCsvOpen(true)}><Upload className="h-4 w-4 mr-2" />Importar CSV</Button>
+            <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo Fornecedor</Button>
+          </div>
         )}
       </div>
 
@@ -214,6 +220,8 @@ export default function SuppliersPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <CsvImportModal config={suppliersImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={fetchSuppliers} />
     </div>
   );
 }
