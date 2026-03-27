@@ -3,11 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Trash2, TrendingDown, AlertTriangle, FileText } from "lucide-react";
 import { formatCurrency } from "@/lib/helpers";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useAuth } from "@/contexts/AuthContext";
+import StrategyCards, { useStrategyAnalysis } from "@/components/order/StrategyCards";
 
 type Product = { id: string; nome: string; unidade_medida: string; codigo_interno: string | null };
 type Supplier = { id: string; razao_social: string };
@@ -59,13 +59,11 @@ export default function ComparativePage() {
 
   const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
 
-  // Relevant suppliers = those with at least one price for any item
   const relevantSuppliers = useMemo(() => {
     const ids = new Set(prices.filter(p => items.some(i => i.product_id === p.product_id)).map(p => p.supplier_id));
     return suppliers.filter(s => ids.has(s.id));
   }, [suppliers, prices, items]);
 
-  // Totals
   const supplierTotals = useMemo(() => {
     const totals: Record<string, number> = {};
     relevantSuppliers.forEach(s => {
@@ -77,31 +75,11 @@ export default function ComparativePage() {
       totals[s.id] = total;
     });
     return totals;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [relevantSuppliers, items, prices]);
 
-  const bestPerItemTotal = useMemo(() => {
-    return items.reduce((sum, item) => {
-      const min = getMinPrice(item.product_id);
-      return sum + (min ? min * item.quantidade : 0);
-    }, 0);
-  }, [items, prices]);
-
-  const bestSingleSupplier = useMemo(() => {
-    if (relevantSuppliers.length === 0) return null;
-    // Best = covers most items, then lowest total
-    let best = { id: '', total: Infinity, coverage: 0 };
-    relevantSuppliers.forEach(s => {
-      let total = 0; let coverage = 0;
-      items.forEach(item => {
-        const price = getPrice(item.product_id, s.id);
-        if (price) { total += price * item.quantidade; coverage++; }
-      });
-      if (coverage > best.coverage || (coverage === best.coverage && total < best.total)) {
-        best = { id: s.id, total, coverage };
-      }
-    });
-    return best.id ? best : null;
-  }, [relevantSuppliers, items, prices]);
+  // Strategy analysis
+  const analysis = useStrategyAnalysis(items, prices, suppliers);
 
   const exportQuotPDF = async () => {
     if (items.length === 0) return;
@@ -109,8 +87,8 @@ export default function ComparativePage() {
     generateQuotationPDF({
       numero: `COT-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
       created_at: new Date().toISOString(),
-      estrategia: bestSingleSupplier ? "melhor_fornecedor" : "melhor_preco",
-      total: bestSingleSupplier ? bestSingleSupplier.total : bestPerItemTotal,
+      estrategia: analysis?.recommendedStrategy || "melhor_preco",
+      total: analysis?.bestPerItem.total || 0,
       items: items.map(item => ({
         product_name: item.product_name,
         unidade: item.unidade,
@@ -119,7 +97,7 @@ export default function ComparativePage() {
       })),
       suppliers: relevantSuppliers,
       supplierTotals,
-      bestSupplierId: bestSingleSupplier?.id,
+      bestSupplierId: analysis?.bestSingle?.supplierId,
       comprador: profile?.full_name,
     });
   };
@@ -129,7 +107,7 @@ export default function ComparativePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Comparativo de Cotação</h1>
-          <p className="text-muted-foreground text-sm mt-1">Compare preços entre fornecedores</p>
+          <p className="text-muted-foreground text-sm mt-1">Compare preços entre fornecedores e escolha a melhor estratégia</p>
         </div>
         {items.length > 0 && (
           <Button variant="outline" size="sm" onClick={exportQuotPDF}>
@@ -160,6 +138,10 @@ export default function ComparativePage() {
 
       {items.length > 0 && (
         <>
+          {/* Strategy cards */}
+          {analysis && <StrategyCards analysis={analysis} />}
+
+          {/* Comparative table */}
           <Card>
             <CardContent className="p-0 overflow-x-auto">
               <table className="w-full text-sm">
@@ -194,7 +176,7 @@ export default function ComparativePage() {
                           const price = getPrice(item.product_id, s.id);
                           const isMin = price !== undefined && price === minPrice;
                           return (
-                            <td key={s.id} className={`py-3 px-4 text-right currency ${isMin ? 'text-success font-bold' : 'text-muted-foreground'}`}>
+                            <td key={s.id} className={`py-3 px-4 text-right ${isMin ? 'text-success font-bold' : 'text-muted-foreground'}`}>
                               {price !== undefined ? (
                                 <span>{isMin && <TrendingDown className="h-3 w-3 inline mr-1" />}{formatCurrency(price)}</span>
                               ) : (
@@ -214,46 +196,21 @@ export default function ComparativePage() {
                   <tr className="border-t-2 font-bold">
                     <td className="py-3 px-4 sticky left-0 bg-card">Total por fornecedor</td>
                     <td></td>
-                    {relevantSuppliers.map(s => (
-                      <td key={s.id} className="py-3 px-4 text-right currency">
-                        {formatCurrency(supplierTotals[s.id] || 0)}
-                      </td>
-                    ))}
+                    {relevantSuppliers.map(s => {
+                      const isLowest = analysis?.bestSingle?.supplierId === s.id;
+                      return (
+                        <td key={s.id} className={`py-3 px-4 text-right ${isLowest ? 'text-success' : ''}`}>
+                          {formatCurrency(supplierTotals[s.id] || 0)}
+                          {isLowest && <TrendingDown className="h-3 w-3 inline ml-1" />}
+                        </td>
+                      );
+                    })}
                     <td></td>
                   </tr>
                 </tfoot>
               </table>
             </CardContent>
           </Card>
-
-          {/* Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Melhor Preço por Item</CardTitle></CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold currency">{formatCurrency(bestPerItemTotal)}</p>
-                <p className="text-xs text-muted-foreground mt-1">Pode dividir entre vários fornecedores</p>
-              </CardContent>
-            </Card>
-            {bestSingleSupplier && (
-              <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Melhor Fornecedor Único</CardTitle></CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold currency">{formatCurrency(bestSingleSupplier.total)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{suppliers.find(s => s.id === bestSingleSupplier.id)?.razao_social} ({bestSingleSupplier.coverage}/{items.length} itens)</p>
-                </CardContent>
-              </Card>
-            )}
-            {bestSingleSupplier && bestSingleSupplier.total > bestPerItemTotal && (
-              <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Diferença</CardTitle></CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold currency text-warning">{formatCurrency(bestSingleSupplier.total - bestPerItemTotal)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Economia ao dividir entre fornecedores</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
         </>
       )}
     </div>
