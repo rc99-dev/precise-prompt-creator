@@ -4,8 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Trash2, TrendingDown, AlertTriangle } from "lucide-react";
+import { Search, Plus, Trash2, TrendingDown, AlertTriangle, FileText } from "lucide-react";
 import { formatCurrency } from "@/lib/helpers";
+import { generateQuotationPDF } from "@/lib/pdfGenerator";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Product = { id: string; nome: string; unidade_medida: string; codigo_interno: string | null };
 type Supplier = { id: string; razao_social: string };
@@ -13,6 +15,7 @@ type PriceEntry = { supplier_id: string; product_id: string; preco_unitario: num
 type CompItem = { product_id: string; product_name: string; unidade: string; quantidade: number };
 
 export default function ComparativePage() {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [prices, setPrices] = useState<PriceEntry[]>([]);
@@ -100,11 +103,39 @@ export default function ComparativePage() {
     return best.id ? best : null;
   }, [relevantSuppliers, items, prices]);
 
+  const exportQuotPDF = async () => {
+    if (items.length === 0) return;
+    const { data: profile } = await supabase.from('profiles').select('full_name').eq('user_id', user!.id).single();
+    generateQuotationPDF({
+      numero: `COT-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+      created_at: new Date().toISOString(),
+      estrategia: bestSingleSupplier ? "melhor_fornecedor" : "melhor_preco",
+      total: bestSingleSupplier ? bestSingleSupplier.total : bestPerItemTotal,
+      items: items.map(item => ({
+        product_name: item.product_name,
+        unidade: item.unidade,
+        quantidade: item.quantidade,
+        prices: Object.fromEntries(relevantSuppliers.map(s => [s.id, getPrice(item.product_id, s.id) ?? null])),
+      })),
+      suppliers: relevantSuppliers,
+      supplierTotals,
+      bestSupplierId: bestSingleSupplier?.id,
+      comprador: profile?.full_name,
+    });
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Comparativo de Cotação</h1>
-        <p className="text-muted-foreground text-sm mt-1">Compare preços entre fornecedores</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Comparativo de Cotação</h1>
+          <p className="text-muted-foreground text-sm mt-1">Compare preços entre fornecedores</p>
+        </div>
+        {items.length > 0 && (
+          <Button variant="outline" size="sm" onClick={exportQuotPDF}>
+            <FileText className="h-4 w-4 mr-1.5" />Exportar PDF
+          </Button>
+        )}
       </div>
 
       <Card>
