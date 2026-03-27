@@ -38,7 +38,7 @@ export const suppliersImportConfig: CsvImportConfig = {
         if (error) errors.push(`Linha CNPJ ${cnpj}: ${error.message}`);
         else success++;
       } else {
-        const { error } = await supabase.from('suppliers').insert(row as Record<string, unknown>);
+        const { error } = await supabase.from('suppliers').insert(row as any);
         if (error) errors.push(`Linha CNPJ ${cnpj}: ${error.message}`);
         else success++;
       }
@@ -74,7 +74,7 @@ export const productsImportConfig: CsvImportConfig = {
         if (error) errors.push(`"${nome}": ${error.message}`);
         else success++;
       } else {
-        const { error } = await supabase.from('products').insert(row as Record<string, unknown>);
+        const { error } = await supabase.from('products').insert(row as any);
         if (error) errors.push(`"${nome}": ${error.message}`);
         else success++;
       }
@@ -121,7 +121,7 @@ export function createPricesImportConfig(
           if (error) errors.push(`Preço: ${error.message}`);
           else success++;
         } else {
-          const { error } = await supabase.from('supplier_prices').insert(row as Record<string, unknown>);
+          const { error } = await supabase.from('supplier_prices').insert(row as any);
           if (error) errors.push(`Preço: ${error.message}`);
           else success++;
         }
