@@ -36,7 +36,7 @@ export default function NewOrderPage() {
       const [{ data: p }, { data: s }, { data: pr }] = await Promise.all([
         supabase.from('products').select('id, nome, codigo_interno, unidade_medida').eq('status', 'ativo').order('nome'),
         supabase.from('suppliers').select('id, razao_social').eq('status', 'ativo').order('razao_social'),
-        supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario'),
+        supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario').limit(5000),
       ]);
       setProducts(p || []);
       setSuppliers(s || []);

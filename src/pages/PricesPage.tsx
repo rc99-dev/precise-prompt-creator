@@ -40,7 +40,7 @@ export default function PricesPage() {
 
   const fetchAll = async () => {
     const [{ data: pricesData }, { data: suppData }, { data: prodData }] = await Promise.all([
-      supabase.from('supplier_prices').select('*, suppliers(razao_social), products(nome, categoria)').order('updated_at', { ascending: false }),
+      supabase.from('supplier_prices').select('*, suppliers(razao_social), products(nome, categoria)').order('updated_at', { ascending: false }).limit(5000),
       supabase.from('suppliers').select('id, razao_social').eq('status', 'ativo').order('razao_social'),
       supabase.from('products').select('id, nome').eq('status', 'ativo').order('nome'),
     ]);
