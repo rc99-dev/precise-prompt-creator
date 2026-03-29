@@ -1,18 +1,21 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CsvImportModal from "@/components/CsvImportModal";
 import { suppliersImportConfig } from "@/lib/csvConfigs";
+import TableSkeleton from "@/components/TableSkeleton";
+import QueryError from "@/components/QueryError";
 
 type Supplier = {
   id: string; razao_social: string; nome_fantasia: string | null; cnpj: string | null;
@@ -28,7 +31,7 @@ const emptySupplier = {
 export default function SuppliersPage() {
   const { role } = useAuth();
   const isAdmin = role === 'master';
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -37,14 +40,19 @@ export default function SuppliersPage() {
   const [loading, setLoading] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
 
-  const fetchSuppliers = async () => {
-    let query = supabase.from('suppliers').select('*').order('razao_social');
-    if (statusFilter !== 'todos') query = query.eq('status', statusFilter);
-    const { data } = await query;
-    setSuppliers(data || []);
-  };
+  const { data: suppliers = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['suppliers', statusFilter],
+    queryFn: async () => {
+      let query = supabase.from('suppliers').select('*').order('razao_social');
+      if (statusFilter !== 'todos') query = query.eq('status', statusFilter);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as Supplier[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => { fetchSuppliers(); }, [statusFilter]);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['suppliers'] });
 
   const filtered = suppliers.filter(s =>
     s.razao_social.toLowerCase().includes(search.toLowerCase()) ||
@@ -70,23 +78,18 @@ export default function SuppliersPage() {
     setLoading(true);
     if (editing) {
       const { error } = await supabase.from('suppliers').update(form).eq('id', editing.id);
-      if (error) toast.error(error.message);
-      else toast.success("Fornecedor atualizado!");
+      if (error) toast.error(error.message); else toast.success("Fornecedor atualizado!");
     } else {
       const { error } = await supabase.from('suppliers').insert(form);
-      if (error) toast.error(error.message);
-      else toast.success("Fornecedor cadastrado!");
+      if (error) toast.error(error.message); else toast.success("Fornecedor cadastrado!");
     }
-    setLoading(false);
-    setDialogOpen(false);
-    fetchSuppliers();
+    setLoading(false); setDialogOpen(false); invalidate();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Deseja excluir este fornecedor?")) return;
     const { error } = await supabase.from('suppliers').delete().eq('id', id);
-    if (error) toast.error(error.message);
-    else { toast.success("Fornecedor excluído!"); fetchSuppliers(); }
+    if (error) toast.error(error.message); else { toast.success("Fornecedor excluído!"); invalidate(); }
   };
 
   return (
@@ -121,79 +124,60 @@ export default function SuppliersPage() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Razão Social</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Nome Fantasia</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">CNPJ</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Contato</th>
-                  <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
-                  {isAdmin && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum fornecedor encontrado.</td></tr>
-                ) : filtered.map(s => (
-                  <tr key={s.id} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="py-3 px-4 font-medium">{s.razao_social}</td>
-                    <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{s.nome_fantasia || '—'}</td>
-                    <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{s.cnpj || '—'}</td>
-                    <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{s.contato_principal || '—'}</td>
-                    <td className="py-3 px-4 text-center">
-                      <Badge variant={s.status === 'ativo' ? 'default' : 'secondary'}>{s.status === 'ativo' ? 'Ativo' : 'Inativo'}</Badge>
-                    </td>
-                    {isAdmin && (
-                      <td className="py-3 px-4 text-right space-x-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                      </td>
-                    )}
+          {isLoading ? <TableSkeleton columns={6} rows={10} /> : isError ? (
+            <QueryError onRetry={() => refetch()} />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Razão Social</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Nome Fantasia</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">CNPJ</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Contato</th>
+                    <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
+                    {isAdmin && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum fornecedor encontrado.</td></tr>
+                  ) : filtered.map(s => (
+                    <tr key={s.id} className="border-b last:border-0 hover:bg-muted/50">
+                      <td className="py-3 px-4 font-medium">{s.razao_social}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{s.nome_fantasia || '—'}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{s.cnpj || '—'}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{s.contato_principal || '—'}</td>
+                      <td className="py-3 px-4 text-center">
+                        <Badge variant={s.status === 'ativo' ? 'default' : 'secondary'}>{s.status === 'ativo' ? 'Ativo' : 'Inativo'}</Badge>
+                      </td>
+                      {isAdmin && (
+                        <td className="py-3 px-4 text-right space-x-1">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editing ? "Editar Fornecedor" : "Novo Fornecedor"}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? "Editar Fornecedor" : "Novo Fornecedor"}</DialogTitle></DialogHeader>
           <form onSubmit={handleSave} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Razão Social *</Label>
-                <Input value={form.razao_social} onChange={e => setForm({...form, razao_social: e.target.value})} required />
-              </div>
-              <div className="space-y-2">
-                <Label>Nome Fantasia</Label>
-                <Input value={form.nome_fantasia} onChange={e => setForm({...form, nome_fantasia: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label>CNPJ</Label>
-                <Input value={form.cnpj} onChange={e => setForm({...form, cnpj: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label>Contato Principal</Label>
-                <Input value={form.contato_principal} onChange={e => setForm({...form, contato_principal: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label>Telefone</Label>
-                <Input value={form.telefone} onChange={e => setForm({...form, telefone: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label>WhatsApp</Label>
-                <Input value={form.whatsapp} onChange={e => setForm({...form, whatsapp: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label>E-mail</Label>
-                <Input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
-              </div>
+              <div className="space-y-2"><Label>Razão Social *</Label><Input value={form.razao_social} onChange={e => setForm({...form, razao_social: e.target.value})} required /></div>
+              <div className="space-y-2"><Label>Nome Fantasia</Label><Input value={form.nome_fantasia} onChange={e => setForm({...form, nome_fantasia: e.target.value})} /></div>
+              <div className="space-y-2"><Label>CNPJ</Label><Input value={form.cnpj} onChange={e => setForm({...form, cnpj: e.target.value})} /></div>
+              <div className="space-y-2"><Label>Contato Principal</Label><Input value={form.contato_principal} onChange={e => setForm({...form, contato_principal: e.target.value})} /></div>
+              <div className="space-y-2"><Label>Telefone</Label><Input value={form.telefone} onChange={e => setForm({...form, telefone: e.target.value})} /></div>
+              <div className="space-y-2"><Label>WhatsApp</Label><Input value={form.whatsapp} onChange={e => setForm({...form, whatsapp: e.target.value})} /></div>
+              <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
               <div className="space-y-2">
                 <Label>Status</Label>
                 <Select value={form.status} onValueChange={v => setForm({...form, status: v})}>
@@ -205,14 +189,8 @@ export default function SuppliersPage() {
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Endereço</Label>
-              <Input value={form.endereco} onChange={e => setForm({...form, endereco: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <Label>Observações</Label>
-              <Textarea value={form.observacoes} onChange={e => setForm({...form, observacoes: e.target.value})} />
-            </div>
+            <div className="space-y-2"><Label>Endereço</Label><Input value={form.endereco} onChange={e => setForm({...form, endereco: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Observações</Label><Textarea value={form.observacoes} onChange={e => setForm({...form, observacoes: e.target.value})} /></div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={loading}>{loading ? "Salvando..." : "Salvar"}</Button>
@@ -221,7 +199,7 @@ export default function SuppliersPage() {
         </DialogContent>
       </Dialog>
 
-      <CsvImportModal config={suppliersImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={fetchSuppliers} />
+      <CsvImportModal config={suppliersImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={invalidate} />
     </div>
   );
 }
