@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CsvImportModal from "@/components/CsvImportModal";
 import { productsImportConfig } from "@/lib/csvConfigs";
+import TableSkeleton from "@/components/TableSkeleton";
+import QueryError from "@/components/QueryError";
 
 type Product = {
   id: string; nome: string; codigo_interno: string | null; categoria: string | null;
@@ -25,7 +28,7 @@ const emptyProduct = { nome: "", codigo_interno: "", categoria: "", unidade_medi
 export default function ProductsPage() {
   const { role } = useAuth();
   const isAdmin = role === 'master';
-  const [products, setProducts] = useState<Product[]>([]);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -34,14 +37,19 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
 
-  const fetchProducts = async () => {
-    let query = supabase.from('products').select('*').order('nome');
-    if (statusFilter !== 'todos') query = query.eq('status', statusFilter);
-    const { data } = await query;
-    setProducts(data || []);
-  };
+  const { data: products = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['products', statusFilter],
+    queryFn: async () => {
+      let query = supabase.from('products').select('*').order('nome');
+      if (statusFilter !== 'todos') query = query.eq('status', statusFilter);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as Product[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => { fetchProducts(); }, [statusFilter]);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['products'] });
 
   const filtered = products.filter(p =>
     p.nome.toLowerCase().includes(search.toLowerCase()) ||
@@ -69,13 +77,13 @@ export default function ProductsPage() {
       const { error } = await supabase.from('products').insert(form);
       if (error) toast.error(error.message); else toast.success("Produto cadastrado!");
     }
-    setLoading(false); setDialogOpen(false); fetchProducts();
+    setLoading(false); setDialogOpen(false); invalidate();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Deseja excluir este produto?")) return;
     const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) toast.error(error.message); else { toast.success("Produto excluído!"); fetchProducts(); }
+    if (error) toast.error(error.message); else { toast.success("Produto excluído!"); invalidate(); }
   };
 
   return (
@@ -110,41 +118,45 @@ export default function ProductsPage() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Nome</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Código</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Categoria</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Unidade</th>
-                  <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
-                  {isAdmin && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum produto encontrado.</td></tr>
-                ) : filtered.map(p => (
-                  <tr key={p.id} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="py-3 px-4 font-medium">{p.nome}</td>
-                    <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{p.codigo_interno || '—'}</td>
-                    <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{p.categoria || '—'}</td>
-                    <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{p.unidade_medida}</td>
-                    <td className="py-3 px-4 text-center">
-                      <Badge variant={p.status === 'ativo' ? 'default' : 'secondary'}>{p.status === 'ativo' ? 'Ativo' : 'Inativo'}</Badge>
-                    </td>
-                    {isAdmin && (
-                      <td className="py-3 px-4 text-right space-x-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                      </td>
-                    )}
+          {isLoading ? <TableSkeleton columns={6} rows={10} /> : isError ? (
+            <QueryError onRetry={() => refetch()} />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Nome</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Código</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Categoria</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Unidade</th>
+                    <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
+                    {isAdmin && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum produto encontrado.</td></tr>
+                  ) : filtered.map(p => (
+                    <tr key={p.id} className="border-b last:border-0 hover:bg-muted/50">
+                      <td className="py-3 px-4 font-medium">{p.nome}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{p.codigo_interno || '—'}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{p.categoria || '—'}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{p.unidade_medida}</td>
+                      <td className="py-3 px-4 text-center">
+                        <Badge variant={p.status === 'ativo' ? 'default' : 'secondary'}>{p.status === 'ativo' ? 'Ativo' : 'Inativo'}</Badge>
+                      </td>
+                      {isAdmin && (
+                        <td className="py-3 px-4 text-right space-x-1">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -201,7 +213,7 @@ export default function ProductsPage() {
         </DialogContent>
       </Dialog>
 
-      <CsvImportModal config={productsImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={fetchProducts} />
+      <CsvImportModal config={productsImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={invalidate} />
     </div>
   );
 }

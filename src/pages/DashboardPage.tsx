@@ -1,50 +1,56 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Package, ShoppingCart, Plus, TrendingDown, Clock, CheckCircle, Truck, ClipboardList, AlertTriangle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Building2, Package, ShoppingCart, Plus, TrendingDown, Clock, ClipboardList } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatCurrency, formatDate, statusLabels, statusColors } from "@/lib/helpers";
+import { useQuery } from "@tanstack/react-query";
+import QueryError from "@/components/QueryError";
 
 export default function DashboardPage() {
-  const { role, user } = useAuth();
-  const [stats, setStats] = useState({ suppliers: 0, products: 0, pendingReqs: 0, pendingApprovals: 0, monthOrders: 0, monthTotal: 0 });
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const { role } = useAuth();
 
-  useEffect(() => {
-    const fetchStats = async () => {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: async () => {
       const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
-      const [
-        { count: sc }, { count: pc },
-        { count: pendReqs }, { count: pendApprovals },
-        { data: orders },
-      ] = await Promise.all([
+      const [{ count: sc }, { count: pc }, { count: pendReqs }, { count: pendApprovals }, { data: orders }] = await Promise.all([
         supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
         supabase.from('products').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
         supabase.from('requisitions').select('*', { count: 'exact', head: true }).eq('status', 'pendente'),
         supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'aguardando_aprovacao'),
         supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }).limit(10),
       ]);
-
       const monthOrders = (orders || []).filter(o => new Date(o.created_at) >= startOfMonth);
       const monthTotal = monthOrders.reduce((s: number, o: any) => s + (o.total || 0), 0);
+      return {
+        stats: { suppliers: sc || 0, products: pc || 0, pendingReqs: pendReqs || 0, pendingApprovals: pendApprovals || 0, monthOrders: monthOrders.length, monthTotal },
+        recentOrders: orders || [],
+      };
+    },
+    staleTime: 2 * 60 * 1000,
+  });
 
-      setStats({
-        suppliers: sc || 0, products: pc || 0,
-        pendingReqs: pendReqs || 0, pendingApprovals: pendApprovals || 0,
-        monthOrders: monthOrders.length, monthTotal,
-      });
-      setRecentOrders(orders || []);
-    };
-    fetchStats();
-  }, []);
+  const stats = data?.stats || { suppliers: 0, products: 0, pendingReqs: 0, pendingApprovals: 0, monthOrders: 0, monthTotal: 0 };
+  const recentOrders = data?.recentOrders || [];
 
   const statusBadge = (status: string) => (
-    <Badge className={statusColors[status] || 'bg-muted text-muted-foreground'}>
-      {statusLabels[status] || status}
-    </Badge>
+    <Badge className={statusColors[status] || 'bg-muted text-muted-foreground'}>{statusLabels[status] || status}</Badge>
+  );
+
+  const StatCard = ({ title, icon: Icon, value, className }: { title: string; icon: any; value: React.ReactNode; className?: string }) => (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        {isLoading ? <Skeleton className="h-9 w-24" /> : <div className={`text-3xl font-bold ${className || ''}`}>{value}</div>}
+      </CardContent>
+    </Card>
   );
 
   return (
@@ -53,20 +59,17 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {role === 'aprovador' ? 'Fila de aprovações' :
-             role === 'estoquista' ? 'Entregas e recebimentos' :
-             'Visão geral do sistema'}
+            {role === 'aprovador' ? 'Fila de aprovações' : role === 'estoquista' ? 'Entregas e recebimentos' : 'Visão geral do sistema'}
           </p>
         </div>
         {(role === 'comprador' || role === 'master') && (
-          <Link to="/nova-ordem">
-            <Button><Plus className="h-4 w-4 mr-2" />Nova Ordem</Button>
-          </Link>
+          <Link to="/nova-ordem"><Button><Plus className="h-4 w-4 mr-2" />Nova Ordem</Button></Link>
         )}
       </div>
 
-      {/* Alert banners */}
-      {(role === 'comprador' || role === 'master') && stats.pendingReqs > 0 && (
+      {isError && <QueryError onRetry={() => refetch()} />}
+
+      {!isLoading && (role === 'comprador' || role === 'master') && stats.pendingReqs > 0 && (
         <Card className="border-warning/30 bg-warning/5">
           <CardContent className="flex items-center gap-3 py-3">
             <ClipboardList className="h-5 w-5 text-warning" />
@@ -79,7 +82,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {(role === 'aprovador' || role === 'master') && stats.pendingApprovals > 0 && (
+      {!isLoading && (role === 'aprovador' || role === 'master') && stats.pendingApprovals > 0 && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="flex items-center gap-3 py-3">
             <Clock className="h-5 w-5 text-primary" />
@@ -91,61 +94,35 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {(role === 'comprador' || role === 'master') && (
           <>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Pedidos do Mês</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent><div className="text-3xl font-bold">{stats.monthOrders}</div></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total do Mês</CardTitle>
-                <TrendingDown className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent><div className="text-3xl font-bold currency">{formatCurrency(stats.monthTotal)}</div></CardContent>
-            </Card>
+            <StatCard title="Pedidos do Mês" icon={ShoppingCart} value={stats.monthOrders} />
+            <StatCard title="Total do Mês" icon={TrendingDown} value={formatCurrency(stats.monthTotal)} className="currency" />
           </>
         )}
-        {(role === 'master') && (
+        {role === 'master' && (
           <>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Fornecedores</CardTitle>
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent><div className="text-3xl font-bold">{stats.suppliers}</div></CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Produtos</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent><div className="text-3xl font-bold">{stats.products}</div></CardContent>
-            </Card>
+            <StatCard title="Fornecedores" icon={Building2} value={stats.suppliers} />
+            <StatCard title="Produtos" icon={Package} value={stats.products} />
           </>
         )}
         {role === 'aprovador' && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Aguardando Aprovação</CardTitle>
-              <Clock className="h-4 w-4 text-warning" />
-            </CardHeader>
-            <CardContent><div className="text-3xl font-bold text-warning">{stats.pendingApprovals}</div></CardContent>
-          </Card>
+          <StatCard title="Aguardando Aprovação" icon={Clock} value={stats.pendingApprovals} className="text-warning" />
         )}
       </div>
 
-      {/* Recent orders */}
       {role !== 'solicitante' && (
         <Card>
           <CardHeader><CardTitle className="text-lg">Últimos Pedidos</CardTitle></CardHeader>
           <CardContent>
-            {recentOrders.length === 0 ? (
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex gap-4"><Skeleton className="h-5 flex-1" /><Skeleton className="h-5 w-20" /><Skeleton className="h-5 w-24" /><Skeleton className="h-5 w-20" /></div>
+                ))}
+              </div>
+            ) : recentOrders.length === 0 ? (
               <p className="text-muted-foreground text-sm text-center py-8">Nenhuma ordem de compra ainda.</p>
             ) : (
               <div className="overflow-x-auto">

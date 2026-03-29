@@ -6,10 +6,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/helpers";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import OrderProductSearch from "@/components/order/OrderProductSearch";
 import OrderItemRow from "@/components/order/OrderItemRow";
 import OrderStickyFooter from "@/components/order/OrderStickyFooter";
 import StrategyCards, { useStrategyAnalysis } from "@/components/order/StrategyCards";
+import TableSkeleton from "@/components/TableSkeleton";
+import QueryError from "@/components/QueryError";
 
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
@@ -20,30 +23,33 @@ type OrderItem = {
   subtotal: number; observacoes: string;
 };
 
+const fetchOrderData = async () => {
+  const [{ data: p, error: e1 }, { data: s, error: e2 }, { data: pr, error: e3 }] = await Promise.all([
+    supabase.from('products').select('id, nome, codigo_interno, unidade_medida').eq('status', 'ativo').order('nome'),
+    supabase.from('suppliers').select('id, razao_social').eq('status', 'ativo').order('razao_social'),
+    supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario'),
+  ]);
+  if (e1 || e2 || e3) throw new Error("Erro ao carregar dados");
+  return { products: (p || []) as Product[], suppliers: (s || []) as Supplier[], prices: (pr || []) as PriceEntry[] };
+};
+
 export default function NewOrderPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [allPrices, setAllPrices] = useState<PriceEntry[]>([]);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [activeStrategy, setActiveStrategy] = useState<"melhor_preco" | "melhor_fornecedor" | null>(null);
   const [observacoes, setObservacoes] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const [{ data: p }, { data: s }, { data: pr }] = await Promise.all([
-        supabase.from('products').select('id, nome, codigo_interno, unidade_medida').eq('status', 'ativo').order('nome'),
-        supabase.from('suppliers').select('id, razao_social').eq('status', 'ativo').order('razao_social'),
-        supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario').limit(5000),
-      ]);
-      setProducts(p || []);
-      setSuppliers(s || []);
-      setAllPrices(pr || []);
-    };
-    fetchData();
-  }, []);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['order-base-data'],
+    queryFn: fetchOrderData,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const products = data?.products || [];
+  const suppliers = data?.suppliers || [];
+  const allPrices = data?.prices || [];
 
   const pricesByProduct = useMemo(() => {
     const map: Record<string, { supplier_id: string; preco: number }[]> = {};
@@ -85,7 +91,6 @@ export default function NewOrderPage() {
       updated.subtotal = updated.quantidade * updated.preco_unitario;
       return updated;
     }));
-    // Clear active strategy when user manually edits
     setActiveStrategy(null);
   }, [getSupplierPrice]);
 
@@ -93,13 +98,10 @@ export default function NewOrderPage() {
     setItems(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  // Strategy analysis
   const analysis = useStrategyAnalysis(items, allPrices, suppliers);
 
-  // Apply strategy
   const applyStrategy = useCallback((strategy: "melhor_preco" | "melhor_fornecedor") => {
     setActiveStrategy(strategy);
-
     if (strategy === "melhor_preco") {
       setItems(prev => prev.map(item => {
         const min = getMinPrice(item.product_id);
@@ -131,23 +133,18 @@ export default function NewOrderPage() {
     setSaving(true);
     const { data: numData } = await supabase.rpc('generate_order_number');
     const numero = numData || `PED-${Date.now()}`;
-
     const modo = activeStrategy || 'manual';
     const { data: order, error: orderError } = await supabase.from('purchase_orders').insert({
       numero, user_id: user!.id, modo, status, observacoes, total,
     }).select().single();
-
     if (orderError) { toast.error(orderError.message); setSaving(false); return; }
-
     const orderItems = items.map(i => ({
       order_id: order.id, product_id: i.product_id, supplier_id: i.supplier_id || null,
       quantidade: i.quantidade, preco_unitario: i.preco_unitario, subtotal: i.subtotal,
       observacoes: i.observacoes || null,
     }));
-
     const { error: itemsError } = await supabase.from('purchase_order_items').insert(orderItems);
     if (itemsError) { toast.error(itemsError.message); setSaving(false); return; }
-
     toast.success(status === 'rascunho' ? "Rascunho salvo!" : "Enviado para aprovação!");
     setSaving(false);
     navigate('/historico');
@@ -165,27 +162,21 @@ export default function NewOrderPage() {
         <p className="text-muted-foreground text-sm mt-1">Monte seu pedido e escolha a melhor estratégia de compra</p>
       </div>
 
-      {/* Product search */}
+      {isError && <QueryError onRetry={() => refetch()} />}
+
       <Card>
-        <CardHeader className="py-3 px-4">
-          <CardTitle className="text-base">Adicionar Produtos</CardTitle>
-        </CardHeader>
+        <CardHeader className="py-3 px-4"><CardTitle className="text-base">Adicionar Produtos</CardTitle></CardHeader>
         <CardContent className="px-4 pb-4 pt-0">
-          <OrderProductSearch products={products} excludeIds={excludeIds} onAdd={addProduct} />
+          {isLoading ? <TableSkeleton columns={2} rows={3} /> : (
+            <OrderProductSearch products={products} excludeIds={excludeIds} onAdd={addProduct} />
+          )}
         </CardContent>
       </Card>
 
-      {/* Strategy cards — visible when items exist */}
       {items.length > 0 && analysis && (
-        <StrategyCards
-          analysis={analysis}
-          selectedStrategy={activeStrategy}
-          onSelect={applyStrategy}
-          showSelectButton
-        />
+        <StrategyCards analysis={analysis} selectedStrategy={activeStrategy} onSelect={applyStrategy} showSelectButton />
       )}
 
-      {/* Items table */}
       {items.length > 0 && (
         <Card>
           <CardContent className="p-0">
@@ -205,15 +196,10 @@ export default function NewOrderPage() {
                   {items.map((item, idx) => {
                     const min = getMinPrice(item.product_id);
                     return (
-                      <OrderItemRow
-                        key={item.product_id}
-                        item={item}
-                        index={idx}
+                      <OrderItemRow key={item.product_id} item={item} index={idx}
                         isMinPrice={!!min && item.preco_unitario === min.preco}
                         availableSuppliers={getAvailableSuppliers(item.product_id)}
-                        onUpdate={updateItem}
-                        onRemove={removeItem}
-                      />
+                        onUpdate={updateItem} onRemove={removeItem} />
                     );
                   })}
                 </tbody>
@@ -223,7 +209,6 @@ export default function NewOrderPage() {
         </Card>
       )}
 
-      {/* Observations */}
       <Card>
         <CardHeader className="py-3 px-4"><CardTitle className="text-base">Observações Gerais</CardTitle></CardHeader>
         <CardContent className="px-4 pb-4 pt-0">
@@ -231,15 +216,8 @@ export default function NewOrderPage() {
         </CardContent>
       </Card>
 
-      {/* Sticky footer */}
-      <OrderStickyFooter
-        total={total}
-        economy={economy}
-        itemCount={items.length}
-        saving={saving}
-        onSaveDraft={() => handleSave('rascunho')}
-        onSubmit={() => handleSave('aguardando_aprovacao')}
-      />
+      <OrderStickyFooter total={total} economy={economy} itemCount={items.length} saving={saving}
+        onSaveDraft={() => handleSave('rascunho')} onSubmit={() => handleSave('aguardando_aprovacao')} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,8 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Users, Plus, Pencil, Search } from "lucide-react";
+import { Users, Pencil, Search } from "lucide-react";
 import { roleLabels, AppRole } from "@/lib/helpers";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import TableSkeleton from "@/components/TableSkeleton";
+import QueryError from "@/components/QueryError";
 
 type UserProfile = {
   id: string; user_id: string; full_name: string; email: string | null;
@@ -19,23 +22,26 @@ type UserProfile = {
 };
 
 export default function UsersPage() {
-  const { user } = useAuth();
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [editDialog, setEditDialog] = useState<UserProfile | null>(null);
   const [editRole, setEditRole] = useState<AppRole>('solicitante');
   const [editSetor, setEditSetor] = useState("");
 
-  const fetchUsers = async () => {
-    const { data: profiles } = await supabase.from('profiles').select('*').order('full_name');
-    const { data: roles } = await supabase.from('user_roles').select('user_id, role');
-    const roleMap: Record<string, AppRole> = {};
-    (roles || []).forEach((r: any) => { roleMap[r.user_id] = r.role; });
-    const enriched = (profiles || []).map((p: any) => ({ ...p, role: roleMap[p.user_id] || 'solicitante' }));
-    setUsers(enriched);
-  };
-
-  useEffect(() => { fetchUsers(); }, []);
+  const { data: users = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['users-list'],
+    queryFn: async () => {
+      const [{ data: profiles, error: e1 }, { data: roles, error: e2 }] = await Promise.all([
+        supabase.from('profiles').select('*').order('full_name'),
+        supabase.from('user_roles').select('user_id, role'),
+      ]);
+      if (e1 || e2) throw new Error("Erro ao carregar usuários");
+      const roleMap: Record<string, AppRole> = {};
+      (roles || []).forEach((r: any) => { roleMap[r.user_id] = r.role; });
+      return (profiles || []).map((p: any) => ({ ...p, role: roleMap[p.user_id] || 'solicitante' })) as UserProfile[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   const filtered = users.filter(u =>
     u.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -50,13 +56,11 @@ export default function UsersPage() {
 
   const handleSave = async () => {
     if (!editDialog) return;
-    // Update role
     await supabase.from('user_roles').update({ role: editRole } as any).eq('user_id', editDialog.user_id);
-    // Update profile
     await supabase.from('profiles').update({ unidade_setor: editSetor || null } as any).eq('user_id', editDialog.user_id);
     toast.success("Usuário atualizado!");
     setEditDialog(null);
-    fetchUsers();
+    queryClient.invalidateQueries({ queryKey: ['users-list'] });
   };
 
   return (
@@ -73,7 +77,9 @@ export default function UsersPage() {
 
       <Card>
         <CardContent className="p-0">
-          {filtered.length === 0 ? (
+          {isLoading ? <TableSkeleton columns={5} rows={6} /> : isError ? (
+            <QueryError onRetry={() => refetch()} />
+          ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <Users className="h-12 w-12 mb-3 opacity-50" />
               <p className="text-sm">Nenhum usuário encontrado</p>
@@ -100,9 +106,7 @@ export default function UsersPage() {
                         <Badge variant="outline">{roleLabels[u.role || 'solicitante']}</Badge>
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(u)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(u)}><Pencil className="h-4 w-4" /></Button>
                       </td>
                     </tr>
                   ))}
@@ -117,10 +121,7 @@ export default function UsersPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>Editar Usuário</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nome</Label>
-              <Input value={editDialog?.full_name || ''} disabled />
-            </div>
+            <div className="space-y-2"><Label>Nome</Label><Input value={editDialog?.full_name || ''} disabled /></div>
             <div className="space-y-2">
               <Label>Perfil de Acesso</Label>
               <Select value={editRole} onValueChange={v => setEditRole(v as AppRole)}>

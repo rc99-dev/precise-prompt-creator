@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,32 +7,40 @@ import { Search, Plus, Trash2, TrendingDown, AlertTriangle, FileText } from "luc
 import { formatCurrency } from "@/lib/helpers";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 import StrategyCards, { useStrategyAnalysis } from "@/components/order/StrategyCards";
+import TableSkeleton from "@/components/TableSkeleton";
+import QueryError from "@/components/QueryError";
 
 type Product = { id: string; nome: string; unidade_medida: string; codigo_interno: string | null };
 type Supplier = { id: string; razao_social: string };
 type PriceEntry = { supplier_id: string; product_id: string; preco_unitario: number };
 type CompItem = { product_id: string; product_name: string; unidade: string; quantidade: number };
 
+const fetchCompData = async () => {
+  const [{ data: p, error: e1 }, { data: s, error: e2 }, { data: pr, error: e3 }] = await Promise.all([
+    supabase.from('products').select('id, nome, unidade_medida, codigo_interno').eq('status', 'ativo').order('nome'),
+    supabase.from('suppliers').select('id, razao_social').eq('status', 'ativo').order('razao_social'),
+    supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario'),
+  ]);
+  if (e1 || e2 || e3) throw new Error("Erro ao carregar dados");
+  return { products: (p || []) as Product[], suppliers: (s || []) as Supplier[], prices: (pr || []) as PriceEntry[] };
+};
+
 export default function ComparativePage() {
   const { user } = useAuth();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [prices, setPrices] = useState<PriceEntry[]>([]);
   const [items, setItems] = useState<CompItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const [{ data: p }, { data: s }, { data: pr }] = await Promise.all([
-        supabase.from('products').select('id, nome, unidade_medida, codigo_interno').eq('status', 'ativo').order('nome'),
-        supabase.from('suppliers').select('id, razao_social').eq('status', 'ativo').order('razao_social'),
-        supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario'),
-      ]);
-      setProducts(p || []); setSuppliers(s || []); setPrices(pr || []);
-    };
-    fetchData();
-  }, []);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['comparative-base-data'],
+    queryFn: fetchCompData,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const products = data?.products || [];
+  const suppliers = data?.suppliers || [];
+  const prices = data?.prices || [];
 
   const getPrice = (productId: string, supplierId: string) =>
     prices.find(p => p.product_id === productId && p.supplier_id === supplierId)?.preco_unitario;
@@ -78,7 +86,6 @@ export default function ComparativePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [relevantSuppliers, items, prices]);
 
-  // Strategy analysis
   const analysis = useStrategyAnalysis(items, prices, suppliers);
 
   const exportQuotPDF = async () => {
@@ -90,13 +97,10 @@ export default function ComparativePage() {
       estrategia: analysis?.recommendedStrategy || "melhor_preco",
       total: analysis?.bestPerItem.total || 0,
       items: items.map(item => ({
-        product_name: item.product_name,
-        unidade: item.unidade,
-        quantidade: item.quantidade,
+        product_name: item.product_name, unidade: item.unidade, quantidade: item.quantidade,
         prices: Object.fromEntries(relevantSuppliers.map(s => [s.id, getPrice(item.product_id, s.id) ?? null])),
       })),
-      suppliers: relevantSuppliers,
-      supplierTotals,
+      suppliers: relevantSuppliers, supplierTotals,
       bestSupplierId: analysis?.bestSingle?.supplierId,
       comprador: profile?.full_name,
     });
@@ -116,32 +120,35 @@ export default function ComparativePage() {
         )}
       </div>
 
+      {isError && <QueryError onRetry={() => refetch()} />}
+
       <Card>
         <CardHeader><CardTitle className="text-lg">Adicionar Produtos</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar produto..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-          </div>
-          {searchTerm && filteredProducts.length > 0 && (
-            <div className="border rounded-md max-h-48 overflow-y-auto">
-              {filteredProducts.slice(0, 10).map(p => (
-                <button key={p.id} className="w-full text-left px-4 py-2.5 hover:bg-muted/50 flex items-center justify-between text-sm border-b last:border-0" onClick={() => addProduct(p)}>
-                  <span className="font-medium">{p.nome}</span>
-                  <Plus className="h-4 w-4 text-muted-foreground" />
-                </button>
-              ))}
-            </div>
+          {isLoading ? <TableSkeleton columns={2} rows={3} /> : (
+            <>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar produto..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              </div>
+              {searchTerm && filteredProducts.length > 0 && (
+                <div className="border rounded-md max-h-48 overflow-y-auto">
+                  {filteredProducts.slice(0, 10).map(p => (
+                    <button key={p.id} className="w-full text-left px-4 py-2.5 hover:bg-muted/50 flex items-center justify-between text-sm border-b last:border-0" onClick={() => addProduct(p)}>
+                      <span className="font-medium">{p.nome}</span>
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
 
       {items.length > 0 && (
         <>
-          {/* Strategy cards */}
           {analysis && <StrategyCards analysis={analysis} />}
-
-          {/* Comparative table */}
           <Card>
             <CardContent className="p-0 overflow-x-auto">
               <table className="w-full text-sm">
