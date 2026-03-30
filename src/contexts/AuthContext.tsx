@@ -21,30 +21,89 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (session?.user) {
-        const userRole = await getUserRole(session.user.id);
-        setRole(userRole);
-      } else {
+    let isMounted = true;
+    let authResolved = false;
+
+    const resolveLoading = (source: string) => {
+      if (!isMounted) return;
+      if (!authResolved) {
+        console.info(`[auth] loading resolvido por: ${source}`);
+      }
+      authResolved = true;
+      setLoading(false);
+    };
+
+    const fetchRole = (userId?: string) => {
+      if (!userId) {
+        if (isMounted) setRole(null);
+        return;
+      }
+
+      console.info("[auth] buscando role do usuário", { userId });
+      void getUserRole(userId)
+        .then((userRole) => {
+          if (!isMounted) return;
+          console.info("[auth] role carregada", { userId, role: userRole });
+          setRole(userRole);
+        })
+        .catch((error) => {
+          console.error("[auth] falha ao buscar role", error);
+          if (isMounted) setRole(null);
+        });
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      if (!isMounted || authResolved) return;
+      console.warn("[auth] timeout de 3s ao restaurar sessão; redirecionando para login");
+      setSession(null);
+      setRole(null);
+      resolveLoading("timeout-3s");
+    }, 3000);
+
+    console.info("[auth] iniciando escuta de autenticação");
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!isMounted) return;
+      console.info("[auth] onAuthStateChange", { event, userId: nextSession?.user?.id ?? null });
+      setSession(nextSession);
+      fetchRole(nextSession?.user?.id);
+      resolveLoading(`onAuthStateChange:${event}`);
+    });
+
+    console.info("[auth] restaurando sessão via getSession");
+    supabase.auth.getSession()
+      .then(({ data: { session: restoredSession }, error }) => {
+        if (!isMounted) return;
+
+        if (error) {
+          console.error("[auth] erro em getSession", error);
+          setSession(null);
+          setRole(null);
+          resolveLoading("getSession-error");
+          return;
+        }
+
+        console.info("[auth] sessão restaurada", { userId: restoredSession?.user?.id ?? null });
+        setSession(restoredSession);
+        fetchRole(restoredSession?.user?.id);
+        resolveLoading("getSession-success");
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        console.error("[auth] exceção inesperada em getSession", error);
+        setSession(null);
         setRole(null);
-      }
-      setLoading(false);
-    });
+        resolveLoading("getSession-catch");
+      });
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        const userRole = await getUserRole(session.user.id);
-        setRole(userRole);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
+    console.info("[auth] iniciando signOut");
     await supabase.auth.signOut();
   };
 
