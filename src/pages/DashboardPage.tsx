@@ -16,20 +16,53 @@ export default function DashboardPage() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
-      const [{ count: sc }, { count: pc }, { count: pendReqs }, { count: pendApprovals }, { data: orders }] = await Promise.all([
-        supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
-        supabase.from('products').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
-        supabase.from('requisitions').select('*', { count: 'exact', head: true }).eq('status', 'pendente'),
-        supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'aguardando_aprovacao'),
-        supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }).limit(10),
-      ]);
-      const monthOrders = (orders || []).filter(o => new Date(o.created_at) >= startOfMonth);
-      const monthTotal = monthOrders.reduce((s: number, o: any) => s + (o.total || 0), 0);
-      return {
-        stats: { suppliers: sc || 0, products: pc || 0, pendingReqs: pendReqs || 0, pendingApprovals: pendApprovals || 0, monthOrders: monthOrders.length, monthTotal },
-        recentOrders: orders || [],
-      };
+      console.info('[dashboard] iniciando carga de métricas');
+      try {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+
+        const [suppliersRes, productsRes, reqsRes, approvalsRes, ordersRes] = await Promise.all([
+          supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
+          supabase.from('products').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
+          supabase.from('requisitions').select('*', { count: 'exact', head: true }).eq('status', 'pendente'),
+          supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'aguardando_aprovacao'),
+          supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }).limit(10),
+        ]);
+
+        if (suppliersRes.error) throw suppliersRes.error;
+        if (productsRes.error) throw productsRes.error;
+        if (reqsRes.error) throw reqsRes.error;
+        if (approvalsRes.error) throw approvalsRes.error;
+        if (ordersRes.error) throw ordersRes.error;
+
+        const orders = ordersRes.data || [];
+        const monthOrders = orders.filter((o) => new Date(o.created_at) >= startOfMonth);
+        const monthTotal = monthOrders.reduce((s: number, o: any) => s + (o.total || 0), 0);
+
+        console.info('[dashboard] métricas carregadas com sucesso', {
+          suppliers: suppliersRes.count || 0,
+          products: productsRes.count || 0,
+          pendingReqs: reqsRes.count || 0,
+          pendingApprovals: approvalsRes.count || 0,
+          recentOrders: orders.length,
+        });
+
+        return {
+          stats: {
+            suppliers: suppliersRes.count || 0,
+            products: productsRes.count || 0,
+            pendingReqs: reqsRes.count || 0,
+            pendingApprovals: approvalsRes.count || 0,
+            monthOrders: monthOrders.length,
+            monthTotal,
+          },
+          recentOrders: orders,
+        };
+      } catch (error) {
+        console.error('[dashboard] falha ao carregar métricas iniciais', error);
+        throw error;
+      }
     },
     staleTime: 2 * 60 * 1000,
   });
