@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { getUserRole, AppRole } from "@/lib/helpers";
@@ -19,6 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const roleFetchedForUser = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -36,9 +37,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fetchRole = (userId?: string) => {
       if (!userId) {
         if (isMounted) setRole(null);
+        roleFetchedForUser.current = null;
         return;
       }
 
+      // Skip if already fetched for this user
+      if (roleFetchedForUser.current === userId) {
+        console.info("[auth] role já carregada, ignorando chamada duplicada", { userId });
+        return;
+      }
+
+      roleFetchedForUser.current = userId;
       console.info("[auth] buscando role do usuário", { userId });
       void getUserRole(userId)
         .then((userRole) => {
@@ -48,7 +57,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         .catch((error) => {
           console.error("[auth] falha ao buscar role", error);
-          if (isMounted) setRole(null);
+          if (isMounted) {
+            setRole(null);
+            roleFetchedForUser.current = null;
+          }
         });
     };
 
@@ -60,20 +72,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resolveLoading("timeout-3s");
     }, 3000);
 
-    console.info("[auth] iniciando escuta de autenticação");
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!isMounted) return;
       console.info("[auth] onAuthStateChange", { event, userId: nextSession?.user?.id ?? null });
       setSession(nextSession);
-      fetchRole(nextSession?.user?.id);
+
+      if (event === 'TOKEN_REFRESHED' && roleFetchedForUser.current === nextSession?.user?.id) {
+        console.info("[auth] TOKEN_REFRESHED ignorado — role já carregada");
+      } else {
+        fetchRole(nextSession?.user?.id);
+      }
+
       resolveLoading(`onAuthStateChange:${event}`);
     });
 
-    console.info("[auth] restaurando sessão via getSession");
     supabase.auth.getSession()
       .then(({ data: { session: restoredSession }, error }) => {
         if (!isMounted) return;
-
         if (error) {
           console.error("[auth] erro em getSession", error);
           setSession(null);
@@ -81,8 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           resolveLoading("getSession-error");
           return;
         }
-
-        console.info("[auth] sessão restaurada", { userId: restoredSession?.user?.id ?? null });
         setSession(restoredSession);
         fetchRole(restoredSession?.user?.id);
         resolveLoading("getSession-success");
