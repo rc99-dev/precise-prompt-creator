@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { CheckCircle, XCircle, Eye, Clock } from "lucide-react";
-import { formatCurrency, formatDate, statusLabels, statusColors } from "@/lib/helpers";
+import { formatCurrency, formatDate } from "@/lib/helpers";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import TableSkeleton from "@/components/TableSkeleton";
+import QueryError from "@/components/QueryError";
 
 type Order = {
   id: string; numero: string; user_id: string; modo: string;
@@ -23,21 +25,26 @@ type OrderItem = {
   suppliers?: { razao_social: string } | null;
 };
 
+const fetchApprovalOrders = async () => {
+  const { data, error } = await supabase.from('purchase_orders').select('*')
+    .eq('status', 'aguardando_aprovacao').order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as Order[];
+};
+
 export default function ApprovalsPage() {
   const { user } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const queryClient = useQueryClient();
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [rejectDialog, setRejectDialog] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
-  const fetchOrders = async () => {
-    const { data } = await supabase.from('purchase_orders').select('*')
-      .eq('status', 'aguardando_aprovacao').order('created_at', { ascending: false });
-    setOrders((data || []) as Order[]);
-  };
-
-  useEffect(() => { fetchOrders(); }, []);
+  const { data: orders = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['approval-orders'],
+    queryFn: fetchApprovalOrders,
+    staleTime: 2 * 60 * 1000,
+  });
 
   const viewDetails = async (order: Order) => {
     setDetailOrder(order);
@@ -47,19 +54,19 @@ export default function ApprovalsPage() {
     setOrderItems((data || []) as unknown as OrderItem[]);
   };
 
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['approval-orders'] });
+
   const handleApprove = async (orderId: string) => {
     const { error } = await supabase.from('purchase_orders').update({
       status: 'aprovado', approved_by: user!.id, approved_at: new Date().toISOString(),
     } as any).eq('id', orderId);
     if (error) { toast.error(error.message); return; }
-
     await supabase.from('approval_log').insert({
       order_id: orderId, user_id: user!.id, action: 'aprovado',
     } as any);
-
     toast.success("Pedido aprovado!");
     setDetailOrder(null);
-    fetchOrders();
+    invalidate();
   };
 
   const handleReject = async () => {
@@ -68,14 +75,12 @@ export default function ApprovalsPage() {
       status: 'rejeitado', rejected_reason: rejectReason,
     } as any).eq('id', rejectDialog);
     if (error) { toast.error(error.message); return; }
-
     await supabase.from('approval_log').insert({
       order_id: rejectDialog, user_id: user!.id, action: 'rejeitado', motivo: rejectReason,
     } as any);
-
     toast.success("Pedido rejeitado.");
     setRejectDialog(null); setRejectReason(""); setDetailOrder(null);
-    fetchOrders();
+    invalidate();
   };
 
   return (
@@ -85,7 +90,11 @@ export default function ApprovalsPage() {
         <p className="text-muted-foreground text-sm mt-1">Fila de pedidos aguardando aprovação</p>
       </div>
 
-      {orders.length === 0 ? (
+      {isLoading ? (
+        <Card><CardContent><TableSkeleton columns={4} rows={4} /></CardContent></Card>
+      ) : isError ? (
+        <QueryError onRetry={() => refetch()} />
+      ) : orders.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <CheckCircle className="h-12 w-12 mb-3 opacity-50" />
@@ -129,7 +138,6 @@ export default function ApprovalsPage() {
         </div>
       )}
 
-      {/* Detail modal */}
       <Dialog open={!!detailOrder} onOpenChange={() => setDetailOrder(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Pedido {detailOrder?.numero}</DialogTitle></DialogHeader>
@@ -178,7 +186,6 @@ export default function ApprovalsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Reject dialog */}
       <Dialog open={!!rejectDialog} onOpenChange={() => { setRejectDialog(null); setRejectReason(""); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Rejeitar Pedido</DialogTitle></DialogHeader>
