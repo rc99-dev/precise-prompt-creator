@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Search, Plus, ClipboardList, Package } from "lucide-react";
+import { Plus, ClipboardList } from "lucide-react";
 import { formatDate, statusLabels } from "@/lib/helpers";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import TableSkeleton from "@/components/TableSkeleton";
+import QueryError from "@/components/QueryError";
 
 type Requisition = {
   id: string; user_id: string; product_id: string; saldo_atual: number;
@@ -23,46 +26,48 @@ type Product = { id: string; nome: string; unidade_medida: string };
 
 export default function MyRequisitionsPage() {
   const { user } = useAuth();
-  const [requisitions, setRequisitions] = useState<Requisition[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({ product_id: "", saldo_atual: "", unidade_setor: "", observacoes: "" });
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const fetchData = async () => {
-    const [{ data: reqs }, { data: prods }] = await Promise.all([
-      supabase.from('requisitions').select('*, products(nome)').eq('user_id', user!.id).order('created_at', { ascending: false }),
-      supabase.from('products').select('id, nome, unidade_medida').eq('status', 'ativo').order('nome'),
-    ]);
-    setRequisitions((reqs || []) as unknown as Requisition[]);
-    setProducts(prods || []);
-  };
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['my-requisitions', user?.id],
+    queryFn: async () => {
+      const [{ data: reqs, error: e1 }, { data: prods, error: e2 }] = await Promise.all([
+        supabase.from('requisitions').select('*, products(nome)').eq('user_id', user!.id).order('created_at', { ascending: false }),
+        supabase.from('products').select('id, nome, unidade_medida').eq('status', 'ativo').order('nome'),
+      ]);
+      if (e1 || e2) throw new Error("Erro ao carregar dados");
+      return { requisitions: (reqs || []) as unknown as Requisition[], products: (prods || []) as Product[] };
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => { if (user) fetchData(); }, [user]);
-
+  const requisitions = data?.requisitions || [];
+  const products = data?.products || [];
   const selectedProduct = products.find(p => p.id === form.product_id);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.product_id) { toast.error("Selecione um produto."); return; }
-    setLoading(true);
+    setSaving(true);
     const { error } = await supabase.from('requisitions').insert({
-      user_id: user!.id,
-      product_id: form.product_id,
+      user_id: user!.id, product_id: form.product_id,
       saldo_atual: parseFloat(form.saldo_atual) || 0,
       unidade_medida: selectedProduct?.unidade_medida || 'unidade',
-      unidade_setor: form.unidade_setor || null,
-      observacoes: form.observacoes || null,
+      unidade_setor: form.unidade_setor || null, observacoes: form.observacoes || null,
     });
     if (error) toast.error(error.message);
     else {
       toast.success("Solicitação enviada!");
       setForm({ product_id: "", saldo_atual: "", unidade_setor: "", observacoes: "" });
       setShowForm(false);
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['my-requisitions'] });
     }
-    setLoading(false);
+    setSaving(false);
   };
 
   const statusBadge = (status: string) => {
@@ -132,7 +137,7 @@ export default function MyRequisitionsPage() {
               </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
-                <Button type="submit" disabled={loading}>{loading ? "Enviando..." : "Enviar Solicitação"}</Button>
+                <Button type="submit" disabled={saving}>{saving ? "Enviando..." : "Enviar Solicitação"}</Button>
               </div>
             </form>
           </CardContent>
@@ -141,7 +146,11 @@ export default function MyRequisitionsPage() {
 
       <Card>
         <CardContent className="p-0">
-          {requisitions.length === 0 ? (
+          {isLoading ? (
+            <TableSkeleton columns={5} rows={5} />
+          ) : isError ? (
+            <QueryError onRetry={() => refetch()} />
+          ) : requisitions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <ClipboardList className="h-12 w-12 mb-3 opacity-50" />
               <p className="text-sm font-medium">Nenhuma solicitação ainda</p>
@@ -175,6 +184,7 @@ export default function MyRequisitionsPage() {
           )}
         </CardContent>
       </Card>
+
       {requisitions.some(r => r.status === 'recusada' && r.motivo_recusa) && (
         <Card>
           <CardHeader><CardTitle className="text-lg text-destructive">Solicitações Recusadas</CardTitle></CardHeader>

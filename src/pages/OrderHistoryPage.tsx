@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,9 @@ import { formatCurrency, formatDate } from "@/lib/helpers";
 import { generateOrderPDF } from "@/lib/pdfGenerator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import TableSkeleton from "@/components/TableSkeleton";
+import QueryError from "@/components/QueryError";
 
 type Order = {
   id: string; numero: string; user_id: string; modo: string;
@@ -26,24 +29,27 @@ type OrderItem = {
   suppliers?: { razao_social: string } | null;
 };
 
+const fetchOrders = async () => {
+  const { data, error } = await supabase
+    .from('purchase_orders').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as unknown as Order[];
+};
+
 export default function OrderHistoryPage() {
-  const { role, user } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("todos");
   const [search, setSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const fetchOrders = async () => {
-    const { data } = await supabase
-      .from('purchase_orders')
-      .select('*')
-      .order('created_at', { ascending: false });
-    setOrders((data || []) as unknown as Order[]);
-  };
-
-  useEffect(() => { fetchOrders(); }, []);
+  const { data: orders = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['order-history'],
+    queryFn: fetchOrders,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const filtered = orders.filter(o => {
     const matchStatus = statusFilter === 'todos' || o.status === statusFilter;
@@ -69,7 +75,6 @@ export default function OrderHistoryPage() {
       observacoes: order.observacoes, total: order.total,
     }).select().single();
     if (error || !newOrder) { toast.error("Erro ao duplicar."); return; }
-
     const { data: items } = await supabase.from('purchase_order_items').select('*').eq('order_id', order.id);
     if (items) {
       const newItems = items.map(i => ({
@@ -79,7 +84,7 @@ export default function OrderHistoryPage() {
       await supabase.from('purchase_order_items').insert(newItems);
     }
     toast.success("Ordem duplicada como rascunho!");
-    fetchOrders();
+    queryClient.invalidateQueries({ queryKey: ['order-history'] });
   };
 
   const exportCSV = async (order: Order) => {
@@ -101,17 +106,12 @@ export default function OrderHistoryPage() {
   };
 
   const exportPDF = async (order: Order) => {
-    // Fetch items with product details
     const { data: items } = await supabase
       .from('purchase_order_items')
       .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social, cnpj, telefone, cidade)')
       .eq('order_id', order.id);
     if (!items || items.length === 0) { toast.error("Sem itens para exportar."); return; }
-
-    // Get buyer profile
     const { data: buyerProfile } = await supabase.from('profiles').select('full_name').eq('user_id', order.user_id).single();
-
-    // Get approver name if approved
     let aprovadorName: string | null = null;
     if (order.status === 'aprovado' || order.status === 'emitido' || order.status === 'recebido') {
       const { data: log } = await supabase.from('approval_log').select('user_id').eq('order_id', order.id).eq('action', 'aprovado').limit(1).single();
@@ -120,32 +120,17 @@ export default function OrderHistoryPage() {
         aprovadorName = ap?.full_name || null;
       }
     }
-
-    // Use the first supplier from items as main supplier
     const mainSupplier = items[0]?.suppliers as any;
-
     generateOrderPDF({
-      numero: order.numero,
-      created_at: order.created_at,
-      observacoes: order.observacoes,
+      numero: order.numero, created_at: order.created_at, observacoes: order.observacoes,
       total: order.total,
-      supplier: mainSupplier ? {
-        razao_social: mainSupplier.razao_social,
-        cnpj: mainSupplier.cnpj,
-        telefone: mainSupplier.telefone,
-        cidade: mainSupplier.cidade,
-      } : null,
+      supplier: mainSupplier ? { razao_social: mainSupplier.razao_social, cnpj: mainSupplier.cnpj, telefone: mainSupplier.telefone, cidade: mainSupplier.cidade } : null,
       items: items.map(i => ({
-        codigo: (i.products as any)?.codigo_interno,
-        descricao: (i.products as any)?.nome || "",
-        unidade: (i.products as any)?.unidade_medida || "",
-        quantidade: i.quantidade,
-        preco_unitario: i.preco_unitario,
-        subtotal: i.subtotal,
+        codigo: (i.products as any)?.codigo_interno, descricao: (i.products as any)?.nome || "",
+        unidade: (i.products as any)?.unidade_medida || "", quantidade: i.quantidade,
+        preco_unitario: i.preco_unitario, subtotal: i.subtotal,
       })),
-      comprador: buyerProfile?.full_name,
-      aprovador: aprovadorName,
-      approved_at: (order as any).approved_at,
+      comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (order as any).approved_at,
     });
     toast.success("PDF gerado!");
   };
@@ -179,47 +164,51 @@ export default function OrderHistoryPage() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Número</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Data</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Modo</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Total</th>
-                  <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma ordem encontrada.</td></tr>
-                ) : filtered.map(o => (
-                  <tr key={o.id} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="py-3 px-4 font-medium">{o.numero}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{formatDate(o.created_at)}</td>
-                    <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{modoLabel(o.modo)}</td>
-                    <td className="py-3 px-4 text-right currency font-medium">{formatCurrency(o.total)}</td>
-                    <td className="py-3 px-4 text-center"><Badge variant={statusVariant(o.status)}>{statusLabel(o.status)}</Badge></td>
-                    <td className="py-3 px-4 text-right space-x-1">
-                      <Button variant="ghost" size="icon" onClick={() => viewOrder(o)} title="Visualizar"><Eye className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => exportPDF(o)} title="PDF"><FileText className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)} title="Duplicar"><Copy className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => exportCSV(o)} title="CSV"><Download className="h-4 w-4" /></Button>
-                    </td>
+          {isLoading ? (
+            <TableSkeleton columns={6} rows={6} />
+          ) : isError ? (
+            <QueryError onRetry={() => refetch()} />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Número</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Data</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Modo</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground">Total</th>
+                    <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma ordem encontrada.</td></tr>
+                  ) : filtered.map(o => (
+                    <tr key={o.id} className="border-b last:border-0 hover:bg-muted/50">
+                      <td className="py-3 px-4 font-medium">{o.numero}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{formatDate(o.created_at)}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{modoLabel(o.modo)}</td>
+                      <td className="py-3 px-4 text-right currency font-medium">{formatCurrency(o.total)}</td>
+                      <td className="py-3 px-4 text-center"><Badge variant={statusVariant(o.status)}>{statusLabel(o.status)}</Badge></td>
+                      <td className="py-3 px-4 text-right space-x-1">
+                        <Button variant="ghost" size="icon" onClick={() => viewOrder(o)} title="Visualizar"><Eye className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => exportPDF(o)} title="PDF"><FileText className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)} title="Duplicar"><Copy className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => exportCSV(o)} title="CSV"><Download className="h-4 w-4" /></Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Ordem {selectedOrder?.numero}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Ordem {selectedOrder?.numero}</DialogTitle></DialogHeader>
           {selectedOrder && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
