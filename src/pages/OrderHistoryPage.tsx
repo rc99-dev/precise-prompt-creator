@@ -6,12 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Eye, Copy, Download, FileText } from "lucide-react";
+import { Search, Eye, Copy, Download, FileText, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/helpers";
 import { generateOrderPDF } from "@/lib/pdfGenerator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 
@@ -38,12 +40,15 @@ const fetchOrders = async () => {
 
 export default function OrderHistoryPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("todos");
   const [search, setSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['order-history'],
@@ -84,6 +89,18 @@ export default function OrderHistoryPage() {
       await supabase.from('purchase_order_items').insert(newItems);
     }
     toast.success("Ordem duplicada como rascunho!");
+    queryClient.invalidateQueries({ queryKey: ['order-history'] });
+  };
+
+  const handleDeleteDraft = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    // Delete items first, then order
+    await supabase.from('purchase_order_items').delete().eq('order_id', deleteTarget.id);
+    const { error } = await supabase.from('purchase_orders').delete().eq('id', deleteTarget.id);
+    if (error) { toast.error(error.message); } else { toast.success("Rascunho excluído!"); }
+    setDeleting(false);
+    setDeleteTarget(null);
     queryClient.invalidateQueries({ queryKey: ['order-history'] });
   };
 
@@ -135,8 +152,20 @@ export default function OrderHistoryPage() {
     toast.success("PDF gerado!");
   };
 
-  const statusLabel = (s: string) => s === 'rascunho' ? 'Rascunho' : s === 'finalizado' ? 'Finalizado' : 'Enviado';
-  const statusVariant = (s: string): "default" | "secondary" | "outline" => s === 'finalizado' ? 'default' : s === 'enviado' ? 'secondary' : 'outline';
+  const statusLabel = (s: string) => {
+    const map: Record<string, string> = {
+      rascunho: 'Rascunho', aguardando_aprovacao: 'Aguardando Aprovação',
+      aprovado: 'Aprovado', rejeitado: 'Rejeitado', emitido: 'Emitido',
+      recebido: 'Recebido', finalizado: 'Finalizado', enviado: 'Enviado',
+    };
+    return map[s] || s;
+  };
+  const statusVariant = (s: string): "default" | "secondary" | "outline" | "destructive" => {
+    if (s === 'aprovado' || s === 'finalizado' || s === 'recebido') return 'default';
+    if (s === 'rejeitado') return 'destructive';
+    if (s === 'aguardando_aprovacao' || s === 'enviado' || s === 'emitido') return 'secondary';
+    return 'outline';
+  };
   const modoLabel = (m: string) => m === 'manual' ? 'Manual' : m === 'melhor_preco' ? 'Melhor Preço' : 'Melhor Fornecedor';
 
   return (
@@ -152,12 +181,15 @@ export default function OrderHistoryPage() {
           <Input placeholder="Buscar por número..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="rascunho">Rascunho</SelectItem>
-            <SelectItem value="finalizado">Finalizado</SelectItem>
-            <SelectItem value="enviado">Enviado</SelectItem>
+            <SelectItem value="aguardando_aprovacao">Aguardando Aprovação</SelectItem>
+            <SelectItem value="aprovado">Aprovado</SelectItem>
+            <SelectItem value="rejeitado">Rejeitado</SelectItem>
+            <SelectItem value="emitido">Emitido</SelectItem>
+            <SelectItem value="recebido">Recebido</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -191,11 +223,23 @@ export default function OrderHistoryPage() {
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{modoLabel(o.modo)}</td>
                       <td className="py-3 px-4 text-right currency font-medium">{formatCurrency(o.total)}</td>
                       <td className="py-3 px-4 text-center"><Badge variant={statusVariant(o.status)}>{statusLabel(o.status)}</Badge></td>
-                      <td className="py-3 px-4 text-right space-x-1">
-                        <Button variant="ghost" size="icon" onClick={() => viewOrder(o)} title="Visualizar"><Eye className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => exportPDF(o)} title="PDF"><FileText className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)} title="Duplicar"><Copy className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => exportCSV(o)} title="CSV"><Download className="h-4 w-4" /></Button>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <Button variant="ghost" size="icon" onClick={() => viewOrder(o)} title="Visualizar"><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => exportPDF(o)} title="PDF"><FileText className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)} title="Duplicar"><Copy className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => exportCSV(o)} title="CSV"><Download className="h-4 w-4" /></Button>
+                          {o.status === 'rascunho' && (
+                            <>
+                              <Button variant="ghost" size="icon" onClick={() => navigate(`/nova-ordem?edit=${o.id}`)} title="Editar">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(o)} title="Excluir">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -246,6 +290,23 @@ export default function OrderHistoryPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir rascunho?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir permanentemente o rascunho <strong>{deleteTarget?.numero}</strong>? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteDraft} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,11 +1,12 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/helpers";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import OrderProductSearch from "@/components/order/OrderProductSearch";
 import OrderItemRow from "@/components/order/OrderItemRow";
@@ -13,15 +14,13 @@ import OrderStickyFooter from "@/components/order/OrderStickyFooter";
 import StrategyCards, { useStrategyAnalysis } from "@/components/order/StrategyCards";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
+import { useOrderDraft, DraftOrderItem } from "@/hooks/useOrderDraft";
+import { AlertTriangle, Trash2, RotateCcw } from "lucide-react";
 
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
 type PriceEntry = { supplier_id: string; product_id: string; preco_unitario: number };
-type OrderItem = {
-  product_id: string; product_name: string; unidade: string;
-  quantidade: number; supplier_id: string; preco_unitario: number;
-  subtotal: number; observacoes: string;
-};
+type OrderItem = DraftOrderItem;
 
 const fetchOrderData = async () => {
   const [{ data: p, error: e1 }, { data: s, error: e2 }, { data: pr, error: e3 }] = await Promise.all([
@@ -36,10 +35,15 @@ const fetchOrderData = async () => {
 export default function NewOrderPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editOrderId = searchParams.get("edit");
   const [items, setItems] = useState<OrderItem[]>([]);
   const [activeStrategy, setActiveStrategy] = useState<"melhor_preco" | "melhor_fornecedor" | null>(null);
   const [observacoes, setObservacoes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const draftRestored = useRef(false);
+  const { hasDraft, saveDraft, loadDraft, clearDraft } = useOrderDraft();
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['order-base-data'],
@@ -50,6 +54,73 @@ export default function NewOrderPage() {
   const products = data?.products || [];
   const suppliers = data?.suppliers || [];
   const allPrices = data?.prices || [];
+
+  // Load draft or editing order once data is available
+  useEffect(() => {
+    if (!data || draftRestored.current) return;
+    draftRestored.current = true;
+
+    if (editOrderId) {
+      // Load order from DB for editing
+      (async () => {
+        const { data: orderItems } = await supabase
+          .from('purchase_order_items')
+          .select('*, products(nome, unidade_medida)')
+          .eq('order_id', editOrderId);
+        const { data: order } = await supabase
+          .from('purchase_orders')
+          .select('observacoes, modo')
+          .eq('id', editOrderId)
+          .single();
+        if (orderItems && orderItems.length > 0) {
+          setItems(orderItems.map(i => ({
+            product_id: i.product_id,
+            product_name: (i.products as any)?.nome || '',
+            unidade: (i.products as any)?.unidade_medida || '',
+            quantidade: i.quantidade,
+            supplier_id: i.supplier_id || '',
+            preco_unitario: i.preco_unitario,
+            subtotal: i.subtotal,
+            observacoes: i.observacoes || '',
+          })));
+          if (order?.observacoes) setObservacoes(order.observacoes);
+          if (order?.modo === 'melhor_preco' || order?.modo === 'melhor_fornecedor') {
+            setActiveStrategy(order.modo as any);
+          }
+        }
+      })();
+      return;
+    }
+
+    // Check for localStorage draft
+    const draft = loadDraft();
+    if (draft && draft.items.length > 0) {
+      setShowDraftBanner(true);
+    }
+  }, [data, editOrderId, loadDraft]);
+
+  const restoreDraft = useCallback(() => {
+    const draft = loadDraft();
+    if (draft) {
+      setItems(draft.items);
+      setObservacoes(draft.observacoes);
+      setActiveStrategy(draft.activeStrategy);
+      setShowDraftBanner(false);
+      toast.success("Rascunho restaurado!");
+    }
+  }, [loadDraft]);
+
+  const discardDraft = useCallback(() => {
+    clearDraft();
+    setShowDraftBanner(false);
+    toast.info("Rascunho descartado.");
+  }, [clearDraft]);
+
+  // Auto-save draft on changes (skip when editing existing order)
+  useEffect(() => {
+    if (editOrderId || !draftRestored.current) return;
+    saveDraft({ items, observacoes, activeStrategy, editingOrderId: null });
+  }, [items, observacoes, activeStrategy, saveDraft, editOrderId]);
 
   const pricesByProduct = useMemo(() => {
     const map: Record<string, { supplier_id: string; preco: number }[]> = {};
@@ -131,21 +202,45 @@ export default function NewOrderPage() {
   const handleSave = async (status: 'rascunho' | 'aguardando_aprovacao') => {
     if (items.length === 0) { toast.error("Adicione pelo menos um item."); return; }
     setSaving(true);
-    const { data: numData } = await supabase.rpc('generate_order_number');
-    const numero = numData || `PED-${Date.now()}`;
-    const modo = activeStrategy || 'manual';
-    const { data: order, error: orderError } = await supabase.from('purchase_orders').insert({
-      numero, user_id: user!.id, modo, status, observacoes, total,
-    }).select().single();
-    if (orderError) { toast.error(orderError.message); setSaving(false); return; }
-    const orderItems = items.map(i => ({
-      order_id: order.id, product_id: i.product_id, supplier_id: i.supplier_id || null,
-      quantidade: i.quantidade, preco_unitario: i.preco_unitario, subtotal: i.subtotal,
-      observacoes: i.observacoes || null,
-    }));
-    const { error: itemsError } = await supabase.from('purchase_order_items').insert(orderItems);
-    if (itemsError) { toast.error(itemsError.message); setSaving(false); return; }
-    toast.success(status === 'rascunho' ? "Rascunho salvo!" : "Enviado para aprovação!");
+
+    if (editOrderId) {
+      // Update existing order
+      const modo = activeStrategy || 'manual';
+      const { error: updateErr } = await supabase.from('purchase_orders').update({
+        modo, status, observacoes, total,
+      }).eq('id', editOrderId);
+      if (updateErr) { toast.error(updateErr.message); setSaving(false); return; }
+
+      // Delete old items and insert new
+      await supabase.from('purchase_order_items').delete().eq('order_id', editOrderId);
+      const orderItems = items.map(i => ({
+        order_id: editOrderId, product_id: i.product_id, supplier_id: i.supplier_id || null,
+        quantidade: i.quantidade, preco_unitario: i.preco_unitario, subtotal: i.subtotal,
+        observacoes: i.observacoes || null,
+      }));
+      const { error: itemsError } = await supabase.from('purchase_order_items').insert(orderItems);
+      if (itemsError) { toast.error(itemsError.message); setSaving(false); return; }
+      toast.success(status === 'rascunho' ? "Rascunho atualizado!" : "Enviado para aprovação!");
+    } else {
+      // Create new order
+      const { data: numData } = await supabase.rpc('generate_order_number');
+      const numero = numData || `PED-${Date.now()}`;
+      const modo = activeStrategy || 'manual';
+      const { data: order, error: orderError } = await supabase.from('purchase_orders').insert({
+        numero, user_id: user!.id, modo, status, observacoes, total,
+      }).select().single();
+      if (orderError) { toast.error(orderError.message); setSaving(false); return; }
+      const orderItems = items.map(i => ({
+        order_id: order.id, product_id: i.product_id, supplier_id: i.supplier_id || null,
+        quantidade: i.quantidade, preco_unitario: i.preco_unitario, subtotal: i.subtotal,
+        observacoes: i.observacoes || null,
+      }));
+      const { error: itemsError } = await supabase.from('purchase_order_items').insert(orderItems);
+      if (itemsError) { toast.error(itemsError.message); setSaving(false); return; }
+      toast.success(status === 'rascunho' ? "Rascunho salvo!" : "Enviado para aprovação!");
+    }
+
+    clearDraft();
     setSaving(false);
     navigate('/historico');
   };
@@ -158,9 +253,30 @@ export default function NewOrderPage() {
   return (
     <div className="space-y-5 pb-20">
       <div>
-        <h1 className="text-2xl font-bold">Nova Ordem de Compra</h1>
-        <p className="text-muted-foreground text-sm mt-1">Monte seu pedido e escolha a melhor estratégia de compra</p>
+        <h1 className="text-2xl font-bold">{editOrderId ? "Editar Ordem de Compra" : "Nova Ordem de Compra"}</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          {editOrderId ? "Edite os itens e salve ou envie para aprovação" : "Monte seu pedido e escolha a melhor estratégia de compra"}
+        </p>
       </div>
+
+      {showDraftBanner && !editOrderId && (
+        <Card className="border-warning/50 bg-warning/5">
+          <CardContent className="py-3 px-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <span className="font-medium">Você tem uma ordem em andamento.</span>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={discardDraft}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" />Descartar
+              </Button>
+              <Button size="sm" onClick={restoreDraft}>
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />Continuar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {isError && <QueryError onRetry={() => refetch()} />}
 
