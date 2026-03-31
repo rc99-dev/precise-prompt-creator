@@ -21,7 +21,7 @@ const fetchCompData = async () => {
   const [{ data: p, error: e1 }, { data: s, error: e2 }, { data: pr, error: e3 }] = await Promise.all([
     supabase.from('products').select('id, nome, unidade_medida, codigo_interno').eq('status', 'ativo').order('nome'),
     supabase.from('suppliers').select('id, razao_social').eq('status', 'ativo').order('razao_social'),
-    supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario').limit(5000),
+    supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario'),
   ]);
   if (e1 || e2 || e3) throw new Error("Erro ao carregar dados");
   return { products: (p || []) as Product[], suppliers: (s || []) as Supplier[], prices: (pr || []) as PriceEntry[] };
@@ -33,7 +33,7 @@ export default function ComparativePage() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['comparative-base-data'],
+    queryKey: ['comparative-base-data-v2'],
     queryFn: fetchCompData,
     staleTime: 5 * 60 * 1000,
   });
