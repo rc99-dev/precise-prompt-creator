@@ -4,10 +4,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/helpers";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { UNIDADES } from "@/lib/constants";
 import OrderProductSearch from "@/components/order/OrderProductSearch";
 import OrderItemRow from "@/components/order/OrderItemRow";
 import OrderStickyFooter from "@/components/order/OrderStickyFooter";
@@ -29,7 +31,6 @@ const fetchOrderData = async () => {
   ]);
   if (e1 || e2) throw new Error("Erro ao carregar dados");
 
-  // Busca preços em duas páginas para superar limite de 1000
   const [{ data: pr1 }, { data: pr2 }] = await Promise.all([
     supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario').range(0, 999),
     supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario').range(1000, 1999),
@@ -47,6 +48,7 @@ export default function NewOrderPage() {
   const [items, setItems] = useState<OrderItem[]>([]);
   const [activeStrategy, setActiveStrategy] = useState<"melhor_preco" | "melhor_fornecedor" | null>(null);
   const [observacoes, setObservacoes] = useState("");
+  const [unidadeSolicitante, setUnidadeSolicitante] = useState("");
   const [saving, setSaving] = useState(false);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const draftRestored = useRef(false);
@@ -62,13 +64,11 @@ export default function NewOrderPage() {
   const suppliers = data?.suppliers || [];
   const allPrices = data?.prices || [];
 
-  // Load draft or editing order once data is available
   useEffect(() => {
     if (!data || draftRestored.current) return;
     draftRestored.current = true;
 
     if (editOrderId) {
-      // Load order from DB for editing
       (async () => {
         const { data: orderItems } = await supabase
           .from('purchase_order_items')
@@ -76,7 +76,7 @@ export default function NewOrderPage() {
           .eq('order_id', editOrderId);
         const { data: order } = await supabase
           .from('purchase_orders')
-          .select('observacoes, modo')
+          .select('observacoes, modo, unidade_setor')
           .eq('id', editOrderId)
           .single();
         if (orderItems && orderItems.length > 0) {
@@ -91,6 +91,7 @@ export default function NewOrderPage() {
             observacoes: i.observacoes || '',
           })));
           if (order?.observacoes) setObservacoes(order.observacoes);
+          if (order?.unidade_setor) setUnidadeSolicitante(order.unidade_setor);
           if (order?.modo === 'melhor_preco' || order?.modo === 'melhor_fornecedor') {
             setActiveStrategy(order.modo as any);
           }
@@ -99,7 +100,6 @@ export default function NewOrderPage() {
       return;
     }
 
-    // Check for localStorage draft
     const draft = loadDraft();
     if (draft && draft.items.length > 0) {
       setShowDraftBanner(true);
@@ -123,7 +123,6 @@ export default function NewOrderPage() {
     toast.info("Rascunho descartado.");
   }, [clearDraft]);
 
-  // Auto-save draft on changes (skip when editing existing order)
   useEffect(() => {
     if (editOrderId || !draftRestored.current) return;
     saveDraft({ items, observacoes, activeStrategy, editingOrderId: null });
@@ -211,14 +210,12 @@ export default function NewOrderPage() {
     setSaving(true);
 
     if (editOrderId) {
-      // Update existing order
       const modo = activeStrategy || 'manual';
       const { error: updateErr } = await supabase.from('purchase_orders').update({
-        modo, status, observacoes, total,
+        modo, status, observacoes, total, unidade_setor: unidadeSolicitante || null,
       }).eq('id', editOrderId);
       if (updateErr) { toast.error(updateErr.message); setSaving(false); return; }
 
-      // Delete old items and insert new
       await supabase.from('purchase_order_items').delete().eq('order_id', editOrderId);
       const orderItems = items.map(i => ({
         order_id: editOrderId, product_id: i.product_id, supplier_id: i.supplier_id || null,
@@ -229,12 +226,12 @@ export default function NewOrderPage() {
       if (itemsError) { toast.error(itemsError.message); setSaving(false); return; }
       toast.success(status === 'rascunho' ? "Rascunho atualizado!" : "Enviado para aprovação!");
     } else {
-      // Create new order
       const { data: numData } = await supabase.rpc('generate_order_number');
       const numero = numData || `PED-${Date.now()}`;
       const modo = activeStrategy || 'manual';
       const { data: order, error: orderError } = await supabase.from('purchase_orders').insert({
         numero, user_id: user!.id, modo, status, observacoes, total,
+        unidade_setor: unidadeSolicitante || null,
       }).select().single();
       if (orderError) { toast.error(orderError.message); setSaving(false); return; }
       const orderItems = items.map(i => ({
@@ -286,6 +283,18 @@ export default function NewOrderPage() {
       )}
 
       {isError && <QueryError onRetry={() => refetch()} />}
+
+      <Card>
+        <CardHeader className="py-3 px-4"><CardTitle className="text-sm">Unidade Solicitante</CardTitle></CardHeader>
+        <CardContent className="px-4 pb-4 pt-0">
+          <Select value={unidadeSolicitante} onValueChange={setUnidadeSolicitante}>
+            <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
+            <SelectContent>
+              {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="py-3 px-4"><CardTitle className="text-base">Adicionar Produtos</CardTitle></CardHeader>

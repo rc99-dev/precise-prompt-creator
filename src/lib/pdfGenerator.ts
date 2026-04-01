@@ -3,41 +3,74 @@ import autoTable from "jspdf-autotable";
 import { formatCurrency, formatDate } from "./helpers";
 
 const COMPANY = "Point do Açaí D'Amazônia";
-const PURPLE = [107, 78, 255] as const; // primary brand
+const BRAND = [92, 27, 67] as const; // #5c1b43
 const DARK = [30, 27, 45] as const;
-const GRAY_LIGHT = [240, 238, 250] as const;
+const GRAY_LIGHT = [245, 238, 242] as const;
 const WHITE = [255, 255, 255] as const;
 const GREEN = [34, 197, 94] as const;
 
-function drawHeader(doc: jsPDF, docType: string, numero: string, date: string) {
+function addLogo(doc: jsPDF, x: number, y: number, h: number) {
+  try {
+    doc.addImage("/logo.png", "PNG", x, y, h, h);
+  } catch {
+    // logo not available
+  }
+}
+
+function drawHeader(doc: jsPDF, docType: string, numero: string, date: string, unidade?: string, reqInfo?: { solicitante: string; unidade: string; setor: string }) {
   const w = doc.internal.pageSize.getWidth();
-  // Purple bar
-  doc.setFillColor(...PURPLE);
-  doc.rect(0, 0, w, 38, "F");
+  const headerH = reqInfo ? 52 : unidade ? 44 : 38;
+
+  doc.setFillColor(...BRAND);
+  doc.rect(0, 0, w, headerH, "F");
+
+  // Logo
+  try {
+    // We'll use a small white area for logo visibility
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(10, 4, 14, 14, 2, 2, "F");
+    addLogo(doc, 10.5, 4.5, 13);
+  } catch { /* no logo */ }
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   doc.setTextColor(...WHITE);
-  doc.text(COMPANY, 14, 16);
+  doc.text(COMPANY, 28, 14);
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text("Sistema de Compras", 14, 24);
+  doc.text("Sistema de Compras", 28, 21);
+
+  if (unidade) {
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Unidade: ${unidade}`, 28, 28);
+  }
 
   // Doc type badge
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text(docType, w - 14, 16, { align: "right" });
+  doc.text(docType, w - 14, 14, { align: "right" });
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text(numero, w - 14, 24, { align: "right" });
-  doc.text(`Emissão: ${date}`, w - 14, 32, { align: "right" });
+  doc.text(numero, w - 14, 21, { align: "right" });
+  doc.text(`Emissão: ${date}`, w - 14, 28, { align: "right" });
+
+  if (reqInfo) {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(255, 255, 255);
+    const reqLine = `Solicitante: ${reqInfo.solicitante}  |  Unidade: ${reqInfo.unidade}  |  Setor: ${reqInfo.setor}`;
+    doc.text(reqLine, 14, headerH - 6);
+  }
 
   // Separator line
-  doc.setDrawColor(...PURPLE);
+  doc.setDrawColor(...BRAND);
   doc.setLineWidth(0.5);
-  doc.line(14, 42, w - 14, 42);
+  doc.line(14, headerH + 4, w - 14, headerH + 4);
+
+  return headerH + 8;
 }
 
 function drawFooterLine(doc: jsPDF) {
@@ -78,15 +111,14 @@ interface OrderPDFData {
   comprador?: string;
   aprovador?: string | null;
   approved_at?: string | null;
+  unidadeSolicitante?: string;
 }
 
 export function generateOrderPDF(data: OrderPDFData) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const w = doc.internal.pageSize.getWidth();
 
-  drawHeader(doc, "ORDEM DE COMPRA", data.numero, formatDate(data.created_at));
-
-  let y = 48;
+  let y = drawHeader(doc, "ORDEM DE COMPRA", data.numero, formatDate(data.created_at), data.unidadeSolicitante);
 
   // Supplier block
   if (data.supplier) {
@@ -127,12 +159,12 @@ export function generateOrderPDF(data: OrderPDFData) {
     margin: { left: 14, right: 14 },
     styles: { fontSize: 8, cellPadding: 2.5, textColor: DARK as any },
     headStyles: {
-      fillColor: PURPLE as any,
+      fillColor: BRAND as any,
       textColor: WHITE as any,
       fontStyle: "bold",
       fontSize: 8,
     },
-    alternateRowStyles: { fillColor: [248, 246, 255] },
+    alternateRowStyles: { fillColor: [250, 245, 248] },
     columnStyles: {
       0: { cellWidth: 8, halign: "center" },
       1: { cellWidth: 20 },
@@ -142,9 +174,7 @@ export function generateOrderPDF(data: OrderPDFData) {
       5: { cellWidth: 26, halign: "right" },
       6: { cellWidth: 26, halign: "right" },
     },
-    didDrawPage: () => {
-      drawFooterLine(doc);
-    },
+    didDrawPage: () => { drawFooterLine(doc); },
   });
 
   y = (doc as any).lastAutoTable.finalY + 4;
@@ -217,6 +247,7 @@ interface QuotPDFItem {
   unidade: string;
   quantidade: number;
   prices: Record<string, number | null>; // supplier_id -> price
+  saldo?: number;
 }
 
 interface QuotPDFData {
@@ -229,15 +260,16 @@ interface QuotPDFData {
   supplierTotals: Record<string, number>;
   bestSupplierId?: string | null;
   comprador?: string;
+  unidadeSolicitante?: string;
+  showSaldo?: boolean;
+  requisitionInfo?: { solicitante: string; unidade: string; setor: string };
 }
 
 export function generateQuotationPDF(data: QuotPDFData) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const w = doc.internal.pageSize.getWidth();
 
-  drawHeader(doc, "COTAÇÃO", data.numero, formatDate(data.created_at));
-
-  let y = 48;
+  let y = drawHeader(doc, "COTAÇÃO", data.numero, formatDate(data.created_at), data.unidadeSolicitante, data.requisitionInfo);
 
   // Strategy block
   const stratLabel = data.estrategia === "melhor_preco" ? "Melhor Preço por Item" : "Melhor Fornecedor Único";
@@ -262,6 +294,7 @@ export function generateQuotationPDF(data: QuotPDFData) {
 
   // Comparative table
   const head = ["#", "Produto", "Unidade", "Qtd"];
+  if (data.showSaldo) head.push("Saldo");
   data.suppliers.forEach(s => head.push(s.razao_social));
 
   const body: (string | { content: string; styles?: any })[][] = [];
@@ -277,6 +310,10 @@ export function generateQuotationPDF(data: QuotPDFData) {
       item.unidade,
       String(item.quantidade),
     ];
+
+    if (data.showSaldo) {
+      row.push(item.saldo !== undefined ? String(item.saldo) : "—");
+    }
 
     prices.forEach(p => {
       if (p === null) {
@@ -296,6 +333,7 @@ export function generateQuotationPDF(data: QuotPDFData) {
 
   // Totals row
   const totalRow: (string | { content: string; styles?: any })[] = ["", "TOTAL", "", ""];
+  if (data.showSaldo) totalRow.push("");
   const totals = data.suppliers.map(s => data.supplierTotals[s.id] || 0);
   const minTotal = Math.min(...totals.filter(t => t > 0));
   data.suppliers.forEach(s => {
@@ -311,8 +349,6 @@ export function generateQuotationPDF(data: QuotPDFData) {
   });
   body.push(totalRow);
 
-  const supplierColWidth = Math.min(36, (w - 28 - 80) / data.suppliers.length);
-
   autoTable(doc, {
     startY: y,
     head: [head],
@@ -320,12 +356,12 @@ export function generateQuotationPDF(data: QuotPDFData) {
     margin: { left: 14, right: 14 },
     styles: { fontSize: 7, cellPadding: 2, textColor: DARK as any, overflow: "linebreak" },
     headStyles: {
-      fillColor: PURPLE as any,
+      fillColor: BRAND as any,
       textColor: WHITE as any,
       fontStyle: "bold",
       fontSize: 7,
     },
-    alternateRowStyles: { fillColor: [248, 246, 255] },
+    alternateRowStyles: { fillColor: [250, 245, 248] },
     columnStyles: {
       0: { cellWidth: 8, halign: "center" },
       1: { cellWidth: "auto" },

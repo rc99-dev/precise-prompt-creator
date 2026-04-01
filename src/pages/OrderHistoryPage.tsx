@@ -140,7 +140,7 @@ export default function OrderHistoryPage() {
     const mainSupplier = items[0]?.suppliers as any;
     generateOrderPDF({
       numero: order.numero, created_at: order.created_at, observacoes: order.observacoes,
-      total: order.total,
+      total: order.total, unidadeSolicitante: (order as any).unidade_setor || undefined,
       supplier: mainSupplier ? { razao_social: mainSupplier.razao_social, cnpj: mainSupplier.cnpj, telefone: mainSupplier.telefone, cidade: mainSupplier.cidade } : null,
       items: items.map(i => ({
         codigo: (i.products as any)?.codigo_interno, descricao: (i.products as any)?.nome || "",
