@@ -41,6 +41,8 @@ export default function ComparativePage() {
   const products = data?.products || [];
   const suppliers = data?.suppliers || [];
   const prices = data?.prices || [];
+  console.log('[debug] prices carregados:', prices.length);
+  console.log('[debug] camarao:', prices.filter(p => p.product_id === '11000a66-d670-4bc4-980a-91112e950cca'));
 
   const getPrice = (productId: string, supplierId: string) =>
     prices.find(p => p.product_id === productId && p.supplier_id === supplierId)?.preco_unitario;
