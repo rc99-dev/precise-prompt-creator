@@ -28,14 +28,19 @@ type SupplierPrice = {
 };
 
 const fetchPricesData = async () => {
-  const [{ data: pricesData, error: e1 }, { data: suppData, error: e2 }, { data: prodData, error: e3 }] = await Promise.all([
-    supabase.from('supplier_prices').select('*, suppliers(razao_social), products(nome, categoria)').order('updated_at', { ascending: false }).limit(5000),
+  const [{ data: suppData, error: e2 }, { data: prodData, error: e3 }] = await Promise.all([
     supabase.from('suppliers').select('id, razao_social').eq('status', 'ativo').order('razao_social'),
     supabase.from('products').select('id, nome').eq('status', 'ativo').order('nome'),
   ]);
-  if (e1 || e2 || e3) throw new Error("Erro ao carregar dados");
+  if (e2 || e3) throw new Error("Erro ao carregar dados");
+
+  const [{ data: pr1 }, { data: pr2 }] = await Promise.all([
+    supabase.from('supplier_prices').select('*, suppliers(razao_social), products(nome, categoria)').order('updated_at', { ascending: false }).range(0, 999),
+    supabase.from('supplier_prices').select('*, suppliers(razao_social), products(nome, categoria)').order('updated_at', { ascending: false }).range(1000, 1999),
+  ]);
+
   return {
-    prices: (pricesData || []) as unknown as SupplierPrice[],
+    prices: [...(pr1 || []), ...(pr2 || [])] as unknown as SupplierPrice[],
     suppliers: suppData || [],
     products: prodData || [],
   };
