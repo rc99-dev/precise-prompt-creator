@@ -26,7 +26,7 @@ const fetchOrderData = async () => {
   const [{ data: p, error: e1 }, { data: s, error: e2 }, { data: pr, error: e3 }] = await Promise.all([
     supabase.from('products').select('id, nome, codigo_interno, unidade_medida').eq('status', 'ativo').order('nome'),
     supabase.from('suppliers').select('id, razao_social').eq('status', 'ativo').order('razao_social'),
-    supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario'),
+    supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario').limit(3000),
   ]);
   if (e1 || e2 || e3) throw new Error("Erro ao carregar dados");
   return { products: (p || []) as Product[], suppliers: (s || []) as Supplier[], prices: (pr || []) as PriceEntry[] };
@@ -46,7 +46,7 @@ export default function NewOrderPage() {
   const { hasDraft, saveDraft, loadDraft, clearDraft } = useOrderDraft();
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['order-base-data-v2'],
+    queryKey: ['order-base-data-v3'],
     queryFn: fetchOrderData,
     staleTime: 5 * 60 * 1000,
   });
