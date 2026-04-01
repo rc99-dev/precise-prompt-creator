@@ -23,13 +23,20 @@ type PriceEntry = { supplier_id: string; product_id: string; preco_unitario: num
 type OrderItem = DraftOrderItem;
 
 const fetchOrderData = async () => {
-  const [{ data: p, error: e1 }, { data: s, error: e2 }, { data: pr, error: e3 }] = await Promise.all([
-    supabase.from('products').select('id, nome, codigo_interno, unidade_medida').eq('status', 'ativo').order('nome'),
+ const [{ data: p, error: e1 }, { data: s, error: e2 }] = await Promise.all([
+    supabase.from('products').select('id, nome, unidade_medida, codigo_interno').eq('status', 'ativo').order('nome'),
     supabase.from('suppliers').select('id, razao_social').eq('status', 'ativo').order('razao_social'),
-    supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario').limit(3000),
   ]);
-  if (e1 || e2 || e3) throw new Error("Erro ao carregar dados");
-  return { products: (p || []) as Product[], suppliers: (s || []) as Supplier[], prices: (pr || []) as PriceEntry[] };
+  if (e1 || e2) throw new Error("Erro ao carregar dados");
+
+  // Busca preços em duas páginas para superar limite de 1000
+  const [{ data: pr1 }, { data: pr2 }] = await Promise.all([
+    supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario').range(0, 999),
+    supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario').range(1000, 1999),
+  ]);
+
+  const prices = [...(pr1 || []), ...(pr2 || [])];
+  return { products: (p || []) as Product[], suppliers: (s || []) as Supplier[], prices: prices as PriceEntry[] };
 };
 
 export default function NewOrderPage() {
