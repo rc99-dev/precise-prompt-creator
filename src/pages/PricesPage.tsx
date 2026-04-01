@@ -141,20 +141,44 @@ export default function PricesPage() {
     if (error) toast.error(error.message); else { toast.success("Preço excluído!"); invalidate(); }
   };
 
-  const handleLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!linkSupplierId || !linkProductId || !linkPreco) { toast.error("Preencha todos os campos obrigatórios."); return; }
-    setLinkSaving(true);
-  const { error } = await supabase.from('supplier_prices').upsert({
-  supplier_id: linkSupplierId, product_id: linkProductId,
-  preco_unitario: parseFloat(linkPreco),
-  prazo_entrega: linkPrazo || null,
-}, { onConflict: 'supplier_id,product_id' });
-    });
-    if (error) toast.error(error.message);
-    else { toast.success("Vínculo criado com sucesso!"); setLinkPreco(""); setLinkPrazo(""); invalidate(); }
-    setLinkSaving(false);
-  };
+const handleLink = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!linkSupplierId || !linkProductId || !linkPreco) { 
+    toast.error("Preencha todos os campos obrigatórios."); 
+    return; 
+  }
+  setLinkSaving(true);
+  
+  // Verifica se já existe esse par
+  const { data: existing } = await supabase
+    .from('supplier_prices')
+    .select('id')
+    .eq('supplier_id', linkSupplierId)
+    .eq('product_id', linkProductId)
+    .maybeSingle();
+
+  let error;
+  if (existing) {
+    // Atualiza o preço existente
+    ({ error } = await supabase
+      .from('supplier_prices')
+      .update({ preco_unitario: parseFloat(linkPreco), prazo_entrega: linkPrazo || null })
+      .eq('id', existing.id));
+    if (!error) toast.success("Preço atualizado!");
+  } else {
+    // Cria novo vínculo
+    ({ error } = await supabase
+      .from('supplier_prices')
+      .insert({ supplier_id: linkSupplierId, product_id: linkProductId, preco_unitario: parseFloat(linkPreco), prazo_entrega: linkPrazo || null }));
+    if (!error) toast.success("Vínculo criado com sucesso!");
+  }
+
+  if (error) toast.error(error.message);
+  setLinkPreco(""); 
+  setLinkPrazo(""); 
+  setLinkSaving(false);
+  invalidate();
+};
 
   // Inline edit price
   const [inlineEdit, setInlineEdit] = useState<{ id: string; value: string } | null>(null);
