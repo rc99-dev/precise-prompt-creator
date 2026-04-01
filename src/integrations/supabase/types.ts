@@ -180,6 +180,7 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
+          unidade: string | null
           unidade_setor: string | null
           updated_at: string
           user_id: string
@@ -189,6 +190,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          unidade?: string | null
           unidade_setor?: string | null
           updated_at?: string
           user_id: string
@@ -198,6 +200,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          unidade?: string | null
           unidade_setor?: string | null
           updated_at?: string
           user_id?: string
@@ -532,7 +535,9 @@ export type Database = {
           order_id: string | null
           product_id: string
           saldo_atual: number
+          setor: string | null
           status: string
+          unidade: string | null
           unidade_medida: string
           unidade_setor: string | null
           updated_at: string
@@ -546,7 +551,9 @@ export type Database = {
           order_id?: string | null
           product_id: string
           saldo_atual?: number
+          setor?: string | null
           status?: string
+          unidade?: string | null
           unidade_medida?: string
           unidade_setor?: string | null
           updated_at?: string
@@ -560,7 +567,9 @@ export type Database = {
           order_id?: string | null
           product_id?: string
           saldo_atual?: number
+          setor?: string | null
           status?: string
+          unidade?: string | null
           unidade_medida?: string
           unidade_setor?: string | null
           updated_at?: string
