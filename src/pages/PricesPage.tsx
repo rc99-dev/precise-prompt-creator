@@ -129,7 +129,7 @@ export default function PricesPage() {
       const { error } = await supabase.from('supplier_prices').update(payload).eq('id', editing.id);
       if (error) toast.error(error.message); else toast.success("Preço atualizado!");
     } else {
-      const { error } = await supabase.from('supplier_prices').insert(payload);
+      const { error } = await supabase.from('supplier_prices').upsert(payload, { onConflict: 'supplier_id,product_id' });
       if (error) toast.error(error.message); else toast.success("Preço cadastrado!");
     }
     setLoading(false); setDialogOpen(false); invalidate();
@@ -145,10 +145,11 @@ export default function PricesPage() {
     e.preventDefault();
     if (!linkSupplierId || !linkProductId || !linkPreco) { toast.error("Preencha todos os campos obrigatórios."); return; }
     setLinkSaving(true);
-    const { error } = await supabase.from('supplier_prices').insert({
-      supplier_id: linkSupplierId, product_id: linkProductId,
-      preco_unitario: parseFloat(linkPreco),
-      prazo_entrega: linkPrazo || null,
+  const { error } = await supabase.from('supplier_prices').upsert({
+  supplier_id: linkSupplierId, product_id: linkProductId,
+  preco_unitario: parseFloat(linkPreco),
+  prazo_entrega: linkPrazo || null,
+}, { onConflict: 'supplier_id,product_id' });
     });
     if (error) toast.error(error.message);
     else { toast.success("Vínculo criado com sucesso!"); setLinkPreco(""); setLinkPrazo(""); invalidate(); }
