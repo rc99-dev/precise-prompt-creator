@@ -66,7 +66,7 @@ export default function PricesPage() {
   const [linkSaving, setLinkSaving] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['prices-page-data'],
+    queryKey: ['prices-page-data-v2'],
     queryFn: fetchPricesData,
     staleTime: 5 * 60 * 1000,
   });
