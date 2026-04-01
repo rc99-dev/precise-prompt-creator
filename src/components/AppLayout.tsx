@@ -50,9 +50,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = allNavItems.filter(item => canAccess(role, item.page));
 
-  // Solicitante only sees "Minhas Solicitações"
-  const isSolicitante = role === 'solicitante';
-
   return (
     <div className="flex h-screen overflow-hidden">
       {mobileOpen && (
@@ -69,14 +66,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} px-4 py-4 border-b border-sidebar-border`}>
           {!collapsed && (
             <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-primary p-2">
-                <ShoppingCart className="h-4 w-4 text-primary-foreground" />
-              </div>
+              <img src="/logo.png" alt="Logo" className="h-10 w-10 rounded-lg object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               <div>
                 <h1 className="text-sm font-bold tracking-tight">Point do Açaí</h1>
-                <p className="text-xs text-sidebar-muted">{role ? roleLabels[role] : ''}</p>
+                <p className="text-xs text-sidebar-muted">D'Amazônia</p>
+                <p className="text-[10px] text-sidebar-muted">{role ? roleLabels[role] : ''}</p>
               </div>
             </div>
+          )}
+          {collapsed && (
+            <img src="/logo.png" alt="Logo" className="h-8 w-8 rounded-lg object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           )}
           <button onClick={() => setCollapsed(!collapsed)} className="hidden lg:block text-sidebar-muted hover:text-sidebar-foreground transition-colors">
             <ChevronLeft className={`h-4 w-4 transition-transform ${collapsed ? 'rotate-180' : ''}`} />

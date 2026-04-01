@@ -11,13 +11,15 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, ClipboardList } from "lucide-react";
 import { formatDate, statusLabels } from "@/lib/helpers";
+import { UNIDADES, SETORES } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 
 type Requisition = {
   id: string; user_id: string; product_id: string; saldo_atual: number;
-  unidade_medida: string; unidade_setor: string | null; observacoes: string | null;
+  unidade_medida: string; unidade_setor: string | null; unidade: string | null;
+  setor: string | null; observacoes: string | null;
   status: string; motivo_recusa: string | null; created_at: string;
   products?: { nome: string } | null;
 };
@@ -29,7 +31,7 @@ export default function MyRequisitionsPage() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState({ product_id: "", saldo_atual: "", unidade_setor: "", observacoes: "" });
+  const [form, setForm] = useState({ product_id: "", saldo_atual: "", unidade: "", setor: "", observacoes: "" });
   const [saving, setSaving] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -58,12 +60,15 @@ export default function MyRequisitionsPage() {
       user_id: user!.id, product_id: form.product_id,
       saldo_atual: parseFloat(form.saldo_atual) || 0,
       unidade_medida: selectedProduct?.unidade_medida || 'unidade',
-      unidade_setor: form.unidade_setor || null, observacoes: form.observacoes || null,
-    });
+      unidade: form.unidade || null,
+      setor: form.setor || null,
+      unidade_setor: form.setor ? `${form.unidade} - ${form.setor}` : form.unidade || null,
+      observacoes: form.observacoes || null,
+    } as any);
     if (error) toast.error(error.message);
     else {
       toast.success("Solicitação enviada!");
-      setForm({ product_id: "", saldo_atual: "", unidade_setor: "", observacoes: "" });
+      setForm({ product_id: "", saldo_atual: "", unidade: "", setor: "", observacoes: "" });
       setShowForm(false);
       queryClient.invalidateQueries({ queryKey: ['my-requisitions'] });
     }
@@ -124,16 +129,35 @@ export default function MyRequisitionsPage() {
                     <p className="text-xs text-muted-foreground">Unidade: {selectedProduct.unidade_medida}</p>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label>Unidade/Setor</Label>
-                  <Input value={form.unidade_setor} onChange={e => setForm({ ...form, unidade_setor: e.target.value })}
-                    placeholder="Ex: Loja Centro, Cozinha..." />
-                </div>
-                <div className="space-y-2">
-                  <Label>Observação</Label>
-                  <Textarea value={form.observacoes} onChange={e => setForm({ ...form, observacoes: e.target.value })}
-                    placeholder="Observação opcional..." />
-                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className="border-border">
+                  <CardHeader className="py-2 px-4"><CardTitle className="text-sm">Unidade</CardTitle></CardHeader>
+                  <CardContent className="px-4 pb-3 pt-0">
+                    <Select value={form.unidade} onValueChange={v => setForm({ ...form, unidade: v })}>
+                      <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
+                      <SelectContent>
+                        {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </CardContent>
+                </Card>
+                <Card className="border-border">
+                  <CardHeader className="py-2 px-4"><CardTitle className="text-sm">Setor</CardTitle></CardHeader>
+                  <CardContent className="px-4 pb-3 pt-0">
+                    <Select value={form.setor} onValueChange={v => setForm({ ...form, setor: v })}>
+                      <SelectTrigger><SelectValue placeholder="Selecione o setor" /></SelectTrigger>
+                      <SelectContent>
+                        {SETORES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="space-y-2">
+                <Label>Observação</Label>
+                <Textarea value={form.observacoes} onChange={e => setForm({ ...form, observacoes: e.target.value })}
+                  placeholder="Observação opcional..." />
               </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
@@ -147,7 +171,7 @@ export default function MyRequisitionsPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <TableSkeleton columns={5} rows={5} />
+            <TableSkeleton columns={6} rows={5} />
           ) : isError ? (
             <QueryError onRetry={() => refetch()} />
           ) : requisitions.length === 0 ? (
@@ -163,6 +187,7 @@ export default function MyRequisitionsPage() {
                   <tr className="border-b">
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Produto</th>
                     <th className="text-right py-3 px-4 font-medium text-muted-foreground">Saldo Atual</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Unidade</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Setor</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Data</th>
                     <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
@@ -173,7 +198,8 @@ export default function MyRequisitionsPage() {
                     <tr key={r.id} className="border-b last:border-0 hover:bg-muted/50">
                       <td className="py-3 px-4 font-medium">{r.products?.nome || '—'}</td>
                       <td className="py-3 px-4 text-right currency">{r.saldo_atual} {r.unidade_medida}</td>
-                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{r.unidade_setor || '—'}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{(r as any).unidade || '—'}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{(r as any).setor || r.unidade_setor || '—'}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{formatDate(r.created_at)}</td>
                       <td className="py-3 px-4 text-center">{statusBadge(r.status)}</td>
                     </tr>
