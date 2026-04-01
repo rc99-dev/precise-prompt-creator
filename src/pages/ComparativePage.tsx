@@ -1,21 +1,34 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Trash2, TrendingDown, AlertTriangle, FileText } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Plus, Trash2, TrendingDown, AlertTriangle, FileText, RotateCcw } from "lucide-react";
 import { formatCurrency } from "@/lib/helpers";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
+import { UNIDADES } from "@/lib/constants";
 import StrategyCards, { useStrategyAnalysis } from "@/components/order/StrategyCards";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
+import { useComparativeDraft, DraftCompItem } from "@/hooks/useComparativeDraft";
 
 type Product = { id: string; nome: string; unidade_medida: string; codigo_interno: string | null };
 type Supplier = { id: string; razao_social: string };
 type PriceEntry = { supplier_id: string; product_id: string; preco_unitario: number };
-type CompItem = { product_id: string; product_name: string; unidade: string; quantidade: number };
+type CompItem = DraftCompItem;
+
+type RequisitionOption = {
+  id: string; product_id: string; saldo_atual: number; unidade_medida: string;
+  unidade: string | null; setor: string | null; unidade_setor: string | null;
+  user_id: string; created_at: string;
+  products?: { nome: string } | null;
+  profiles?: { full_name: string } | null;
+};
 
 const fetchCompData = async () => {
   const [{ data: p, error: e1 }, { data: s, error: e2 }] = await Promise.all([
@@ -24,7 +37,6 @@ const fetchCompData = async () => {
   ]);
   if (e1 || e2) throw new Error("Erro ao carregar dados");
 
-  // Busca preços em duas páginas para superar limite de 1000
   const [{ data: pr1 }, { data: pr2 }] = await Promise.all([
     supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario').range(0, 999),
     supabase.from('supplier_prices').select('supplier_id, product_id, preco_unitario').range(1000, 1999),
@@ -38,6 +50,13 @@ export default function ComparativePage() {
   const { user } = useAuth();
   const [items, setItems] = useState<CompItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [unidadeSolicitante, setUnidadeSolicitante] = useState("");
+  const [showSaldo, setShowSaldo] = useState(false);
+  const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
+  const [reqInfo, setReqInfo] = useState<{ solicitante: string; unidade: string; setor: string } | null>(null);
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const draftRestored = useRef(false);
+  const { hasDraft, saveDraft, loadDraft, clearDraft } = useComparativeDraft();
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['comparative-base-data-v3'],
@@ -45,11 +64,94 @@ export default function ComparativePage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: pendingReqs = [] } = useQuery({
+    queryKey: ['pending-requisitions-for-comp'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('requisitions')
+        .select('id, product_id, saldo_atual, unidade_medida, unidade, setor, unidade_setor, user_id, created_at, products(nome)')
+        .eq('status', 'pendente')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as unknown as RequisitionOption[];
+    },
+    staleTime: 3 * 60 * 1000,
+    enabled: showSaldo,
+  });
+
   const products = data?.products || [];
   const suppliers = data?.suppliers || [];
   const prices = data?.prices || [];
-  console.log('[debug] prices carregados:', prices.length);
-  console.log('[debug] camarao:', prices.filter(p => p.product_id === '11000a66-d670-4bc4-980a-91112e950cca'));
+
+  // Draft restore
+  useEffect(() => {
+    if (!data || draftRestored.current) return;
+    draftRestored.current = true;
+    const draft = loadDraft();
+    if (draft && draft.items.length > 0) {
+      setShowDraftBanner(true);
+    }
+  }, [data, loadDraft]);
+
+  const restoreDraft = useCallback(() => {
+    const draft = loadDraft();
+    if (draft) {
+      setItems(draft.items);
+      setUnidadeSolicitante(draft.unidadeSolicitante);
+      setShowSaldo(draft.showSaldo);
+      setSelectedReqId(draft.selectedRequisitionId);
+      setShowDraftBanner(false);
+    }
+  }, [loadDraft]);
+
+  const discardDraft = useCallback(() => {
+    clearDraft();
+    setShowDraftBanner(false);
+  }, [clearDraft]);
+
+  // Auto-save draft
+  useEffect(() => {
+    if (!draftRestored.current) return;
+    saveDraft({ items, unidadeSolicitante, showSaldo, selectedRequisitionId: selectedReqId });
+  }, [items, unidadeSolicitante, showSaldo, selectedReqId, saveDraft]);
+
+  // Load requisition products
+  useEffect(() => {
+    if (!selectedReqId || !showSaldo) return;
+    const reqs = pendingReqs.filter(r => r.id === selectedReqId || selectedReqId === 'all');
+    // If single req selected, get user info
+    if (selectedReqId !== 'all' && reqs.length > 0) {
+      const req = reqs[0];
+      supabase.from('profiles').select('full_name').eq('user_id', req.user_id).single()
+        .then(({ data: profile }) => {
+          setReqInfo({
+            solicitante: profile?.full_name || '—',
+            unidade: (req as any).unidade || req.unidade_setor || '—',
+            setor: (req as any).setor || '—',
+          });
+        });
+    }
+    // Pre-load products
+    const newItems: CompItem[] = reqs.map(r => ({
+      product_id: r.product_id,
+      product_name: r.products?.nome || '—',
+      unidade: r.unidade_medida,
+      quantidade: 1,
+      saldo: r.saldo_atual,
+    }));
+    // Merge with existing, avoiding duplicates
+    setItems(prev => {
+      const existingIds = new Set(prev.map(i => i.product_id));
+      const toAdd = newItems.filter(i => !existingIds.has(i.product_id));
+      // Update saldo on existing items
+      const updated = prev.map(p => {
+        const match = newItems.find(n => n.product_id === p.product_id);
+        return match ? { ...p, saldo: match.saldo } : p;
+      });
+      return [...updated, ...toAdd];
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedReqId, showSaldo, pendingReqs]);
 
   const getPrice = (productId: string, supplierId: string) =>
     prices.find(p => p.product_id === productId && p.supplier_id === supplierId)?.preco_unitario;
@@ -108,10 +210,18 @@ export default function ComparativePage() {
       items: items.map(item => ({
         product_name: item.product_name, unidade: item.unidade, quantidade: item.quantidade,
         prices: Object.fromEntries(relevantSuppliers.map(s => [s.id, getPrice(item.product_id, s.id) ?? null])),
+        saldo: item.saldo,
       })),
       suppliers: relevantSuppliers, supplierTotals,
       bestSupplierId: analysis?.bestSingle?.supplierId,
       comprador: profile?.full_name,
+      unidadeSolicitante: unidadeSolicitante || undefined,
+      showSaldo,
+      requisitionInfo: showSaldo && reqInfo ? {
+        solicitante: reqInfo.solicitante,
+        unidade: reqInfo.unidade,
+        setor: reqInfo.setor,
+      } : undefined,
     });
   };
 
@@ -129,7 +239,77 @@ export default function ComparativePage() {
         )}
       </div>
 
+      {showDraftBanner && (
+        <Card className="border-warning/50 bg-warning/5">
+          <CardContent className="py-3 px-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <span className="font-medium">Você tem uma cotação em andamento.</span>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={discardDraft}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" />Descartar
+              </Button>
+              <Button size="sm" onClick={restoreDraft}>
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />Continuar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {isError && <QueryError onRetry={() => refetch()} />}
+
+      {/* Unidade + Solicitação controls */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="py-3 px-4"><CardTitle className="text-sm">Unidade Solicitante</CardTitle></CardHeader>
+          <CardContent className="px-4 pb-3 pt-0">
+            <Select value={unidadeSolicitante} onValueChange={setUnidadeSolicitante}>
+              <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
+              <SelectContent>
+                {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm">Solicitação</CardTitle>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground">Mostrar saldo</Label>
+                <Switch checked={showSaldo} onCheckedChange={setShowSaldo} />
+              </div>
+            </div>
+          </CardHeader>
+          {showSaldo && (
+            <CardContent className="px-4 pb-3 pt-0">
+              <Select value={selectedReqId || ''} onValueChange={v => setSelectedReqId(v || null)}>
+                <SelectTrigger><SelectValue placeholder="Selecione a solicitação" /></SelectTrigger>
+                <SelectContent>
+                  {pendingReqs.map(r => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.products?.nome || '—'} — Saldo: {r.saldo_atual} ({new Date(r.created_at).toLocaleDateString('pt-BR')})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          )}
+        </Card>
+      </div>
+
+      {showSaldo && reqInfo && selectedReqId && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="py-3 px-4 text-sm">
+            <span className="font-medium">Cotação referente à solicitação</span>
+            {" — "}Solicitante: <span className="font-medium">{reqInfo.solicitante}</span>
+            {" — "}Unidade: <span className="font-medium">{reqInfo.unidade}</span>
+            {" — "}Setor: <span className="font-medium">{reqInfo.setor}</span>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader><CardTitle className="text-lg">Adicionar Produtos</CardTitle></CardHeader>
@@ -165,6 +345,7 @@ export default function ComparativePage() {
                   <tr className="border-b">
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground sticky left-0 bg-card">Produto</th>
                     <th className="text-center py-3 px-4 font-medium text-muted-foreground w-20">Qtd</th>
+                    {showSaldo && <th className="text-center py-3 px-4 font-medium text-muted-foreground w-20">Saldo</th>}
                     {relevantSuppliers.map(s => (
                       <th key={s.id} className="text-right py-3 px-4 font-medium text-muted-foreground min-w-[140px]">{s.razao_social}</th>
                     ))}
@@ -188,6 +369,11 @@ export default function ComparativePage() {
                         <td className="py-3 px-4">
                           <Input type="number" min="0.01" step="0.01" className="w-16 text-center mx-auto" value={item.quantidade} onChange={e => updateQty(idx, parseFloat(e.target.value) || 0)} />
                         </td>
+                        {showSaldo && (
+                          <td className="py-3 px-4 text-center text-muted-foreground">
+                            {item.saldo !== undefined ? item.saldo : '—'}
+                          </td>
+                        )}
                         {relevantSuppliers.map(s => {
                           const price = getPrice(item.product_id, s.id);
                           const isMin = price !== undefined && price === minPrice;
@@ -212,6 +398,7 @@ export default function ComparativePage() {
                   <tr className="border-t-2 font-bold">
                     <td className="py-3 px-4 sticky left-0 bg-card">Total por fornecedor</td>
                     <td></td>
+                    {showSaldo && <td></td>}
                     {relevantSuppliers.map(s => {
                       const isLowest = analysis?.bestSingle?.supplierId === s.id;
                       return (
