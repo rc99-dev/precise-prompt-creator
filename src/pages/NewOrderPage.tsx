@@ -45,6 +45,7 @@ export default function NewOrderPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editOrderId = searchParams.get("edit");
+  const requisitionId = searchParams.get("requisition");
   const [items, setItems] = useState<OrderItem[]>([]);
   const [activeStrategy, setActiveStrategy] = useState<"melhor_preco" | "melhor_fornecedor" | null>(null);
   const [observacoes, setObservacoes] = useState("");
@@ -100,11 +101,44 @@ export default function NewOrderPage() {
       return;
     }
 
+    // Load from requisition param
+    if (requisitionId) {
+      (async () => {
+        const { data: req } = await supabase
+          .from('requisitions')
+          .select('*, products(nome, unidade_medida)')
+          .eq('id', requisitionId)
+          .single();
+        if (req) {
+          const productName = (req.products as any)?.nome || '';
+          const unidade = (req.products as any)?.unidade_medida || '';
+          // Find best price
+          const pricesForProduct = allPrices.filter(p => p.product_id === req.product_id);
+          const min = pricesForProduct.length > 0
+            ? pricesForProduct.reduce((m, e) => e.preco_unitario < m.preco_unitario ? e : m, pricesForProduct[0])
+            : null;
+          setItems([{
+            product_id: req.product_id,
+            product_name: productName,
+            unidade,
+            quantidade: req.saldo_atual || 1,
+            supplier_id: min?.supplier_id || '',
+            preco_unitario: min?.preco_unitario || 0,
+            subtotal: (req.saldo_atual || 1) * (min?.preco_unitario || 0),
+            observacoes: req.observacoes || '',
+          }]);
+          if (req.unidade) setUnidadeSolicitante(req.unidade);
+          else if (req.unidade_setor) setUnidadeSolicitante(req.unidade_setor);
+        }
+      })();
+      return;
+    }
+
     const draft = loadDraft();
     if (draft && draft.items.length > 0) {
       setShowDraftBanner(true);
     }
-  }, [data, editOrderId, loadDraft]);
+  }, [data, editOrderId, requisitionId, loadDraft, allPrices]);
 
   const restoreDraft = useCallback(() => {
     const draft = loadDraft();
@@ -124,9 +158,9 @@ export default function NewOrderPage() {
   }, [clearDraft]);
 
   useEffect(() => {
-    if (editOrderId || !draftRestored.current) return;
+    if (editOrderId || requisitionId || !draftRestored.current) return;
     saveDraft({ items, observacoes, activeStrategy, editingOrderId: null });
-  }, [items, observacoes, activeStrategy, saveDraft, editOrderId]);
+  }, [items, observacoes, activeStrategy, saveDraft, editOrderId, requisitionId]);
 
   const pricesByProduct = useMemo(() => {
     const map: Record<string, { supplier_id: string; preco: number }[]> = {};
@@ -241,6 +275,14 @@ export default function NewOrderPage() {
       }));
       const { error: itemsError } = await supabase.from('purchase_order_items').insert(orderItems);
       if (itemsError) { toast.error(itemsError.message); setSaving(false); return; }
+
+      // Update requisition status if came from requisition
+      if (requisitionId) {
+        await supabase.from('requisitions').update({
+          status: 'incluida_no_pedido', order_id: order.id,
+        } as any).eq('id', requisitionId);
+      }
+
       toast.success(status === 'rascunho' ? "Rascunho salvo!" : "Enviado para aprovação!");
     }
 
@@ -263,7 +305,7 @@ export default function NewOrderPage() {
         </p>
       </div>
 
-      {showDraftBanner && !editOrderId && (
+      {showDraftBanner && !editOrderId && !requisitionId && (
         <Card className="border-warning/50 bg-warning/5">
           <CardContent className="py-3 px-4 flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm">

@@ -5,14 +5,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ShoppingCart } from "lucide-react";
+
+const SIGNUP_UNIDADES = ['CASARÃO', 'VEIGA CABRAL', 'PORTO FUTURO', 'ADM'] as const;
+const SIGNUP_SETORES = [
+  'LOJA', 'BAR', 'SALÃO', 'COZINHA', 'SUPRIMENTOS', 'PRODUÇÃO',
+  'DIRETORIA', 'GENTE & GESTÃO', 'FINANCEIRO', 'MARKETING', 'PROCESSOS & CONTROLADORIA',
+] as const;
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [unidade, setUnidade] = useState("");
+  const [setor, setSetor] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,12 +33,24 @@ export default function LoginPage() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email, password,
       options: { data: { full_name: fullName }, emailRedirectTo: window.location.origin },
     });
-    if (error) toast.error(error.message);
-    else toast.success("Conta criada com sucesso!");
+    if (error) { toast.error(error.message); setLoading(false); return; }
+
+    // Update profile with unidade and setor after signup
+    if (signUpData?.user) {
+      // Small delay to allow trigger to create profile
+      setTimeout(async () => {
+        await supabase.from('profiles').update({
+          unidade: unidade || null,
+          unidade_setor: setor || null,
+        } as any).eq('user_id', signUpData.user!.id);
+      }, 1000);
+    }
+
+    toast.success("Conta criada com sucesso!");
     setLoading(false);
   };
 
@@ -39,9 +59,12 @@ export default function LoginPage() {
       <Card className="w-full max-w-md border-border">
         <CardHeader className="text-center space-y-3">
           <div className="flex justify-center">
-            <div className="rounded-xl bg-primary p-3">
-              <ShoppingCart className="h-7 w-7 text-primary-foreground" />
-            </div>
+            <img
+              src="/logo.png"
+              alt="Logo Point do Açaí"
+              className="h-16 w-16 rounded-xl object-contain"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
           </div>
           <CardTitle className="text-2xl font-bold">Point do Açaí D'Amazônia</CardTitle>
           <CardDescription>Sistema de Gestão de Compras</CardDescription>
@@ -80,6 +103,24 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <Label htmlFor="reg-password">Senha</Label>
                   <Input id="reg-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Unidade</Label>
+                  <Select value={unidade} onValueChange={setUnidade}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
+                    <SelectContent>
+                      {SIGNUP_UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Setor</Label>
+                  <Select value={setor} onValueChange={setSetor}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o setor" /></SelectTrigger>
+                    <SelectContent>
+                      {SIGNUP_SETORES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Criando..." : "Criar conta"}

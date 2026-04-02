@@ -50,22 +50,24 @@ function ProtectedRoutes() {
     );
   }
 
+  const canOrLoading = (page: string) => loading || canAccess(role, page);
+
   return (
     <AppLayout>
       <Routes>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/minhas-solicitacoes" element={<MyRequisitionsPage />} />
-        {canAccess(role, 'solicitacoes') && <Route path="/solicitacoes" element={<RequisitionsPage />} />}
-        {canAccess(role, 'fornecedores') && <Route path="/fornecedores" element={<SuppliersPage />} />}
-        {canAccess(role, 'produtos') && <Route path="/produtos" element={<ProductsPage />} />}
-        {canAccess(role, 'precos') && <Route path="/precos" element={<PricesPage />} />}
-        {canAccess(role, 'nova-ordem') && <Route path="/nova-ordem" element={<NewOrderPage />} />}
-        {canAccess(role, 'historico') && <Route path="/historico" element={<OrderHistoryPage />} />}
-        {canAccess(role, 'comparativo') && <Route path="/comparativo" element={<ComparativePage />} />}
-        {canAccess(role, 'aprovacoes') && <Route path="/aprovacoes" element={<ApprovalsPage />} />}
-        {canAccess(role, 'recebimentos') && <Route path="/recebimentos" element={<ReceiptsPage />} />}
-        {canAccess(role, 'usuarios') && <Route path="/usuarios" element={<UsersPage />} />}
-        {canAccess(role, 'relatorios') && <Route path="/relatorios" element={<ReportsPage />} />}
+        {canOrLoading('solicitacoes') && <Route path="/solicitacoes" element={<RequisitionsPage />} />}
+        {canOrLoading('fornecedores') && <Route path="/fornecedores" element={<SuppliersPage />} />}
+        {canOrLoading('produtos') && <Route path="/produtos" element={<ProductsPage />} />}
+        {canOrLoading('precos') && <Route path="/precos" element={<PricesPage />} />}
+        {canOrLoading('nova-ordem') && <Route path="/nova-ordem" element={<NewOrderPage />} />}
+        {canOrLoading('historico') && <Route path="/historico" element={<OrderHistoryPage />} />}
+        {canOrLoading('comparativo') && <Route path="/comparativo" element={<ComparativePage />} />}
+        {canOrLoading('aprovacoes') && <Route path="/aprovacoes" element={<ApprovalsPage />} />}
+        {canOrLoading('recebimentos') && <Route path="/recebimentos" element={<ReceiptsPage />} />}
+        {canOrLoading('usuarios') && <Route path="/usuarios" element={<UsersPage />} />}
+        {canOrLoading('relatorios') && <Route path="/relatorios" element={<ReportsPage />} />}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
