@@ -156,14 +156,14 @@ export default function OrderHistoryPage() {
     const map: Record<string, string> = {
       rascunho: 'Rascunho', aguardando_aprovacao: 'Aguardando Aprovação',
       aprovado: 'Aprovado', rejeitado: 'Rejeitado', emitido: 'Emitido',
-      recebido: 'Recebido', finalizado: 'Finalizado', enviado: 'Enviado',
+      recebido: 'Recebido', recebido_com_ocorrencia: 'Recebido c/ Ocorrência', cancelado: 'Cancelado',
     };
     return map[s] || s;
   };
   const statusVariant = (s: string): "default" | "secondary" | "outline" | "destructive" => {
-    if (s === 'aprovado' || s === 'finalizado' || s === 'recebido') return 'default';
-    if (s === 'rejeitado') return 'destructive';
-    if (s === 'aguardando_aprovacao' || s === 'enviado' || s === 'emitido') return 'secondary';
+    if (s === 'aprovado' || s === 'recebido') return 'default';
+    if (s === 'rejeitado' || s === 'cancelado') return 'destructive';
+    if (s === 'aguardando_aprovacao' || s === 'emitido' || s === 'recebido_com_ocorrencia') return 'secondary';
     return 'outline';
   };
   const modoLabel = (m: string) => m === 'manual' ? 'Manual' : m === 'melhor_preco' ? 'Melhor Preço' : 'Melhor Fornecedor';
