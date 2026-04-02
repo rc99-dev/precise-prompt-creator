@@ -120,8 +120,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Background image overlay */}
+        <div
+          className="absolute inset-0 z-0 pointer-events-none"
+          style={{
+            backgroundImage: 'url(/back.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            opacity: 0.06,
+          }}
+        />
+        <header className="relative z-10 flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(true)}>
               <Menu className="h-5 w-5" />
@@ -130,7 +140,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <NotificationBell />
         </header>
-        <div className="flex-1 overflow-y-auto p-6 lg:p-8 max-w-7xl mx-auto w-full animate-fade-in">
+        <div className="relative z-10 flex-1 overflow-y-auto p-6 lg:p-8 max-w-7xl mx-auto w-full animate-fade-in">
           {children}
         </div>
       </main>
