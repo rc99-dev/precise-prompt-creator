@@ -74,8 +74,6 @@ export default function PricesPage() {
   const prices = data?.prices || [];
   const suppliers = data?.suppliers || [];
   const products = data?.products || [];
-  console.log('[debug] prices total:', prices.length);
-  console.log('[debug] ceasinha:', prices.filter(p => p.supplier_id === 'a9854441-94d2-4fe4-bb01-3ba764a55750'));
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['prices-page-data'] });
 
