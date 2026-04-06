@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Users, Pencil, Search } from "lucide-react";
+import { Users, Pencil, Search, Trash2 } from "lucide-react";
 import { roleLabels, AppRole } from "@/lib/helpers";
 import { UNIDADES_USUARIO } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,6 +29,8 @@ export default function UsersPage() {
   const [editRole, setEditRole] = useState<AppRole>('solicitante');
   const [editSetor, setEditSetor] = useState("");
   const [editUnidade, setEditUnidade] = useState("");
+  const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
+  const [cleaningUp, setCleaningUp] = useState(false);
 
   const { data: users = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['users-list'],
@@ -65,11 +68,41 @@ export default function UsersPage() {
     queryClient.invalidateQueries({ queryKey: ['users-list'] });
   };
 
+  // MELHORIA 4: Limpar solicitações recusadas
+  const handleCleanupRefused = async () => {
+    setCleaningUp(true);
+    // First count how many will be deleted
+    const { count } = await supabase
+      .from('requisitions')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'recusada');
+    
+    const { error } = await supabase
+      .from('requisitions')
+      .delete()
+      .eq('status', 'recusada');
+    
+    if (error) {
+      toast.error(`Erro ao limpar: ${error.message}`);
+    } else {
+      toast.success(`${count || 0} solicitação(ões) recusada(s) removida(s).`);
+      queryClient.invalidateQueries({ queryKey: ['requisitions-list'] });
+      queryClient.invalidateQueries({ queryKey: ['my-requisitions'] });
+    }
+    setCleaningUp(false);
+    setShowCleanupConfirm(false);
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Usuários</h1>
-        <p className="text-muted-foreground text-sm mt-1">Gerencie os usuários e perfis de acesso</p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Usuários</h1>
+          <p className="text-muted-foreground text-sm mt-1">Gerencie os usuários e perfis de acesso</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setShowCleanupConfirm(true)}>
+          <Trash2 className="h-4 w-4 mr-2" />Limpar Recusadas
+        </Button>
       </div>
 
       <div className="relative max-w-md">
@@ -159,6 +192,23 @@ export default function UsersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showCleanupConfirm} onOpenChange={setShowCleanupConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Limpar solicitações recusadas?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá excluir permanentemente todas as solicitações com status "Recusada" do sistema, incluindo os motivos de recusa. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cleaningUp}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCleanupRefused} disabled={cleaningUp} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {cleaningUp ? "Limpando..." : "Confirmar Limpeza"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

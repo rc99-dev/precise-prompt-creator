@@ -45,7 +45,7 @@ export default function MyRequisitionsPage() {
       return { requisitions: (reqs || []) as unknown as Requisition[], products: (prods || []) as Product[] };
     },
     enabled: !!user,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30 seconds instead of 5 minutes for faster updates
   });
 
   const requisitions = data?.requisitions || [];
@@ -70,7 +70,11 @@ export default function MyRequisitionsPage() {
       toast.success("Solicitação enviada!");
       setForm({ product_id: "", saldo_atual: "", unidade: "", setor: "", observacoes: "" });
       setShowForm(false);
+      // Invalidate all requisition-related queries immediately
       queryClient.invalidateQueries({ queryKey: ['my-requisitions'] });
+      queryClient.invalidateQueries({ queryKey: ['requisitions-list'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-requisitions-for-comp'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     }
     setSaving(false);
   };

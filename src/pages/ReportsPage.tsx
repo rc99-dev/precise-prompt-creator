@@ -13,6 +13,7 @@ import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const COUNTABLE_STATUSES = ['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
 
 const purchasesConfig: ChartConfig = {
   total: { label: "Total (R$)", color: "hsl(var(--primary))" },
@@ -28,7 +29,7 @@ async function fetchReportData(year: string) {
 
   const [ordersRes, itemsRes, approvalRes] = await Promise.all([
     supabase.from("purchase_orders").select("id, created_at, total, status, approved_at, modo")
-      .gte("created_at", startDate).lt("created_at", endDate).not("status", "eq", "cancelado"),
+      .gte("created_at", startDate).lt("created_at", endDate),
     supabase.from("purchase_order_items").select("order_id, supplier_id, subtotal, suppliers(razao_social)")
       .not("supplier_id", "is", null),
     supabase.from("approval_log").select("order_id, created_at, action")
@@ -36,15 +37,20 @@ async function fetchReportData(year: string) {
   ]);
   if (ordersRes.error || itemsRes.error || approvalRes.error) throw new Error("Erro ao carregar relatórios");
 
-  const orders = ordersRes.data || [];
+  const allOrders = ordersRes.data || [];
+  // Only count orders with countable statuses for financial metrics
+  const orders = allOrders.filter(o => COUNTABLE_STATUSES.includes(o.status));
   const items = (itemsRes.data || []) as any[];
   const approvals = approvalRes.data || [];
+
+  // Build set of countable order IDs for filtering items
+  const countableOrderIds = new Set(orders.map(o => o.id));
 
   const monthMap = new Map<number, { total: number; count: number }>();
   for (let i = 0; i < 12; i++) monthMap.set(i, { total: 0, count: 0 });
   const orderMap = new Map<string, any>();
+  allOrders.forEach((o) => { orderMap.set(o.id, o); });
   orders.forEach((o) => {
-    orderMap.set(o.id, o);
     const m = new Date(o.created_at).getMonth();
     const entry = monthMap.get(m)!;
     entry.total += o.total || 0;
@@ -56,6 +62,8 @@ async function fetchReportData(year: string) {
 
   const supplierTotals = new Map<string, { name: string; total: number }>();
   items.forEach((item) => {
+    // Only count items from countable orders
+    if (!countableOrderIds.has(item.order_id)) return;
     const name = (item.suppliers as any)?.razao_social || "Sem fornecedor";
     const existing = supplierTotals.get(name) || { name, total: 0 };
     existing.total += item.subtotal || 0;
