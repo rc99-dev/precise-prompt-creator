@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Eye, Copy, Download, FileText, Pencil, Trash2 } from "lucide-react";
+import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/helpers";
 import { generateOrderPDF } from "@/lib/pdfGenerator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -49,6 +49,10 @@ export default function OrderHistoryPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [previsaoTarget, setPrevisaoTarget] = useState<Order | null>(null);
+  const [previsaoData, setPrevisaoData] = useState("");
+  const [previsaoObs, setPrevisaoObs] = useState("");
+  const [savingPrevisao, setSavingPrevisao] = useState(false);
 
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['order-history'],
@@ -95,7 +99,6 @@ export default function OrderHistoryPage() {
   const handleDeleteDraft = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
-    // Delete items first, then order
     await supabase.from('purchase_order_items').delete().eq('order_id', deleteTarget.id);
     const { error } = await supabase.from('purchase_orders').delete().eq('id', deleteTarget.id);
     if (error) { toast.error(error.message); } else { toast.success("Rascunho excluído!"); }
@@ -149,33 +152,48 @@ export default function OrderHistoryPage() {
       })),
       comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (order as any).approved_at,
     });
+
+    // Atualiza status para emitido se estava aprovado
+    if (order.status === 'aprovado') {
+      await supabase.from('purchase_orders').update({ status: 'emitido' }).eq('id', order.id);
+      const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
+      if (estoquistas?.length) {
+        await supabase.from('notifications').insert(estoquistas.map(e => ({
+          user_id: e.user_id,
+          title: 'Nova ordem emitida',
+          message: `Pedido ${order.numero} foi emitido — aguardando confirmação do fornecedor.`,
+          type: 'info', read: false,
+        })));
+      }
+      queryClient.invalidateQueries({ queryKey: ['order-history'] });
+    }
     toast.success("PDF gerado!");
   };
-// Atualiza status para emitido se estava aprovado
-if (order.status === 'aprovado') {
-  await supabase.from('purchase_orders')
-    .update({ status: 'emitido' })
-    .eq('id', order.id);
-  
-  // Notifica estoquistas
-  const { data: estoquistas } = await supabase
-    .from('user_roles')
-    .select('user_id')
-    .eq('role', 'estoquista');
-  
-  if (estoquistas) {
-    const notifs = estoquistas.map(e => ({
-      user_id: e.user_id,
-      title: 'Nova entrega esperada',
-      message: `Pedido ${order.numero} foi emitido e aguarda recebimento.`,
-      type: 'order_emitted',
-      order_id: order.id,
-    }));
-    await supabase.from('notifications').insert(notifs);
-  }
-  
-  queryClient.invalidateQueries({ queryKey: ['order-history'] });
-}
+
+  const handleSalvarPrevisao = async () => {
+    if (!previsaoTarget || !previsaoData) { toast.error("Informe a data prevista."); return; }
+    setSavingPrevisao(true);
+    await supabase.from('purchase_orders').update({
+      previsao_entrega: previsaoData,
+      obs_estoquista: previsaoObs || null,
+    }).eq('id', previsaoTarget.id);
+    const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
+    if (estoquistas?.length) {
+      await supabase.from('notifications').insert(estoquistas.map(e => ({
+        user_id: e.user_id,
+        title: 'Previsão de entrega registrada',
+        message: `Pedido ${previsaoTarget.numero} — Entrega prevista para ${new Date(previsaoData).toLocaleDateString('pt-BR')}. ${previsaoObs || ''}`,
+        type: 'info', read: false,
+      })));
+    }
+    toast.success("Previsão registrada! Estoquista notificado.");
+    setSavingPrevisao(false);
+    setPrevisaoTarget(null);
+    setPrevisaoData("");
+    setPrevisaoObs("");
+    queryClient.invalidateQueries({ queryKey: ['order-history'] });
+  };
+
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
       rascunho: 'Rascunho', aguardando_aprovacao: 'Aguardando Aprovação',
@@ -184,12 +202,14 @@ if (order.status === 'aprovado') {
     };
     return map[s] || s;
   };
+
   const statusVariant = (s: string): "default" | "secondary" | "outline" | "destructive" => {
     if (s === 'aprovado' || s === 'recebido') return 'default';
     if (s === 'rejeitado' || s === 'cancelado') return 'destructive';
     if (s === 'aguardando_aprovacao' || s === 'emitido' || s === 'recebido_com_ocorrencia') return 'secondary';
     return 'outline';
   };
+
   const modoLabel = (m: string) => m === 'manual' ? 'Manual' : m === 'melhor_preco' ? 'Melhor Preço' : 'Melhor Fornecedor';
 
   return (
@@ -253,6 +273,11 @@ if (order.status === 'aprovado') {
                           <Button variant="ghost" size="icon" onClick={() => exportPDF(o)} title="PDF"><FileText className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)} title="Duplicar"><Copy className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => exportCSV(o)} title="CSV"><Download className="h-4 w-4" /></Button>
+                          {o.status === 'emitido' && (
+                            <Button variant="ghost" size="icon" onClick={() => { setPrevisaoTarget(o); setPrevisaoData(""); setPrevisaoObs(""); }} title="Registrar previsão de entrega">
+                              <Calendar className="h-4 w-4 text-amber-400" />
+                            </Button>
+                          )}
                           {o.status === 'rascunho' && (
                             <>
                               <Button variant="ghost" size="icon" onClick={() => navigate(`/nova-ordem?edit=${o.id}`)} title="Editar">
@@ -312,6 +337,29 @@ if (order.status === 'aprovado') {
               </table>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!previsaoTarget} onOpenChange={(open) => !open && setPrevisaoTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Registrar previsão de entrega</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="text-sm text-muted-foreground">Pedido: <span className="font-medium text-foreground">{previsaoTarget?.numero}</span></div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data prevista de entrega *</label>
+              <Input type="date" value={previsaoData} onChange={e => setPrevisaoData(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Observação para o estoquista</label>
+              <Input placeholder="Ex: Entregar na portaria das 8h às 10h" value={previsaoObs} onChange={e => setPrevisaoObs(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setPrevisaoTarget(null)}>Cancelar</Button>
+              <Button onClick={handleSalvarPrevisao} disabled={savingPrevisao}>
+                {savingPrevisao ? "Salvando..." : "Confirmar e notificar estoquista"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
