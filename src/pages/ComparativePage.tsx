@@ -64,18 +64,26 @@ export default function ComparativePage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Filter requisitions by selected unidade
   const { data: pendingReqs = [] } = useQuery({
-    queryKey: ['pending-requisitions-for-comp'],
+    queryKey: ['pending-requisitions-for-comp', unidadeSolicitante],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('requisitions')
         .select('id, product_id, saldo_atual, unidade_medida, unidade, setor, unidade_setor, user_id, created_at, products(nome)')
         .eq('status', 'pendente')
         .order('created_at', { ascending: false });
+      
+      // BUG 12: filter by unidade when selected
+      if (unidadeSolicitante) {
+        query = query.eq('unidade', unidadeSolicitante);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as unknown as RequisitionOption[];
     },
-    staleTime: 3 * 60 * 1000,
+    staleTime: 30 * 1000,
     enabled: showSaldo,
   });
 
@@ -97,7 +105,7 @@ export default function ComparativePage() {
     const draft = loadDraft();
     if (draft) {
       setItems(draft.items);
-      setUnidadeSolicitante(draft.unidadeSolicitante);
+      setUnidadeSolicitante(draft.unidadeSolicitante || "");
       setShowSaldo(draft.showSaldo);
       setSelectedReqId(draft.selectedRequisitionId);
       setShowDraftBanner(false);
@@ -143,7 +151,6 @@ export default function ComparativePage() {
     setItems(prev => {
       const existingIds = new Set(prev.map(i => i.product_id));
       const toAdd = newItems.filter(i => !existingIds.has(i.product_id));
-      // Update saldo on existing items
       const updated = prev.map(p => {
         const match = newItems.find(n => n.product_id === p.product_id);
         return match ? { ...p, saldo: match.saldo } : p;
@@ -265,7 +272,12 @@ export default function ComparativePage() {
         <Card>
           <CardHeader className="py-3 px-4"><CardTitle className="text-sm">Unidade Solicitante</CardTitle></CardHeader>
           <CardContent className="px-4 pb-3 pt-0">
-            <Select value={unidadeSolicitante} onValueChange={setUnidadeSolicitante}>
+            <Select value={unidadeSolicitante} onValueChange={(v) => {
+              setUnidadeSolicitante(v);
+              // Reset requisition selection when unidade changes
+              setSelectedReqId(null);
+              setReqInfo(null);
+            }}>
               <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
               <SelectContent>
                 {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}

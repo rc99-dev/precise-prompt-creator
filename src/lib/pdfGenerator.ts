@@ -26,7 +26,6 @@ function drawHeader(doc: jsPDF, docType: string, numero: string, date: string, u
 
   // Logo
   try {
-    // We'll use a small white area for logo visibility
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(10, 4, 14, 14, 2, 2, "F");
     addLogo(doc, 10.5, 4.5, 13);
@@ -82,7 +81,9 @@ function drawFooterLine(doc: jsPDF) {
   doc.setFontSize(7);
   doc.setTextColor(150, 150, 150);
   doc.text(COMPANY + " — Documento gerado automaticamente", 14, h - 14);
-  doc.text(`Página ${(doc as any).getCurrentPageInfo?.()?.pageNumber || ""}`, w - 14, h - 14, { align: "right" });
+  const pageCount = (doc as any).internal.getNumberOfPages?.() || 1;
+  const currentPage = (doc as any).getCurrentPageInfo?.()?.pageNumber || (doc as any).internal.getCurrentPageInfo?.()?.pageNumber || "";
+  doc.text(`Página ${currentPage || ""}`, w - 14, h - 14, { align: "right" });
 }
 
 interface SupplierInfo {
@@ -141,7 +142,7 @@ export function generateOrderPDF(data: OrderPDFData) {
     y += 30;
   }
 
-  // Items table
+  // Items table with automatic page break
   const tableBody = data.items.map((item, idx) => [
     String(idx + 1),
     item.codigo || "—",
@@ -156,7 +157,7 @@ export function generateOrderPDF(data: OrderPDFData) {
     startY: y,
     head: [["#", "Código", "Descrição", "Unidade", "Qtd", "Preço Unit.", "Subtotal"]],
     body: tableBody,
-    margin: { left: 14, right: 14 },
+    margin: { left: 14, right: 14, bottom: 30 },
     styles: { fontSize: 8, cellPadding: 2.5, textColor: DARK as any },
     headStyles: {
       fillColor: BRAND as any,
@@ -174,10 +175,20 @@ export function generateOrderPDF(data: OrderPDFData) {
       5: { cellWidth: 26, halign: "right" },
       6: { cellWidth: 26, halign: "right" },
     },
+    // Enable automatic page breaks
+    rowPageBreak: 'auto',
     didDrawPage: () => { drawFooterLine(doc); },
   });
 
   y = (doc as any).lastAutoTable.finalY + 4;
+
+  // Check if we need a new page for the total/footer
+  const pageH = doc.internal.pageSize.getHeight();
+  if (y + 60 > pageH - 30) {
+    doc.addPage();
+    y = 20;
+    drawFooterLine(doc);
+  }
 
   // Total row
   doc.setFillColor(...DARK);
@@ -353,7 +364,7 @@ export function generateQuotationPDF(data: QuotPDFData) {
     startY: y,
     head: [head],
     body,
-    margin: { left: 14, right: 14 },
+    margin: { left: 14, right: 14, bottom: 30 },
     styles: { fontSize: 7, cellPadding: 2, textColor: DARK as any, overflow: "linebreak" },
     headStyles: {
       fillColor: BRAND as any,
@@ -368,6 +379,7 @@ export function generateQuotationPDF(data: QuotPDFData) {
       2: { cellWidth: 16, halign: "center" },
       3: { cellWidth: 12, halign: "center" },
     },
+    rowPageBreak: 'auto',
     didDrawPage: () => { drawFooterLine(doc); },
   });
 
