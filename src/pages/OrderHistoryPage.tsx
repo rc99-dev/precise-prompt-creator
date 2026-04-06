@@ -151,7 +151,31 @@ export default function OrderHistoryPage() {
     });
     toast.success("PDF gerado!");
   };
-
+// Atualiza status para emitido se estava aprovado
+if (order.status === 'aprovado') {
+  await supabase.from('purchase_orders')
+    .update({ status: 'emitido' })
+    .eq('id', order.id);
+  
+  // Notifica estoquistas
+  const { data: estoquistas } = await supabase
+    .from('user_roles')
+    .select('user_id')
+    .eq('role', 'estoquista');
+  
+  if (estoquistas) {
+    const notifs = estoquistas.map(e => ({
+      user_id: e.user_id,
+      title: 'Nova entrega esperada',
+      message: `Pedido ${order.numero} foi emitido e aguarda recebimento.`,
+      type: 'order_emitted',
+      order_id: order.id,
+    }));
+    await supabase.from('notifications').insert(notifs);
+  }
+  
+  queryClient.invalidateQueries({ queryKey: ['order-history'] });
+}
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
       rascunho: 'Rascunho', aguardando_aprovacao: 'Aguardando Aprovação',
