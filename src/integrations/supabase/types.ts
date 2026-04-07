@@ -277,6 +277,7 @@ export type Database = {
           obs_estoquista: string | null
           observacoes: string | null
           previsao_entrega: string | null
+          previsao_registrada_por: string | null
           rejected_reason: string | null
           status: string
           total: number
@@ -295,6 +296,7 @@ export type Database = {
           obs_estoquista?: string | null
           observacoes?: string | null
           previsao_entrega?: string | null
+          previsao_registrada_por?: string | null
           rejected_reason?: string | null
           status?: string
           total?: number
@@ -313,6 +315,7 @@ export type Database = {
           obs_estoquista?: string | null
           observacoes?: string | null
           previsao_entrega?: string | null
+          previsao_registrada_por?: string | null
           rejected_reason?: string | null
           status?: string
           total?: number
@@ -532,6 +535,45 @@ export type Database = {
         }
         Relationships: []
       }
+      requisition_items: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          requisition_id: string
+          saldo: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          requisition_id: string
+          saldo?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          requisition_id?: string
+          saldo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "requisition_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requisition_items_requisition_id_fkey"
+            columns: ["requisition_id"]
+            isOneToOne: false
+            referencedRelation: "requisitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       requisitions: {
         Row: {
           created_at: string
@@ -543,6 +585,7 @@ export type Database = {
           saldo_atual: number
           setor: string | null
           status: string
+          titulo: string | null
           unidade: string | null
           unidade_medida: string
           unidade_setor: string | null
@@ -559,6 +602,7 @@ export type Database = {
           saldo_atual?: number
           setor?: string | null
           status?: string
+          titulo?: string | null
           unidade?: string | null
           unidade_medida?: string
           unidade_setor?: string | null
@@ -575,6 +619,7 @@ export type Database = {
           saldo_atual?: number
           setor?: string | null
           status?: string
+          titulo?: string | null
           unidade?: string | null
           unidade_medida?: string
           unidade_setor?: string | null
