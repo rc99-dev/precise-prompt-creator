@@ -257,6 +257,7 @@ export default function OrderHistoryPage() {
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Número</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Data</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Modo</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Comprador</th>
                     <th className="text-right py-3 px-4 font-medium text-muted-foreground">Total</th>
                     <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
                     <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>
@@ -264,12 +265,13 @@ export default function OrderHistoryPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma ordem encontrada.</td></tr>
+                    <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">Nenhuma ordem encontrada.</td></tr>
                   ) : filtered.map(o => (
                     <tr key={o.id} className="border-b last:border-0 hover:bg-muted/50">
                       <td className="py-3 px-4 font-medium">{o.numero}</td>
                       <td className="py-3 px-4 text-muted-foreground">{formatDate(o.created_at)}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{modoLabel(o.modo)}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{o.comprador_nome || '—'}</td>
                       <td className="py-3 px-4 text-right currency font-medium">{formatCurrency(o.total)}</td>
                       <td className="py-3 px-4 text-center"><Badge variant={statusVariant(o.status)}>{statusLabel(o.status)}</Badge></td>
                       <td className="py-3 px-4 text-right">
