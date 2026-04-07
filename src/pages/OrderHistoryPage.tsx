@@ -21,6 +21,7 @@ type Order = {
   id: string; numero: string; user_id: string; modo: string;
   status: string; observacoes: string | null; total: number;
   created_at: string; profiles?: { full_name: string } | null;
+  comprador_nome?: string;
 };
 
 type OrderItem = {
@@ -32,10 +33,14 @@ type OrderItem = {
 };
 
 const fetchOrders = async () => {
-  const { data, error } = await supabase
-    .from('purchase_orders').select('*').order('created_at', { ascending: false });
+  const [{ data: orders, error }, { data: profiles }] = await Promise.all([
+    supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }),
+    supabase.from('profiles').select('user_id, full_name'),
+  ]);
   if (error) throw error;
-  return (data || []) as unknown as Order[];
+  const profileMap: Record<string, string> = {};
+  (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name; });
+  return (orders || []).map((o: any) => ({ ...o, comprador_nome: profileMap[o.user_id] || '—' })) as unknown as Order[];
 };
 
 export default function OrderHistoryPage() {
@@ -176,6 +181,7 @@ export default function OrderHistoryPage() {
     await supabase.from('purchase_orders').update({
       previsao_entrega: previsaoData,
       obs_estoquista: previsaoObs || null,
+      previsao_registrada_por: user?.id || null,
     } as any).eq('id', previsaoTarget.id);
     const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
     if (estoquistas?.length) {
@@ -252,6 +258,7 @@ export default function OrderHistoryPage() {
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Número</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Data</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Modo</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Comprador</th>
                     <th className="text-right py-3 px-4 font-medium text-muted-foreground">Total</th>
                     <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
                     <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>
@@ -259,12 +266,13 @@ export default function OrderHistoryPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma ordem encontrada.</td></tr>
+                    <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">Nenhuma ordem encontrada.</td></tr>
                   ) : filtered.map(o => (
                     <tr key={o.id} className="border-b last:border-0 hover:bg-muted/50">
                       <td className="py-3 px-4 font-medium">{o.numero}</td>
                       <td className="py-3 px-4 text-muted-foreground">{formatDate(o.created_at)}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{modoLabel(o.modo)}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{o.comprador_nome || '—'}</td>
                       <td className="py-3 px-4 text-right currency font-medium">{formatCurrency(o.total)}</td>
                       <td className="py-3 px-4 text-center"><Badge variant={statusVariant(o.status)}>{statusLabel(o.status)}</Badge></td>
                       <td className="py-3 px-4 text-right">

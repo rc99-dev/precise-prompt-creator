@@ -9,73 +9,138 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, ClipboardList } from "lucide-react";
+import { Plus, ClipboardList, X, Search } from "lucide-react";
 import { formatDate, statusLabels } from "@/lib/helpers";
-import { UNIDADES, SETORES } from "@/lib/constants";
+import { UNIDADES, SETORES, TITULOS_SOLICITACAO } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 
 type Requisition = {
-  id: string; user_id: string; product_id: string; saldo_atual: number;
-  unidade_medida: string; unidade_setor: string | null; unidade: string | null;
-  setor: string | null; observacoes: string | null;
-  status: string; motivo_recusa: string | null; created_at: string;
-  products?: { nome: string } | null;
+  id: string; user_id: string; titulo: string | null; unidade: string | null;
+  setor: string | null; status: string; motivo_recusa: string | null; created_at: string;
+  requisition_items?: { id: string; product_id: string; saldo: number; products?: { nome: string; unidade_medida: string } | null }[];
 };
 
 type Product = { id: string; nome: string; unidade_medida: string };
+
+type DraftItem = { product_id: string; nome: string; unidade_medida: string; saldo: string };
 
 export default function MyRequisitionsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
-  const [search, setSearch] = useState("");
-  const [form, setForm] = useState({ product_id: "", saldo_atual: "", unidade: "", setor: "", observacoes: "" });
+  const [titulo, setTitulo] = useState("");
+  const [unidade, setUnidade] = useState("");
+  const [setor, setSetor] = useState("");
+  const [observacoes, setObservacoes] = useState("");
+  const [items, setItems] = useState<DraftItem[]>([]);
+  const [productSearch, setProductSearch] = useState("");
   const [saving, setSaving] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-requisitions', user?.id],
     queryFn: async () => {
       const [{ data: reqs, error: e1 }, { data: prods, error: e2 }] = await Promise.all([
-        supabase.from('requisitions').select('*, products(nome)').eq('user_id', user!.id).order('created_at', { ascending: false }),
+        supabase.from('requisitions').select('id, user_id, titulo, unidade, setor, status, motivo_recusa, created_at')
+          .eq('user_id', user!.id).order('created_at', { ascending: false }),
         supabase.from('products').select('id, nome, unidade_medida').eq('status', 'ativo').order('nome'),
       ]);
       if (e1 || e2) throw new Error("Erro ao carregar dados");
-      return { requisitions: (reqs || []) as unknown as Requisition[], products: (prods || []) as Product[] };
+
+      // Load items for each requisition
+      const reqIds = (reqs || []).map(r => r.id);
+      let reqItems: any[] = [];
+      if (reqIds.length > 0) {
+        const { data: ri } = await supabase.from('requisition_items')
+          .select('id, requisition_id, product_id, saldo, products(nome, unidade_medida)')
+          .in('requisition_id', reqIds);
+        reqItems = ri || [];
+      }
+
+      const enriched = (reqs || []).map((r: any) => ({
+        ...r,
+        requisition_items: reqItems.filter(ri => ri.requisition_id === r.id),
+      }));
+
+      return { requisitions: enriched as Requisition[], products: (prods || []) as Product[] };
     },
     enabled: !!user,
-    staleTime: 30 * 1000, // 30 seconds instead of 5 minutes for faster updates
+    staleTime: 30 * 1000,
   });
 
   const requisitions = data?.requisitions || [];
   const products = data?.products || [];
-  const selectedProduct = products.find(p => p.id === form.product_id);
+
+  const filteredProducts = products.filter(p =>
+    p.nome.toLowerCase().includes(productSearch.toLowerCase()) &&
+    !items.some(i => i.product_id === p.id)
+  );
+
+  const addProduct = (p: Product) => {
+    setItems([...items, { product_id: p.id, nome: p.nome, unidade_medida: p.unidade_medida, saldo: "" }]);
+    setProductSearch("");
+  };
+
+  const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
+  const updateSaldo = (idx: number, val: string) => {
+    const copy = [...items];
+    copy[idx].saldo = val;
+    setItems(copy);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.product_id) { toast.error("Selecione um produto."); return; }
+    if (!titulo) { toast.error("Selecione o título."); return; }
+    if (!unidade) { toast.error("Selecione a unidade."); return; }
+    if (!setor) { toast.error("Selecione o setor."); return; }
+    if (items.length === 0) { toast.error("Adicione pelo menos um produto."); return; }
+
     setSaving(true);
-    const { error } = await supabase.from('requisitions').insert({
-      user_id: user!.id, product_id: form.product_id,
-      saldo_atual: parseFloat(form.saldo_atual) || 0,
-      unidade_medida: selectedProduct?.unidade_medida || 'unidade',
-      unidade: form.unidade || null,
-      setor: form.setor || null,
-      unidade_setor: form.setor ? `${form.unidade} - ${form.setor}` : form.unidade || null,
-      observacoes: form.observacoes || null,
-    } as any);
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Solicitação enviada!");
-      setForm({ product_id: "", saldo_atual: "", unidade: "", setor: "", observacoes: "" });
-      setShowForm(false);
-      // Invalidate all requisition-related queries immediately
-      queryClient.invalidateQueries({ queryKey: ['my-requisitions'] });
-      queryClient.invalidateQueries({ queryKey: ['requisitions-list'] });
-      queryClient.invalidateQueries({ queryKey: ['pending-requisitions-for-comp'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+
+    // Get user profile for name
+    const { data: profile } = await supabase.from('profiles').select('full_name').eq('user_id', user!.id).single();
+
+    // Create requisition header
+    const { data: req, error } = await supabase.from('requisitions').insert({
+      user_id: user!.id,
+      titulo,
+      unidade,
+      setor,
+      unidade_setor: `${unidade} - ${setor}`,
+      product_id: items[0].product_id, // keep for backward compat
+      saldo_atual: parseFloat(items[0].saldo) || 0,
+      unidade_medida: items[0].unidade_medida,
+      observacoes: observacoes || null,
+    } as any).select('id').single();
+
+    if (error || !req) { toast.error(error?.message || "Erro ao criar solicitação."); setSaving(false); return; }
+
+    // Insert items
+    const itemsToInsert = items.map(i => ({
+      requisition_id: req.id,
+      product_id: i.product_id,
+      saldo: parseFloat(i.saldo) || 0,
+    }));
+    await supabase.from('requisition_items').insert(itemsToInsert);
+
+    // Notify compradores and masters
+    const { data: buyers } = await supabase.from('user_roles').select('user_id').in('role', ['comprador', 'master']);
+    if (buyers?.length) {
+      await supabase.from('notifications').insert(buyers.map(b => ({
+        user_id: b.user_id,
+        titulo: 'Nova solicitação',
+        mensagem: `Nova solicitação: ${titulo} — ${unidade} — ${setor} — por ${profile?.full_name || 'Usuário'}`,
+        tipo: 'info',
+      })));
     }
+
+    toast.success("Solicitação enviada!");
+    setTitulo(""); setUnidade(""); setSetor(""); setObservacoes(""); setItems([]);
+    setShowForm(false);
+    queryClient.invalidateQueries({ queryKey: ['my-requisitions'] });
+    queryClient.invalidateQueries({ queryKey: ['requisitions-list'] });
+    queryClient.invalidateQueries({ queryKey: ['pending-requisitions-for-comp'] });
     setSaving(false);
   };
 
@@ -87,10 +152,6 @@ export default function MyRequisitionsPage() {
     };
     return <Badge className={colors[status] || ''}>{statusLabels[status] || status}</Badge>;
   };
-
-  const filteredProducts = products.filter(p =>
-    p.nome.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="space-y-6">
@@ -109,62 +170,111 @@ export default function MyRequisitionsPage() {
           <CardHeader><CardTitle className="text-lg">Nova Solicitação</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Header fields */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Produto *</Label>
-                  <Select value={form.product_id} onValueChange={v => setForm({ ...form, product_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Selecione o produto" /></SelectTrigger>
+                  <Label>Título *</Label>
+                  <Select value={titulo} onValueChange={setTitulo}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o título" /></SelectTrigger>
                     <SelectContent>
-                      <div className="p-2">
-                        <Input placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} className="mb-2" />
-                      </div>
-                      {filteredProducts.map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
-                      ))}
+                      {TITULOS_SOLICITACAO.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Saldo Atual *</Label>
-                  <Input type="number" step="0.01" min="0" value={form.saldo_atual}
-                    onChange={e => setForm({ ...form, saldo_atual: e.target.value })} required
-                    placeholder="Quantidade em estoque" />
-                  {selectedProduct && (
-                    <p className="text-xs text-muted-foreground">Unidade: {selectedProduct.unidade_medida}</p>
-                  )}
+                  <Label>Unidade *</Label>
+                  <Select value={unidade} onValueChange={setUnidade}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
+                    <SelectContent>
+                      {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Setor *</Label>
+                  <Select value={setor} onValueChange={setSetor}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o setor" /></SelectTrigger>
+                    <SelectContent>
+                      {SETORES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="border-border">
-                  <CardHeader className="py-2 px-4"><CardTitle className="text-sm">Unidade</CardTitle></CardHeader>
-                  <CardContent className="px-4 pb-3 pt-0">
-                    <Select value={form.unidade} onValueChange={v => setForm({ ...form, unidade: v })}>
-                      <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
-                      <SelectContent>
-                        {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </CardContent>
-                </Card>
-                <Card className="border-border">
-                  <CardHeader className="py-2 px-4"><CardTitle className="text-sm">Setor</CardTitle></CardHeader>
-                  <CardContent className="px-4 pb-3 pt-0">
-                    <Select value={form.setor} onValueChange={v => setForm({ ...form, setor: v })}>
-                      <SelectTrigger><SelectValue placeholder="Selecione o setor" /></SelectTrigger>
-                      <SelectContent>
-                        {SETORES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </CardContent>
-                </Card>
+
+              {/* Product search + add */}
+              <div className="space-y-2">
+                <Label>Adicionar Produtos</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar produto para adicionar..."
+                    className="pl-9"
+                    value={productSearch}
+                    onChange={e => setProductSearch(e.target.value)}
+                  />
+                </div>
+                {productSearch.length >= 2 && filteredProducts.length > 0 && (
+                  <div className="border rounded-md max-h-40 overflow-y-auto">
+                    {filteredProducts.slice(0, 10).map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-muted/50 text-sm flex justify-between"
+                        onClick={() => addProduct(p)}
+                      >
+                        <span>{p.nome}</span>
+                        <span className="text-muted-foreground text-xs">{p.unidade_medida}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              {/* Items list */}
+              {items.length > 0 && (
+                <div className="border rounded-md">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/30">
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Produto</th>
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground w-24">Unidade</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground w-32">Saldo</th>
+                        <th className="w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item, idx) => (
+                        <tr key={item.product_id} className="border-b last:border-0">
+                          <td className="py-2 px-3 font-medium">{item.nome}</td>
+                          <td className="py-2 px-3 text-muted-foreground">{item.unidade_medida}</td>
+                          <td className="py-2 px-3">
+                            <Input
+                              type="number" step="0.01" min="0"
+                              className="w-28 ml-auto text-right h-8"
+                              value={item.saldo}
+                              onChange={e => updateSaldo(idx, e.target.value)}
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="py-2 px-1">
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeItem(idx)}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Observação</Label>
-                <Textarea value={form.observacoes} onChange={e => setForm({ ...form, observacoes: e.target.value })}
-                  placeholder="Observação opcional..." />
+                <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observação opcional..." />
               </div>
+
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
+                <Button type="button" variant="outline" onClick={() => { setShowForm(false); setItems([]); }}>Cancelar</Button>
                 <Button type="submit" disabled={saving}>{saving ? "Enviando..." : "Enviar Solicitação"}</Button>
               </div>
             </form>
@@ -182,17 +292,17 @@ export default function MyRequisitionsPage() {
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <ClipboardList className="h-12 w-12 mb-3 opacity-50" />
               <p className="text-sm font-medium">Nenhuma solicitação ainda</p>
-              <p className="text-xs mt-1">Clique em "Nova Solicitação" para informar o saldo de um produto</p>
+              <p className="text-xs mt-1">Clique em "Nova Solicitação" para informar o saldo dos produtos</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Produto</th>
-                    <th className="text-right py-3 px-4 font-medium text-muted-foreground">Saldo Atual</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Título</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Unidade</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Setor</th>
+                    <th className="text-center py-3 px-4 font-medium text-muted-foreground">Itens</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Data</th>
                     <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
                   </tr>
@@ -200,10 +310,10 @@ export default function MyRequisitionsPage() {
                 <tbody>
                   {requisitions.map(r => (
                     <tr key={r.id} className="border-b last:border-0 hover:bg-muted/50">
-                      <td className="py-3 px-4 font-medium">{r.products?.nome || '—'}</td>
-                      <td className="py-3 px-4 text-right currency">{r.saldo_atual} {r.unidade_medida}</td>
-                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{(r as any).unidade || '—'}</td>
-                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{(r as any).setor || r.unidade_setor || '—'}</td>
+                      <td className="py-3 px-4 font-medium">{r.titulo || '—'}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{r.unidade || '—'}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{r.setor || '—'}</td>
+                      <td className="py-3 px-4 text-center">{r.requisition_items?.length || 0}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{formatDate(r.created_at)}</td>
                       <td className="py-3 px-4 text-center">{statusBadge(r.status)}</td>
                     </tr>
@@ -221,7 +331,7 @@ export default function MyRequisitionsPage() {
           <CardContent className="space-y-2">
             {requisitions.filter(r => r.status === 'recusada' && r.motivo_recusa).map(r => (
               <div key={r.id} className="text-sm p-3 rounded-md bg-destructive/10 border border-destructive/20">
-                <span className="font-medium">{r.products?.nome}</span>: {r.motivo_recusa}
+                <span className="font-medium">{r.titulo}</span>: {r.motivo_recusa}
               </div>
             ))}
           </CardContent>

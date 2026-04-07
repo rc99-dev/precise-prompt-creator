@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type AppRole = 'solicitante' | 'comprador' | 'aprovador' | 'estoquista' | 'master';
+export type AppRole = 'solicitante' | 'comprador' | 'aprovador' | 'estoquista' | 'financeiro' | 'master';
 
 export function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -31,6 +31,7 @@ export const roleLabels: Record<AppRole, string> = {
   comprador: 'Comprador',
   aprovador: 'Aprovador',
   estoquista: 'Estoquista',
+  financeiro: 'Financeiro',
   master: 'Master',
 };
 
@@ -65,11 +66,11 @@ export function canAccess(role: AppRole | null, page: string): boolean {
   if (role === 'master') return true;
 
   const permissions: Record<string, AppRole[]> = {
-    dashboard: ['comprador', 'aprovador', 'estoquista', 'master'],
+    dashboard: ['comprador', 'aprovador', 'estoquista', 'financeiro', 'master'],
     solicitacoes: ['solicitante', 'comprador', 'master'],
     'minhas-solicitacoes': ['solicitante'],
     'nova-ordem': ['comprador', 'master'],
-    historico: ['comprador', 'aprovador', 'estoquista', 'master'],
+    historico: ['comprador', 'aprovador', 'estoquista', 'financeiro', 'master'],
     comparativo: ['comprador', 'master'],
     aprovacoes: ['aprovador', 'master'],
     recebimentos: ['estoquista', 'master'],
@@ -77,7 +78,7 @@ export function canAccess(role: AppRole | null, page: string): boolean {
     produtos: ['comprador', 'aprovador', 'master'],
     precos: ['comprador', 'aprovador', 'master'],
     usuarios: ['master'],
-    relatorios: ['master'],
+    relatorios: ['financeiro', 'master'],
   };
 
   return permissions[page]?.includes(role) || false;

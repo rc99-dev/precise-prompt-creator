@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from "sonner";
 import { Users, Pencil, Search, Trash2 } from "lucide-react";
 import { roleLabels, AppRole } from "@/lib/helpers";
-import { UNIDADES_USUARIO } from "@/lib/constants";
+import { UNIDADES } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
@@ -168,6 +168,7 @@ export default function UsersPage() {
                   <SelectItem value="comprador">Comprador</SelectItem>
                   <SelectItem value="aprovador">Aprovador</SelectItem>
                   <SelectItem value="estoquista">Estoquista</SelectItem>
+                  <SelectItem value="financeiro">Financeiro</SelectItem>
                   <SelectItem value="master">Master</SelectItem>
                 </SelectContent>
               </Select>
@@ -177,7 +178,7 @@ export default function UsersPage() {
               <Select value={editUnidade} onValueChange={setEditUnidade}>
                 <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
                 <SelectContent>
-                  {UNIDADES_USUARIO.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
