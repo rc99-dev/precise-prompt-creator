@@ -21,6 +21,7 @@ type Order = {
   id: string; numero: string; user_id: string; modo: string;
   status: string; observacoes: string | null; total: number;
   created_at: string; profiles?: { full_name: string } | null;
+  comprador_nome?: string;
 };
 
 type OrderItem = {
@@ -32,10 +33,14 @@ type OrderItem = {
 };
 
 const fetchOrders = async () => {
-  const { data, error } = await supabase
-    .from('purchase_orders').select('*').order('created_at', { ascending: false });
+  const [{ data: orders, error }, { data: profiles }] = await Promise.all([
+    supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }),
+    supabase.from('profiles').select('user_id, full_name'),
+  ]);
   if (error) throw error;
-  return (data || []) as unknown as Order[];
+  const profileMap: Record<string, string> = {};
+  (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name; });
+  return (orders || []).map((o: any) => ({ ...o, comprador_nome: profileMap[o.user_id] || '—' })) as unknown as Order[];
 };
 
 export default function OrderHistoryPage() {
