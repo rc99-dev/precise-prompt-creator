@@ -174,6 +174,7 @@ export default function OrderHistoryPage() {
     if (!previsaoTarget || !previsaoData) { toast.error("Informe a data prevista."); return; }
     setSavingPrevisao(true);
     await supabase.from('purchase_orders').update({
+      previsao_entrega: previsaoData,
       obs_estoquista: previsaoObs || null,
     } as any).eq('id', previsaoTarget.id);
     const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
