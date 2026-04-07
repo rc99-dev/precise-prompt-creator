@@ -181,6 +181,7 @@ export default function OrderHistoryPage() {
     await supabase.from('purchase_orders').update({
       previsao_entrega: previsaoData,
       obs_estoquista: previsaoObs || null,
+      previsao_registrada_por: user?.id || null,
     } as any).eq('id', previsaoTarget.id);
     const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
     if (estoquistas?.length) {
