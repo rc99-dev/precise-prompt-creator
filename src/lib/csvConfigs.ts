@@ -34,7 +34,7 @@ export const suppliersImportConfig: CsvImportConfig = {
       // Upsert: check if exists by cnpj
       const { data: existing } = await supabase.from('suppliers').select('id').eq('cnpj', cnpj).maybeSingle();
       if (existing) {
-        const { error } = await supabase.from('suppliers').update(row).eq('id', existing.id);
+        const { error } = await supabase.from('suppliers').update(row as any).eq('id', existing.id);
         if (error) errors.push(`Linha CNPJ ${cnpj}: ${error.message}`);
         else success++;
       } else {
@@ -70,7 +70,7 @@ export const productsImportConfig: CsvImportConfig = {
       const nome = row.nome as string;
       const { data: existing } = await supabase.from('products').select('id').eq('nome', nome).maybeSingle();
       if (existing) {
-        const { error } = await supabase.from('products').update(row).eq('id', existing.id);
+        const { error } = await supabase.from('products').update(row as any).eq('id', existing.id);
         if (error) errors.push(`"${nome}": ${error.message}`);
         else success++;
       } else {
@@ -117,7 +117,7 @@ export function createPricesImportConfig(
           .eq('supplier_id', row.supplier_id as string)
           .maybeSingle();
         if (existing) {
-          const { error } = await supabase.from('supplier_prices').update(row).eq('id', existing.id);
+          const { error } = await supabase.from('supplier_prices').update(row as any).eq('id', existing.id);
           if (error) errors.push(`Preço: ${error.message}`);
           else success++;
         } else {

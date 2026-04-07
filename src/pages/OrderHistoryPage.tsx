@@ -160,9 +160,9 @@ export default function OrderHistoryPage() {
       if (estoquistas?.length) {
         await supabase.from('notifications').insert(estoquistas.map(e => ({
           user_id: e.user_id,
-          title: 'Nova ordem emitida',
-          message: `Pedido ${order.numero} foi emitido — aguardando confirmação do fornecedor.`,
-          type: 'info', read: false,
+          titulo: 'Nova ordem emitida',
+          mensagem: `Pedido ${order.numero} foi emitido — aguardando confirmação do fornecedor.`,
+          tipo: 'info', lida: false,
         })));
       }
       queryClient.invalidateQueries({ queryKey: ['order-history'] });
@@ -176,14 +176,14 @@ export default function OrderHistoryPage() {
     await supabase.from('purchase_orders').update({
       previsao_entrega: previsaoData,
       obs_estoquista: previsaoObs || null,
-    }).eq('id', previsaoTarget.id);
+    } as any).eq('id', previsaoTarget.id);
     const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
     if (estoquistas?.length) {
       await supabase.from('notifications').insert(estoquistas.map(e => ({
         user_id: e.user_id,
-        title: 'Previsão de entrega registrada',
-        message: `Pedido ${previsaoTarget.numero} — Entrega prevista para ${new Date(previsaoData).toLocaleDateString('pt-BR')}. ${previsaoObs || ''}`,
-        type: 'info', read: false,
+        titulo: 'Previsão de entrega registrada',
+        mensagem: `Pedido ${previsaoTarget.numero} — Entrega prevista para ${new Date(previsaoData).toLocaleDateString('pt-BR')}. ${previsaoObs || ''}`,
+        tipo: 'info', lida: false,
       })));
     }
     toast.success("Previsão registrada! Estoquista notificado.");
