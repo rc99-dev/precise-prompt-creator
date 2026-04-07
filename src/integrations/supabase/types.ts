@@ -274,7 +274,9 @@ export type Database = {
           id: string
           modo: string
           numero: string
+          obs_estoquista: string | null
           observacoes: string | null
+          previsao_entrega: string | null
           rejected_reason: string | null
           status: string
           total: number
@@ -290,7 +292,9 @@ export type Database = {
           id?: string
           modo?: string
           numero: string
+          obs_estoquista?: string | null
           observacoes?: string | null
+          previsao_entrega?: string | null
           rejected_reason?: string | null
           status?: string
           total?: number
@@ -306,7 +310,9 @@ export type Database = {
           id?: string
           modo?: string
           numero?: string
+          obs_estoquista?: string | null
           observacoes?: string | null
+          previsao_entrega?: string | null
           rejected_reason?: string | null
           status?: string
           total?: number
