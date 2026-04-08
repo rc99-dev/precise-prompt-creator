@@ -210,11 +210,8 @@ export default function OrderHistoryPage() {
     return map[s] || s;
   };
 
-  const statusVariant = (s: string): "default" | "secondary" | "outline" | "destructive" => {
-    if (s === 'aprovado' || s === 'recebido') return 'default';
-    if (s === 'rejeitado' || s === 'cancelado') return 'destructive';
-    if (s === 'aguardando_aprovacao' || s === 'emitido' || s === 'recebido_com_ocorrencia') return 'secondary';
-    return 'outline';
+  const statusBadgeClass = (s: string): string => {
+    return statusColors[s] || 'bg-muted text-muted-foreground';
   };
 
   const modoLabel = (m: string) => m === 'manual' ? 'Manual' : m === 'melhor_preco' ? 'Melhor Preço' : 'Melhor Fornecedor';
