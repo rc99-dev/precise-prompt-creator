@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Truck, Package, CheckCircle, AlertTriangle, Clock } from "lucide-react";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/helpers";
+import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
@@ -76,7 +76,7 @@ const OCORRENCIA_TIPOS = [
 ];
 
 export default function ReceiptsPage() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<ReceiptOrder | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItemForReceipt[]>([]);
@@ -136,7 +136,8 @@ export default function ReceiptsPage() {
     await supabase.from('purchase_orders').update({ status: orderStatus } as any).eq('id', selectedOrder.id);
 
     // MELHORIA 12 — Notificações de recebimento
-    const estoquistaNome = profile?.full_name || 'Estoquista';
+    const { data: myProfile } = await supabase.from('profiles').select('full_name').eq('user_id', user.id).single();
+    const estoquistaNome = myProfile?.full_name || 'Estoquista';
     const dataRecebimento = formatDate(new Date().toISOString());
 
     // Notify order creator
