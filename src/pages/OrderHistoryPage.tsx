@@ -7,10 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar } from "lucide-react";
-import { formatCurrency, formatDate, formatDateTime, statusColors, statusLabels } from "@/lib/helpers";
+import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
 import { generateOrderPDF } from "@/lib/pdfGenerator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import OrderDetailDialog from "@/components/order/OrderDetailDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
