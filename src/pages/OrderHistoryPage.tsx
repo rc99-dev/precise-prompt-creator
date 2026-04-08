@@ -7,9 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/helpers";
+import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
 import { generateOrderPDF } from "@/lib/pdfGenerator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import OrderDetailDialog from "@/components/order/OrderDetailDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -209,11 +210,8 @@ export default function OrderHistoryPage() {
     return map[s] || s;
   };
 
-  const statusVariant = (s: string): "default" | "secondary" | "outline" | "destructive" => {
-    if (s === 'aprovado' || s === 'recebido') return 'default';
-    if (s === 'rejeitado' || s === 'cancelado') return 'destructive';
-    if (s === 'aguardando_aprovacao' || s === 'emitido' || s === 'recebido_com_ocorrencia') return 'secondary';
-    return 'outline';
+  const statusBadgeClass = (s: string): string => {
+    return statusColors[s] || 'bg-muted text-muted-foreground';
   };
 
   const modoLabel = (m: string) => m === 'manual' ? 'Manual' : m === 'melhor_preco' ? 'Melhor Preço' : 'Melhor Fornecedor';
@@ -274,7 +272,7 @@ export default function OrderHistoryPage() {
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{modoLabel(o.modo)}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{o.comprador_nome || '—'}</td>
                       <td className="py-3 px-4 text-right currency font-medium">{formatCurrency(o.total)}</td>
-                      <td className="py-3 px-4 text-center"><Badge variant={statusVariant(o.status)}>{statusLabel(o.status)}</Badge></td>
+                      <td className="py-3 px-4 text-center"><Badge className={statusBadgeClass(o.status)}>{statusLabel(o.status)}</Badge></td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-0.5">
                           <Button variant="ghost" size="icon" onClick={() => viewOrder(o)} title="Visualizar"><Eye className="h-4 w-4" /></Button>
@@ -307,46 +305,15 @@ export default function OrderHistoryPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Ordem {selectedOrder?.numero}</DialogTitle></DialogHeader>
-          {selectedOrder && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div><span className="text-muted-foreground">Data:</span> <span className="font-medium">{formatDate(selectedOrder.created_at)}</span></div>
-                <div><span className="text-muted-foreground">Modo:</span> <span className="font-medium">{modoLabel(selectedOrder.modo)}</span></div>
-                <div><span className="text-muted-foreground">Status:</span> <Badge variant={statusVariant(selectedOrder.status)}>{statusLabel(selectedOrder.status)}</Badge></div>
-                <div><span className="text-muted-foreground">Total:</span> <span className="font-bold currency">{formatCurrency(selectedOrder.total)}</span></div>
-              </div>
-              {selectedOrder.observacoes && (
-                <div className="text-sm"><span className="text-muted-foreground">Observações:</span> {selectedOrder.observacoes}</div>
-              )}
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 font-medium text-muted-foreground">Produto</th>
-                    <th className="text-left py-2 font-medium text-muted-foreground">Fornecedor</th>
-                    <th className="text-center py-2 font-medium text-muted-foreground">Qtd</th>
-                    <th className="text-right py-2 font-medium text-muted-foreground">Preço Unit.</th>
-                    <th className="text-right py-2 font-medium text-muted-foreground">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orderItems.map(i => (
-                    <tr key={i.id} className="border-b last:border-0">
-                      <td className="py-2 font-medium">{i.products?.nome}</td>
-                      <td className="py-2 text-muted-foreground">{i.suppliers?.razao_social || '—'}</td>
-                      <td className="py-2 text-center">{i.quantidade} {i.products?.unidade_medida}</td>
-                      <td className="py-2 text-right currency">{formatCurrency(i.preco_unitario)}</td>
-                      <td className="py-2 text-right currency font-medium">{formatCurrency(i.subtotal)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <OrderDetailDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        order={selectedOrder}
+        orderItems={orderItems}
+        statusLabel={statusLabel}
+        statusBadgeClass={statusBadgeClass}
+        modoLabel={modoLabel}
+      />
 
       <Dialog open={!!previsaoTarget} onOpenChange={(open) => !open && setPrevisaoTarget(null)}>
         <DialogContent className="max-w-md">
