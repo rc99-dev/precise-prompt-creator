@@ -8,15 +8,19 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Truck, Package, CheckCircle } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/helpers";
+import { Truck, Package, CheckCircle, AlertTriangle, Clock } from "lucide-react";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/helpers";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 
-type EmittedOrder = {
-  id: string; numero: string; status: string; total: number; created_at: string;
+type ReceiptOrder = {
+  id: string; numero: string; status: string; total: number;
+  created_at: string; user_id: string; previsao_entrega: string | null;
+  obs_estoquista: string | null; observacoes: string | null;
+  comprador_nome?: string;
 };
 
 type OrderItemForReceipt = {
@@ -30,17 +34,51 @@ type ReceiptItemForm = {
   tipo_ocorrencia: string; observacoes: string;
 };
 
-const fetchEmittedOrders = async () => {
-  const { data, error } = await supabase.from('purchase_orders').select('id, numero, status, total, created_at')
-    .in('status', ['emitido']).order('created_at', { ascending: false });
+const fetchReceiptOrders = async () => {
+  const [{ data: orders, error }, { data: profiles }] = await Promise.all([
+    supabase.from('purchase_orders').select('*')
+      .in('status', ['emitido', 'recebido', 'recebido_com_ocorrencia'])
+      .order('created_at', { ascending: false }),
+    supabase.from('profiles').select('user_id, full_name'),
+  ]);
   if (error) throw error;
-  return (data || []) as EmittedOrder[];
+  const profileMap: Record<string, string> = {};
+  (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name; });
+  const mapped = (orders || []).map((o: any) => ({ ...o, comprador_nome: profileMap[o.user_id] || '—' })) as ReceiptOrder[];
+  // Sort emitido by previsao_entrega ASC (nulls last)
+  return mapped.sort((a, b) => {
+    if (a.status === 'emitido' && b.status !== 'emitido') return -1;
+    if (a.status !== 'emitido' && b.status === 'emitido') return 1;
+    if (a.status === 'emitido' && b.status === 'emitido') {
+      if (!a.previsao_entrega) return 1;
+      if (!b.previsao_entrega) return -1;
+      return a.previsao_entrega.localeCompare(b.previsao_entrega);
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
 };
 
+function getDeliveryBadge(previsao: string | null) {
+  if (!previsao) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const delivery = new Date(previsao + 'T00:00:00'); delivery.setHours(0, 0, 0, 0);
+  const diff = delivery.getTime() - today.getTime();
+  if (diff < 0) return <Badge className="bg-destructive/20 text-destructive text-[10px]"><AlertTriangle className="h-3 w-3 mr-1" />Atrasado</Badge>;
+  if (diff === 0) return <Badge className="bg-warning/20 text-warning text-[10px]"><Clock className="h-3 w-3 mr-1" />Hoje</Badge>;
+  return null;
+}
+
+const OCORRENCIA_TIPOS = [
+  { value: 'avaria', label: 'Avaria' },
+  { value: 'divergencia_quantidade', label: 'Qtd Errada' },
+  { value: 'produto_errado', label: 'Produto Errado' },
+  { value: 'nf_incorreta', label: 'NF Incorreta' },
+];
+
 export default function ReceiptsPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
-  const [selectedOrder, setSelectedOrder] = useState<EmittedOrder | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<ReceiptOrder | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItemForReceipt[]>([]);
   const [receiptItems, setReceiptItems] = useState<ReceiptItemForm[]>([]);
   const [numeroNF, setNumeroNF] = useState("");
@@ -49,12 +87,17 @@ export default function ReceiptsPage() {
 
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['receipt-orders'],
-    queryFn: fetchEmittedOrders,
+    queryFn: fetchReceiptOrders,
     staleTime: 2 * 60 * 1000,
   });
 
-  const openReceipt = async (order: EmittedOrder) => {
+  const pendingOrders = orders.filter(o => o.status === 'emitido' && o.previsao_entrega);
+  const receivedOrders = orders.filter(o => o.status === 'recebido' || o.status === 'recebido_com_ocorrencia');
+
+  const openReceipt = async (order: ReceiptOrder) => {
     setSelectedOrder(order);
+    setNumeroNF("");
+    setObsGeral("");
     const { data } = await supabase.from('purchase_order_items')
       .select('*, products(nome, unidade_medida), suppliers(razao_social)')
       .eq('order_id', order.id);
@@ -77,11 +120,13 @@ export default function ReceiptsPage() {
     const numero = (numData as string) || `REC-${Date.now()}`;
     const hasOccurrence = receiptItems.some(i => i.status !== 'recebido');
     const orderStatus = hasOccurrence ? 'recebido_com_ocorrencia' : 'recebido';
+
     const { data: receipt, error: recError } = await supabase.from('receipts').insert({
       numero, order_id: selectedOrder.id, user_id: user.id,
       numero_nf: numeroNF || null, status: orderStatus, observacoes: obsGeral || null,
     } as any).select().single();
     if (recError) { toast.error(recError.message); setSaving(false); return; }
+
     const items = receiptItems.map(i => ({
       receipt_id: (receipt as any).id, order_item_id: i.order_item_id, status: i.status,
       quantidade_recebida: parseFloat(i.quantidade_recebida) || 0,
@@ -89,13 +134,76 @@ export default function ReceiptsPage() {
     }));
     await supabase.from('receipt_items').insert(items as any);
     await supabase.from('purchase_orders').update({ status: orderStatus } as any).eq('id', selectedOrder.id);
+
+    // MELHORIA 12 — Notificações de recebimento
+    const estoquistaNome = profile?.full_name || 'Estoquista';
+    const dataRecebimento = formatDate(new Date().toISOString());
+
+    // Notify order creator
+    const notifCreator: any = {
+      user_id: selectedOrder.user_id,
+      titulo: hasOccurrence ? '⚠️ Recebido com ocorrências' : 'Pedido recebido',
+      mensagem: hasOccurrence
+        ? `Pedido ${selectedOrder.numero} foi recebido com ocorrências por ${estoquistaNome} em ${dataRecebimento} — verifique os detalhes.`
+        : `Pedido ${selectedOrder.numero} foi recebido por ${estoquistaNome} em ${dataRecebimento}.`,
+      tipo: hasOccurrence ? 'alerta' : 'info',
+      lida: false,
+    };
+    await supabase.from('notifications').insert(notifCreator);
+
+    // If occurrence, also notify all aprovadores
+    if (hasOccurrence) {
+      const { data: aprovadores } = await supabase.from('user_roles').select('user_id').eq('role', 'aprovador');
+      if (aprovadores?.length) {
+        await supabase.from('notifications').insert(aprovadores.map((a: any) => ({
+          user_id: a.user_id,
+          titulo: '⚠️ Ocorrência no recebimento',
+          mensagem: `Pedido ${selectedOrder.numero} recebido com ocorrências — ${estoquistaNome} em ${dataRecebimento}.`,
+          tipo: 'alerta', lida: false,
+        })));
+      }
+    }
+
     toast.success("Recebimento registrado!");
     setSaving(false);
     setSelectedOrder(null);
     queryClient.invalidateQueries({ queryKey: ['receipt-orders'] });
   };
 
-  const OCORRENCIA_TIPOS = ['avaria', 'divergencia_quantidade', 'produto_errado', 'nf_incorreta', 'outro'];
+  const renderOrderCard = (o: ReceiptOrder, showReceiveButton: boolean) => (
+    <Card key={o.id} className="hover:border-primary/30 transition-colors cursor-pointer" onClick={() => showReceiveButton ? openReceipt(o) : null}>
+      <CardContent className="flex items-center justify-between py-4">
+        <div className="flex items-center gap-4">
+          <div className="rounded-lg bg-primary/10 p-2">
+            <Package className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold">{o.numero}</p>
+            <p className="text-xs text-muted-foreground">{o.comprador_nome} • {formatDate(o.created_at)}</p>
+            {o.previsao_entrega && (
+              <p className="text-xs text-muted-foreground">Entrega: {formatDate(o.previsao_entrega)}</p>
+            )}
+            {o.obs_estoquista && (
+              <p className="text-xs text-muted-foreground italic">{o.obs_estoquista}</p>
+            )}
+          </div>
+        </div>
+        <div className="text-right flex flex-col items-end gap-1">
+          <p className="text-lg font-bold currency">{formatCurrency(o.total)}</p>
+          {showReceiveButton ? (
+            <div className="flex items-center gap-2">
+              {getDeliveryBadge(o.previsao_entrega)}
+              <Badge className="bg-info/20 text-info">Emitido</Badge>
+            </div>
+          ) : (
+            <Badge className={o.status === 'recebido' ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'}>
+              {o.status === 'recebido' ? 'Recebido' : 'Recebido c/ Ocorrência'}
+            </Badge>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="space-y-6">
@@ -108,36 +216,38 @@ export default function ReceiptsPage() {
         <Card><CardContent><TableSkeleton columns={3} rows={4} /></CardContent></Card>
       ) : isError ? (
         <QueryError onRetry={() => refetch()} />
-      ) : orders.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <Truck className="h-12 w-12 mb-3 opacity-50" />
-            <p className="text-sm font-medium">Nenhum pedido aguardando recebimento</p>
-            <p className="text-xs mt-1">Pedidos emitidos aparecerão aqui para conferência</p>
-          </CardContent>
-        </Card>
       ) : (
-        <div className="space-y-3">
-          {orders.map(o => (
-            <Card key={o.id} className="hover:border-primary/30 transition-colors cursor-pointer" onClick={() => openReceipt(o)}>
-              <CardContent className="flex items-center justify-between py-4">
-                <div className="flex items-center gap-4">
-                  <div className="rounded-lg bg-primary/10 p-2">
-                    <Package className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-semibold">{o.numero}</p>
-                    <p className="text-sm text-muted-foreground">{formatDate(o.created_at)}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold currency">{formatCurrency(o.total)}</p>
-                  <Badge className="bg-info/20 text-info">Emitido</Badge>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <Tabs defaultValue="pendentes">
+          <TabsList>
+            <TabsTrigger value="pendentes">Pendentes ({pendingOrders.length})</TabsTrigger>
+            <TabsTrigger value="recebidos">Recebidos ({receivedOrders.length})</TabsTrigger>
+          </TabsList>
+          <TabsContent value="pendentes">
+            {pendingOrders.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <Truck className="h-12 w-12 mb-3 opacity-50" />
+                  <p className="text-sm font-medium">Nenhum pedido aguardando recebimento</p>
+                  <p className="text-xs mt-1">Pedidos emitidos com previsão de entrega aparecerão aqui</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3 mt-3">{pendingOrders.map(o => renderOrderCard(o, true))}</div>
+            )}
+          </TabsContent>
+          <TabsContent value="recebidos">
+            {receivedOrders.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <CheckCircle className="h-12 w-12 mb-3 opacity-50" />
+                  <p className="text-sm font-medium">Nenhum recebimento registrado</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3 mt-3">{receivedOrders.map(o => renderOrderCard(o, false))}</div>
+            )}
+          </TabsContent>
+        </Tabs>
       )}
 
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
@@ -172,26 +282,28 @@ export default function ReceiptsPage() {
                         <Select value={receiptItems[idx]?.status} onValueChange={v => updateReceiptItem(idx, { status: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="recebido">Recebido</SelectItem>
+                            <SelectItem value="recebido">Conforme</SelectItem>
                             <SelectItem value="parcial">Parcial</SelectItem>
                             <SelectItem value="ocorrencia">Ocorrência</SelectItem>
                             <SelectItem value="nao_recebido">Não recebido</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Qtd recebida</Label>
-                        <Input type="number" step="0.01" value={receiptItems[idx]?.quantidade_recebida}
-                          onChange={e => updateReceiptItem(idx, { quantidade_recebida: e.target.value })} />
-                      </div>
-                      {receiptItems[idx]?.status !== 'recebido' && (
+                      {receiptItems[idx]?.status === 'parcial' && (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Qtd recebida</Label>
+                          <Input type="number" step="0.01" value={receiptItems[idx]?.quantidade_recebida}
+                            onChange={e => updateReceiptItem(idx, { quantidade_recebida: e.target.value })} />
+                        </div>
+                      )}
+                      {(receiptItems[idx]?.status === 'ocorrencia' || receiptItems[idx]?.status === 'nao_recebido') && (
                         <>
                           <div className="space-y-1">
                             <Label className="text-xs">Tipo ocorrência</Label>
                             <Select value={receiptItems[idx]?.tipo_ocorrencia} onValueChange={v => updateReceiptItem(idx, { tipo_ocorrencia: v })}>
                               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                               <SelectContent>
-                                {OCORRENCIA_TIPOS.map(t => <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>)}
+                                {OCORRENCIA_TIPOS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                               </SelectContent>
                             </Select>
                           </div>

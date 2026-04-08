@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Bell } from "lucide-react";
+import { Bell, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDateTime } from "@/lib/helpers";
@@ -50,6 +50,12 @@ export default function NotificationBell() {
     fetchNotifications();
   };
 
+  const getBorderClass = (tipo: string) => {
+    if (tipo === 'alerta') return 'border-l-4 border-l-destructive';
+    if (tipo === 'previsao') return 'border-l-4 border-l-amber-500';
+    return '';
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -75,10 +81,15 @@ export default function NotificationBell() {
           {notifications.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">Sem notificações</p>
           ) : notifications.map(n => (
-            <div key={n.id} className={`px-4 py-3 border-b border-border last:border-0 ${!n.lida ? 'bg-primary/5' : ''}`}>
-              <p className="text-sm font-medium">{n.titulo}</p>
-              {n.mensagem && <p className="text-xs text-muted-foreground mt-0.5">{n.mensagem}</p>}
-              <p className="text-xs text-muted-foreground mt-1">{formatDateTime(n.created_at)}</p>
+            <div key={n.id} className={`px-4 py-3 border-b border-border last:border-0 ${!n.lida ? 'bg-primary/5' : ''} ${getBorderClass(n.tipo)}`}>
+              <div className="flex items-start gap-2">
+                {n.tipo === 'previsao' && <Calendar className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />}
+                <div>
+                  <p className="text-sm font-medium">{n.titulo}</p>
+                  {n.mensagem && <p className="text-xs text-muted-foreground mt-0.5">{n.mensagem}</p>}
+                  <p className="text-xs text-muted-foreground mt-1">{formatDateTime(n.created_at)}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>
