@@ -73,6 +73,7 @@ export default function NewOrderPage() {
   const products = data?.products || [];
   const suppliers = data?.suppliers || [];
   const allPrices = data?.prices || [];
+  const saldos = data?.saldos || {};
 
   useEffect(() => {
     if (!data || draftRestored.current) return;
