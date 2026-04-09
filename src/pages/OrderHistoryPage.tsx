@@ -285,14 +285,14 @@ export default function OrderHistoryPage() {
                             </Button>
                           )}
                           {o.status === 'rascunho' && (
-                            <>
-                              <Button variant="ghost" size="icon" onClick={() => navigate(`/nova-ordem?edit=${o.id}`)} title="Editar">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(o)} title="Excluir">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </>
+                            <Button variant="ghost" size="icon" onClick={() => navigate(`/nova-ordem?edit=${o.id}`)} title="Editar">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {(o.status === 'rascunho' || o.status === 'rejeitado') && (
+                            <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(o)} title="Excluir">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -341,9 +341,9 @@ export default function OrderHistoryPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir rascunho?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir pedido?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir permanentemente o rascunho <strong>{deleteTarget?.numero}</strong>? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir permanentemente o pedido <strong>{deleteTarget?.numero}</strong>? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
