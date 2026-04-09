@@ -113,6 +113,7 @@ interface OrderPDFData {
   aprovador?: string | null;
   approved_at?: string | null;
   unidadeSolicitante?: string;
+  filenameSuffix?: string;
 }
 
 export function generateOrderPDF(data: OrderPDFData) {
