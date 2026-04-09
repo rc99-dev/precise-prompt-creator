@@ -132,12 +132,12 @@ export default function OrderHistoryPage() {
     toast.success("CSV exportado!");
   };
 
-  const exportPDF = async (order: Order) => {
+  const fetchPDFData = async (order: Order) => {
     const { data: items } = await supabase
       .from('purchase_order_items')
       .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social, cnpj, telefone, cidade)')
       .eq('order_id', order.id);
-    if (!items || items.length === 0) { toast.error("Sem itens para exportar."); return; }
+    if (!items || items.length === 0) { toast.error("Sem itens para exportar."); return null; }
     const { data: buyerProfile } = await supabase.from('profiles').select('full_name').eq('user_id', order.user_id).single();
     let aprovadorName: string | null = null;
     if (order.status === 'aprovado' || order.status === 'emitido' || order.status === 'recebido') {
@@ -147,20 +147,10 @@ export default function OrderHistoryPage() {
         aprovadorName = ap?.full_name || null;
       }
     }
-    const mainSupplier = items[0]?.suppliers as any;
-    generateOrderPDF({
-      numero: order.numero, created_at: order.created_at, observacoes: order.observacoes,
-      total: order.total, unidadeSolicitante: (order as any).unidade_setor || undefined,
-      supplier: mainSupplier ? { razao_social: mainSupplier.razao_social, cnpj: mainSupplier.cnpj, telefone: mainSupplier.telefone, cidade: mainSupplier.cidade } : null,
-      items: items.map(i => ({
-        codigo: (i.products as any)?.codigo_interno, descricao: (i.products as any)?.nome || "",
-        unidade: (i.products as any)?.unidade_medida || "", quantidade: i.quantidade,
-        preco_unitario: i.preco_unitario, subtotal: i.subtotal,
-      })),
-      comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (order as any).approved_at,
-    });
+    return { items, buyerProfile, aprovadorName };
+  };
 
-    // Atualiza status para emitido se estava aprovado
+  const markAsEmitted = async (order: Order) => {
     if (order.status === 'aprovado') {
       await supabase.from('purchase_orders').update({ status: 'emitido' }).eq('id', order.id);
       const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
@@ -174,7 +164,49 @@ export default function OrderHistoryPage() {
       }
       queryClient.invalidateQueries({ queryKey: ['order-history'] });
     }
+  };
+
+  const exportPDF = async (order: Order) => {
+    const result = await fetchPDFData(order);
+    if (!result) return;
+    const { items, buyerProfile, aprovadorName } = result;
+    const mainSupplier = items[0]?.suppliers as any;
+    generateOrderPDF({
+      numero: order.numero, created_at: order.created_at, observacoes: order.observacoes,
+      total: order.total, unidadeSolicitante: (order as any).unidade_setor || undefined,
+      supplier: mainSupplier ? { razao_social: mainSupplier.razao_social, cnpj: mainSupplier.cnpj, telefone: mainSupplier.telefone, cidade: mainSupplier.cidade } : null,
+      items: items.map(i => ({
+        codigo: (i.products as any)?.codigo_interno, descricao: (i.products as any)?.nome || "",
+        unidade: (i.products as any)?.unidade_medida || "", quantidade: i.quantidade,
+        preco_unitario: i.preco_unitario, subtotal: i.subtotal,
+      })),
+      comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (order as any).approved_at,
+    });
+    await markAsEmitted(order);
     toast.success("PDF gerado!");
+  };
+
+  const exportPDFBySupplier = async (order: Order) => {
+    const result = await fetchPDFData(order);
+    if (!result) return;
+    const { items, buyerProfile, aprovadorName } = result;
+    generateOrderPDFBySupplier({
+      numero: order.numero, created_at: order.created_at, observacoes: order.observacoes,
+      unidadeSolicitante: (order as any).unidade_setor || undefined,
+      items: items.map(i => {
+        const sup = i.suppliers as any;
+        return {
+          codigo: (i.products as any)?.codigo_interno, descricao: (i.products as any)?.nome || "",
+          unidade: (i.products as any)?.unidade_medida || "", quantidade: i.quantidade,
+          preco_unitario: i.preco_unitario, subtotal: i.subtotal,
+          supplier_id: i.supplier_id,
+          supplier_info: sup ? { razao_social: sup.razao_social, cnpj: sup.cnpj, telefone: sup.telefone, cidade: sup.cidade } : null,
+        };
+      }),
+      comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (order as any).approved_at,
+    });
+    await markAsEmitted(order);
+    toast.success("PDFs por fornecedor gerados!");
   };
 
   const handleSalvarPrevisao = async () => {
