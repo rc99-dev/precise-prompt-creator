@@ -102,12 +102,12 @@ export default function OrderHistoryPage() {
     queryClient.invalidateQueries({ queryKey: ['order-history'] });
   };
 
-  const handleDeleteDraft = async () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     await supabase.from('purchase_order_items').delete().eq('order_id', deleteTarget.id);
     const { error } = await supabase.from('purchase_orders').delete().eq('id', deleteTarget.id);
-    if (error) { toast.error(error.message); } else { toast.success("Rascunho excluído!"); }
+    if (error) { toast.error(error.message); } else { toast.success("Pedido excluído!"); }
     setDeleting(false);
     setDeleteTarget(null);
     queryClient.invalidateQueries({ queryKey: ['order-history'] });
@@ -348,7 +348,7 @@ export default function OrderHistoryPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteDraft} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleting ? "Excluindo..." : "Excluir"}
             </AlertDialogAction>
           </AlertDialogFooter>
