@@ -247,7 +247,8 @@ export function generateOrderPDF(data: OrderPDFData) {
   doc.line(sig2X, sigY, sig2X + sigW, sigY);
   doc.text("Aprovador", sig2X + sigW / 2, sigY + 4, { align: "center" });
 
-  doc.save(`${data.numero}.pdf`);
+  const filename = data.filenameSuffix ? `${data.numero}_${data.filenameSuffix}.pdf` : `${data.numero}.pdf`;
+  doc.save(filename);
 }
 
 // ===== PDF POR FORNECEDOR =====
