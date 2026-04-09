@@ -309,7 +309,15 @@ export default function OrderHistoryPage() {
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-0.5">
                           <Button variant="ghost" size="icon" onClick={() => viewOrder(o)} title="Visualizar"><Eye className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => exportPDF(o)} title="PDF"><FileText className="h-4 w-4" /></Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" title="PDF"><FileText className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => exportPDF(o)}>PDF Completo</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => exportPDFBySupplier(o)}>PDF por Fornecedor</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                           <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)} title="Duplicar"><Copy className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => exportCSV(o)} title="CSV"><Download className="h-4 w-4" /></Button>
                           {o.status === 'emitido' && (
