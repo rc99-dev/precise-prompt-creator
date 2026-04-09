@@ -20,9 +20,10 @@ interface Props {
   availableSuppliers: Supplier[];
   onUpdate: (index: number, updates: Partial<OrderItem>) => void;
   onRemove: (index: number) => void;
+  saldo?: number;
 }
 
-function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, onRemove }: Props) {
+function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, onRemove, saldo }: Props) {
   const handleQty = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     if (!isNaN(val) && val >= 0) onUpdate(index, { quantidade: val });
