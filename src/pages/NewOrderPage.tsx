@@ -22,6 +22,7 @@ import { AlertTriangle, Trash2, RotateCcw } from "lucide-react";
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
 type PriceEntry = { supplier_id: string; product_id: string; preco_unitario: number };
+type SaldoMap = Record<string, number>;
 type OrderItem = DraftOrderItem;
 
 const fetchOrderData = async () => {
