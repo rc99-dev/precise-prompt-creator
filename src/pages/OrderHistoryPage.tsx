@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar, ChevronDown } from "lucide-react";
+import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar } from "lucide-react";
 import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
 import { generateOrderPDF, generateOrderPDFBySupplier } from "@/lib/pdfGenerator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
