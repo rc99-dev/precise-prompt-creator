@@ -369,6 +369,7 @@ export default function NewOrderPage() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-2.5 px-3 font-medium text-muted-foreground text-xs">Produto</th>
+                    <th className="text-center py-2.5 px-3 font-medium text-muted-foreground text-xs w-16">Saldo</th>
                     <th className="text-center py-2.5 px-3 font-medium text-muted-foreground text-xs w-24">Qtd</th>
                     <th className="text-left py-2.5 px-3 font-medium text-muted-foreground text-xs">Fornecedor</th>
                     <th className="text-right py-2.5 px-3 font-medium text-muted-foreground text-xs">Preço Unit.</th>
@@ -379,11 +380,13 @@ export default function NewOrderPage() {
                 <tbody>
                   {items.map((item, idx) => {
                     const min = getMinPrice(item.product_id);
+                    const saldo = saldos[item.product_id] || 0;
                     return (
                       <OrderItemRow key={item.product_id} item={item} index={idx}
                         isMinPrice={!!min && item.preco_unitario === min.preco}
                         availableSuppliers={getAvailableSuppliers(item.product_id)}
-                        onUpdate={updateItem} onRemove={removeItem} />
+                        onUpdate={updateItem} onRemove={removeItem}
+                        saldo={saldo} />
                     );
                   })}
                 </tbody>
