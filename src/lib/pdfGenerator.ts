@@ -300,6 +300,7 @@ export function generateOrderPDFBySupplier(data: OrderPDFBySupplierData) {
       aprovador: data.aprovador,
       approved_at: data.approved_at,
       unidadeSolicitante: data.unidadeSolicitante,
+      filenameSuffix: supplierLabel,
     });
   });
 }
