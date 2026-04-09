@@ -26,9 +26,10 @@ type SaldoMap = Record<string, number>;
 type OrderItem = DraftOrderItem;
 
 const fetchOrderData = async () => {
- const [{ data: p, error: e1 }, { data: s, error: e2 }] = await Promise.all([
+ const [{ data: p, error: e1 }, { data: s, error: e2 }, { data: reqs }] = await Promise.all([
     supabase.from('products').select('id, nome, unidade_medida, codigo_interno').eq('status', 'ativo').order('nome'),
     supabase.from('suppliers').select('id, razao_social').eq('status', 'ativo').order('razao_social'),
+    supabase.from('requisitions').select('product_id, saldo_atual').eq('status', 'pendente'),
   ]);
   if (e1 || e2) throw new Error("Erro ao carregar dados");
 
@@ -38,7 +39,14 @@ const fetchOrderData = async () => {
   ]);
 
   const prices = [...(pr1 || []), ...(pr2 || [])];
-  return { products: (p || []) as Product[], suppliers: (s || []) as Supplier[], prices: prices as PriceEntry[] };
+
+  // Aggregate saldos by product
+  const saldos: SaldoMap = {};
+  (reqs || []).forEach((r: any) => {
+    saldos[r.product_id] = (saldos[r.product_id] || 0) + r.saldo_atual;
+  });
+
+  return { products: (p || []) as Product[], suppliers: (s || []) as Supplier[], prices: prices as PriceEntry[], saldos };
 };
 
 export default function NewOrderPage() {
