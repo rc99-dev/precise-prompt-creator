@@ -22,12 +22,14 @@ import { AlertTriangle, Trash2, RotateCcw } from "lucide-react";
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
 type PriceEntry = { supplier_id: string; product_id: string; preco_unitario: number };
+type SaldoMap = Record<string, number>;
 type OrderItem = DraftOrderItem;
 
 const fetchOrderData = async () => {
- const [{ data: p, error: e1 }, { data: s, error: e2 }] = await Promise.all([
+ const [{ data: p, error: e1 }, { data: s, error: e2 }, { data: reqs }] = await Promise.all([
     supabase.from('products').select('id, nome, unidade_medida, codigo_interno').eq('status', 'ativo').order('nome'),
     supabase.from('suppliers').select('id, razao_social').eq('status', 'ativo').order('razao_social'),
+    supabase.from('requisitions').select('product_id, saldo_atual').eq('status', 'pendente'),
   ]);
   if (e1 || e2) throw new Error("Erro ao carregar dados");
 
@@ -37,7 +39,14 @@ const fetchOrderData = async () => {
   ]);
 
   const prices = [...(pr1 || []), ...(pr2 || [])];
-  return { products: (p || []) as Product[], suppliers: (s || []) as Supplier[], prices: prices as PriceEntry[] };
+
+  // Aggregate saldos by product
+  const saldos: SaldoMap = {};
+  (reqs || []).forEach((r: any) => {
+    saldos[r.product_id] = (saldos[r.product_id] || 0) + r.saldo_atual;
+  });
+
+  return { products: (p || []) as Product[], suppliers: (s || []) as Supplier[], prices: prices as PriceEntry[], saldos };
 };
 
 export default function NewOrderPage() {
@@ -64,6 +73,7 @@ export default function NewOrderPage() {
   const products = data?.products || [];
   const suppliers = data?.suppliers || [];
   const allPrices = data?.prices || [];
+  const saldos = data?.saldos || {};
 
   useEffect(() => {
     if (!data || draftRestored.current) return;
@@ -359,6 +369,7 @@ export default function NewOrderPage() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-2.5 px-3 font-medium text-muted-foreground text-xs">Produto</th>
+                    <th className="text-center py-2.5 px-3 font-medium text-muted-foreground text-xs w-16">Saldo</th>
                     <th className="text-center py-2.5 px-3 font-medium text-muted-foreground text-xs w-24">Qtd</th>
                     <th className="text-left py-2.5 px-3 font-medium text-muted-foreground text-xs">Fornecedor</th>
                     <th className="text-right py-2.5 px-3 font-medium text-muted-foreground text-xs">Preço Unit.</th>
@@ -369,11 +380,13 @@ export default function NewOrderPage() {
                 <tbody>
                   {items.map((item, idx) => {
                     const min = getMinPrice(item.product_id);
+                    const saldo = saldos[item.product_id] || 0;
                     return (
                       <OrderItemRow key={item.product_id} item={item} index={idx}
                         isMinPrice={!!min && item.preco_unitario === min.preco}
                         availableSuppliers={getAvailableSuppliers(item.product_id)}
-                        onUpdate={updateItem} onRemove={removeItem} />
+                        onUpdate={updateItem} onRemove={removeItem}
+                        saldo={saldo} />
                     );
                   })}
                 </tbody>

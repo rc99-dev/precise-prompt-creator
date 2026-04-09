@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar } from "lucide-react";
 import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
-import { generateOrderPDF } from "@/lib/pdfGenerator";
+import { generateOrderPDF, generateOrderPDFBySupplier } from "@/lib/pdfGenerator";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import OrderDetailDialog from "@/components/order/OrderDetailDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -102,12 +103,12 @@ export default function OrderHistoryPage() {
     queryClient.invalidateQueries({ queryKey: ['order-history'] });
   };
 
-  const handleDeleteDraft = async () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     await supabase.from('purchase_order_items').delete().eq('order_id', deleteTarget.id);
     const { error } = await supabase.from('purchase_orders').delete().eq('id', deleteTarget.id);
-    if (error) { toast.error(error.message); } else { toast.success("Rascunho excluído!"); }
+    if (error) { toast.error(error.message); } else { toast.success("Pedido excluído!"); }
     setDeleting(false);
     setDeleteTarget(null);
     queryClient.invalidateQueries({ queryKey: ['order-history'] });
@@ -131,12 +132,12 @@ export default function OrderHistoryPage() {
     toast.success("CSV exportado!");
   };
 
-  const exportPDF = async (order: Order) => {
+  const fetchPDFData = async (order: Order) => {
     const { data: items } = await supabase
       .from('purchase_order_items')
       .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social, cnpj, telefone, cidade)')
       .eq('order_id', order.id);
-    if (!items || items.length === 0) { toast.error("Sem itens para exportar."); return; }
+    if (!items || items.length === 0) { toast.error("Sem itens para exportar."); return null; }
     const { data: buyerProfile } = await supabase.from('profiles').select('full_name').eq('user_id', order.user_id).single();
     let aprovadorName: string | null = null;
     if (order.status === 'aprovado' || order.status === 'emitido' || order.status === 'recebido') {
@@ -146,20 +147,10 @@ export default function OrderHistoryPage() {
         aprovadorName = ap?.full_name || null;
       }
     }
-    const mainSupplier = items[0]?.suppliers as any;
-    generateOrderPDF({
-      numero: order.numero, created_at: order.created_at, observacoes: order.observacoes,
-      total: order.total, unidadeSolicitante: (order as any).unidade_setor || undefined,
-      supplier: mainSupplier ? { razao_social: mainSupplier.razao_social, cnpj: mainSupplier.cnpj, telefone: mainSupplier.telefone, cidade: mainSupplier.cidade } : null,
-      items: items.map(i => ({
-        codigo: (i.products as any)?.codigo_interno, descricao: (i.products as any)?.nome || "",
-        unidade: (i.products as any)?.unidade_medida || "", quantidade: i.quantidade,
-        preco_unitario: i.preco_unitario, subtotal: i.subtotal,
-      })),
-      comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (order as any).approved_at,
-    });
+    return { items, buyerProfile, aprovadorName };
+  };
 
-    // Atualiza status para emitido se estava aprovado
+  const markAsEmitted = async (order: Order) => {
     if (order.status === 'aprovado') {
       await supabase.from('purchase_orders').update({ status: 'emitido' }).eq('id', order.id);
       const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
@@ -173,7 +164,49 @@ export default function OrderHistoryPage() {
       }
       queryClient.invalidateQueries({ queryKey: ['order-history'] });
     }
+  };
+
+  const exportPDF = async (order: Order) => {
+    const result = await fetchPDFData(order);
+    if (!result) return;
+    const { items, buyerProfile, aprovadorName } = result;
+    const mainSupplier = items[0]?.suppliers as any;
+    generateOrderPDF({
+      numero: order.numero, created_at: order.created_at, observacoes: order.observacoes,
+      total: order.total, unidadeSolicitante: (order as any).unidade_setor || undefined,
+      supplier: mainSupplier ? { razao_social: mainSupplier.razao_social, cnpj: mainSupplier.cnpj, telefone: mainSupplier.telefone, cidade: mainSupplier.cidade } : null,
+      items: items.map(i => ({
+        codigo: (i.products as any)?.codigo_interno, descricao: (i.products as any)?.nome || "",
+        unidade: (i.products as any)?.unidade_medida || "", quantidade: i.quantidade,
+        preco_unitario: i.preco_unitario, subtotal: i.subtotal,
+      })),
+      comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (order as any).approved_at,
+    });
+    await markAsEmitted(order);
     toast.success("PDF gerado!");
+  };
+
+  const exportPDFBySupplier = async (order: Order) => {
+    const result = await fetchPDFData(order);
+    if (!result) return;
+    const { items, buyerProfile, aprovadorName } = result;
+    generateOrderPDFBySupplier({
+      numero: order.numero, created_at: order.created_at, observacoes: order.observacoes,
+      unidadeSolicitante: (order as any).unidade_setor || undefined,
+      items: items.map(i => {
+        const sup = i.suppliers as any;
+        return {
+          codigo: (i.products as any)?.codigo_interno, descricao: (i.products as any)?.nome || "",
+          unidade: (i.products as any)?.unidade_medida || "", quantidade: i.quantidade,
+          preco_unitario: i.preco_unitario, subtotal: i.subtotal,
+          supplier_id: i.supplier_id,
+          supplier_info: sup ? { razao_social: sup.razao_social, cnpj: sup.cnpj, telefone: sup.telefone, cidade: sup.cidade } : null,
+        };
+      }),
+      comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (order as any).approved_at,
+    });
+    await markAsEmitted(order);
+    toast.success("PDFs por fornecedor gerados!");
   };
 
   const handleSalvarPrevisao = async () => {
@@ -276,7 +309,15 @@ export default function OrderHistoryPage() {
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-0.5">
                           <Button variant="ghost" size="icon" onClick={() => viewOrder(o)} title="Visualizar"><Eye className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => exportPDF(o)} title="PDF"><FileText className="h-4 w-4" /></Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" title="PDF"><FileText className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => exportPDF(o)}>PDF Completo</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => exportPDFBySupplier(o)}>PDF por Fornecedor</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                           <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)} title="Duplicar"><Copy className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => exportCSV(o)} title="CSV"><Download className="h-4 w-4" /></Button>
                           {o.status === 'emitido' && (
@@ -285,14 +326,14 @@ export default function OrderHistoryPage() {
                             </Button>
                           )}
                           {o.status === 'rascunho' && (
-                            <>
-                              <Button variant="ghost" size="icon" onClick={() => navigate(`/nova-ordem?edit=${o.id}`)} title="Editar">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(o)} title="Excluir">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </>
+                            <Button variant="ghost" size="icon" onClick={() => navigate(`/nova-ordem?edit=${o.id}`)} title="Editar">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {(o.status === 'rascunho' || o.status === 'rejeitado') && (
+                            <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(o)} title="Excluir">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -341,14 +382,14 @@ export default function OrderHistoryPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir rascunho?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir pedido?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir permanentemente o rascunho <strong>{deleteTarget?.numero}</strong>? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir permanentemente o pedido <strong>{deleteTarget?.numero}</strong>? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteDraft} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleting ? "Excluindo..." : "Excluir"}
             </AlertDialogAction>
           </AlertDialogFooter>

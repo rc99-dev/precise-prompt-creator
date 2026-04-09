@@ -5,9 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Eye, Clock } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Clock, Pencil } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
@@ -37,6 +38,8 @@ export default function ApprovalsPage() {
   const queryClient = useQueryClient();
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [editedItems, setEditedItems] = useState<Record<string, number>>({});
+  const [isEditing, setIsEditing] = useState(false);
   const [rejectDialog, setRejectDialog] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
@@ -48,6 +51,8 @@ export default function ApprovalsPage() {
 
   const viewDetails = async (order: Order) => {
     setDetailOrder(order);
+    setIsEditing(false);
+    setEditedItems({});
     const { data } = await supabase.from('purchase_order_items')
       .select('*, products(nome, unidade_medida), suppliers(razao_social)')
       .eq('order_id', order.id);
@@ -56,16 +61,45 @@ export default function ApprovalsPage() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['approval-orders'] });
 
-  const handleApprove = async (orderId: string) => {
+  const getItemQty = (item: OrderItem) => editedItems[item.id] ?? item.quantidade;
+
+  const computeEditedTotal = () => {
+    return orderItems.reduce((sum, item) => {
+      const qty = getItemQty(item);
+      return sum + qty * item.preco_unitario;
+    }, 0);
+  };
+
+  const hasEdits = Object.keys(editedItems).length > 0;
+
+  const saveEditsAndApprove = async (orderId: string) => {
+    // Save quantity edits if any
+    if (hasEdits) {
+      for (const [itemId, newQty] of Object.entries(editedItems)) {
+        const item = orderItems.find(i => i.id === itemId);
+        if (!item) continue;
+        const newSubtotal = newQty * item.preco_unitario;
+        await supabase.from('purchase_order_items').update({
+          quantidade: newQty, subtotal: newSubtotal,
+        } as any).eq('id', itemId);
+      }
+      const newTotal = computeEditedTotal();
+      await supabase.from('purchase_orders').update({ total: newTotal } as any).eq('id', orderId);
+    }
+
     const { error } = await supabase.from('purchase_orders').update({
       status: 'aprovado', approved_by: user!.id, approved_at: new Date().toISOString(),
     } as any).eq('id', orderId);
     if (error) { toast.error(error.message); return; }
+
+    const motivo = hasEdits ? 'Aprovado com edições de quantidade' : undefined;
     await supabase.from('approval_log').insert({
-      order_id: orderId, user_id: user!.id, action: 'aprovado',
+      order_id: orderId, user_id: user!.id, action: 'aprovado', motivo,
     } as any);
-    toast.success("Pedido aprovado!");
+    toast.success(hasEdits ? "Pedido aprovado com edições!" : "Pedido aprovado!");
     setDetailOrder(null);
+    setIsEditing(false);
+    setEditedItems({});
     invalidate();
   };
 
@@ -124,7 +158,7 @@ export default function ApprovalsPage() {
                     <Button size="sm" variant="outline" onClick={() => viewDetails(o)}>
                       <Eye className="h-3 w-3 mr-1" />Detalhes
                     </Button>
-                    <Button size="sm" onClick={() => handleApprove(o.id)} className="bg-success hover:bg-success/90">
+                    <Button size="sm" onClick={() => saveEditsAndApprove(o.id)} className="bg-success hover:bg-success/90">
                       <CheckCircle className="h-3 w-3 mr-1" />Aprovar
                     </Button>
                     <Button size="sm" variant="destructive" onClick={() => setRejectDialog(o.id)}>
@@ -138,14 +172,23 @@ export default function ApprovalsPage() {
         </div>
       )}
 
-      <Dialog open={!!detailOrder} onOpenChange={() => setDetailOrder(null)}>
+      <Dialog open={!!detailOrder} onOpenChange={() => { setDetailOrder(null); setIsEditing(false); setEditedItems({}); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Pedido {detailOrder?.numero}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Pedido {detailOrder?.numero}</DialogTitle>
+              {!isEditing && (
+                <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
+                  <Pencil className="h-3 w-3 mr-1" />Editar quantidades
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
           {detailOrder && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                 <div><span className="text-muted-foreground">Data:</span> <span className="font-medium">{formatDate(detailOrder.created_at)}</span></div>
-                <div><span className="text-muted-foreground">Total:</span> <span className="font-bold currency">{formatCurrency(detailOrder.total)}</span></div>
+                <div><span className="text-muted-foreground">Total:</span> <span className="font-bold currency">{formatCurrency(isEditing || hasEdits ? computeEditedTotal() : detailOrder.total)}</span></div>
                 <div><span className="text-muted-foreground">Modo:</span> <span className="font-medium capitalize">{detailOrder.modo}</span></div>
               </div>
               {detailOrder.observacoes && (
@@ -162,23 +205,47 @@ export default function ApprovalsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orderItems.map(i => (
-                    <tr key={i.id} className="border-b last:border-0">
-                      <td className="py-2 font-medium">{i.products?.nome}</td>
-                      <td className="py-2 text-muted-foreground">{i.suppliers?.razao_social || '—'}</td>
-                      <td className="py-2 text-center">{i.quantidade} {i.products?.unidade_medida}</td>
-                      <td className="py-2 text-right currency">{formatCurrency(i.preco_unitario)}</td>
-                      <td className="py-2 text-right currency font-medium">{formatCurrency(i.subtotal)}</td>
-                    </tr>
-                  ))}
+                  {orderItems.map(i => {
+                    const qty = getItemQty(i);
+                    return (
+                      <tr key={i.id} className="border-b last:border-0">
+                        <td className="py-2 font-medium">{i.products?.nome}</td>
+                        <td className="py-2 text-muted-foreground">{i.suppliers?.razao_social || '—'}</td>
+                        <td className="py-2 text-center">
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              className="w-20 h-7 text-center text-sm mx-auto"
+                              value={qty}
+                              onChange={e => {
+                                const val = parseFloat(e.target.value);
+                                if (!isNaN(val) && val >= 0) {
+                                  setEditedItems(prev => ({ ...prev, [i.id]: val }));
+                                }
+                              }}
+                            />
+                          ) : (
+                            <>{qty} {i.products?.unidade_medida}</>
+                          )}
+                        </td>
+                        <td className="py-2 text-right currency">{formatCurrency(i.preco_unitario)}</td>
+                        <td className="py-2 text-right currency font-medium">{formatCurrency(qty * i.preco_unitario)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+              {hasEdits && (
+                <p className="text-xs text-warning font-medium">⚠️ Quantidades editadas — o total será atualizado ao aprovar.</p>
+              )}
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="destructive" onClick={() => { setRejectDialog(detailOrder.id); }}>
                   <XCircle className="h-4 w-4 mr-2" />Rejeitar
                 </Button>
-                <Button onClick={() => handleApprove(detailOrder.id)} className="bg-success hover:bg-success/90">
-                  <CheckCircle className="h-4 w-4 mr-2" />Aprovar
+                <Button onClick={() => saveEditsAndApprove(detailOrder.id)} className="bg-success hover:bg-success/90">
+                  <CheckCircle className="h-4 w-4 mr-2" />{hasEdits ? "Aprovar com edições" : "Aprovar"}
                 </Button>
               </div>
             </div>

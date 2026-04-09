@@ -20,9 +20,10 @@ interface Props {
   availableSuppliers: Supplier[];
   onUpdate: (index: number, updates: Partial<OrderItem>) => void;
   onRemove: (index: number) => void;
+  saldo?: number;
 }
 
-function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, onRemove }: Props) {
+function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, onRemove, saldo }: Props) {
   const handleQty = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     if (!isNaN(val) && val >= 0) onUpdate(index, { quantidade: val });
@@ -37,6 +38,9 @@ function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, o
       <td className="py-2.5 px-3">
         <span className="font-medium text-sm">{item.product_name}</span>
         <span className="text-muted-foreground ml-1 text-xs">({item.unidade})</span>
+      </td>
+      <td className="py-2.5 px-3 text-center text-sm text-muted-foreground">
+        {saldo !== undefined && saldo > 0 ? saldo : '—'}
       </td>
       <td className="py-2.5 px-3">
         <Input

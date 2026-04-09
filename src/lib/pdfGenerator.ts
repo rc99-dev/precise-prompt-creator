@@ -113,6 +113,7 @@ interface OrderPDFData {
   aprovador?: string | null;
   approved_at?: string | null;
   unidadeSolicitante?: string;
+  filenameSuffix?: string;
 }
 
 export function generateOrderPDF(data: OrderPDFData) {
@@ -175,14 +176,12 @@ export function generateOrderPDF(data: OrderPDFData) {
       5: { cellWidth: 26, halign: "right" },
       6: { cellWidth: 26, halign: "right" },
     },
-    // Enable automatic page breaks
     rowPageBreak: 'auto',
     didDrawPage: () => { drawFooterLine(doc); },
   });
 
   y = (doc as any).lastAutoTable.finalY + 4;
 
-  // Check if we need a new page for the total/footer
   const pageH = doc.internal.pageSize.getHeight();
   if (y + 60 > pageH - 30) {
     doc.addPage();
@@ -248,7 +247,62 @@ export function generateOrderPDF(data: OrderPDFData) {
   doc.line(sig2X, sigY, sig2X + sigW, sigY);
   doc.text("Aprovador", sig2X + sigW / 2, sigY + 4, { align: "center" });
 
-  doc.save(`${data.numero}.pdf`);
+  const filename = data.filenameSuffix ? `${data.numero}_${data.filenameSuffix}.pdf` : `${data.numero}.pdf`;
+  doc.save(filename);
+}
+
+// ===== PDF POR FORNECEDOR =====
+
+interface OrderPDFBySupplierData extends Omit<OrderPDFData, 'supplier' | 'items' | 'total'> {
+  items: (OrderPDFItem & { supplier_id?: string | null; supplier_info?: SupplierInfo | null })[];
+}
+
+export function generateOrderPDFBySupplier(data: OrderPDFBySupplierData) {
+  // Group items by supplier
+  const groups: Record<string, { supplier: SupplierInfo | null; items: OrderPDFItem[]; total: number }> = {};
+  
+  data.items.forEach(item => {
+    const key = item.supplier_id || 'sem_fornecedor';
+    if (!groups[key]) {
+      groups[key] = { supplier: item.supplier_info || null, items: [], total: 0 };
+    }
+    groups[key].items.push(item);
+    groups[key].total += item.subtotal;
+  });
+
+  const supplierKeys = Object.keys(groups);
+  
+  // If only 1 supplier, generate single PDF
+  if (supplierKeys.length <= 1) {
+    const g = groups[supplierKeys[0]];
+    generateOrderPDF({
+      ...data,
+      supplier: g.supplier,
+      items: g.items,
+      total: g.total,
+    });
+    return;
+  }
+
+  // Generate one PDF per supplier
+  supplierKeys.forEach((key, idx) => {
+    const g = groups[key];
+    const supplierLabel = g.supplier?.razao_social?.replace(/[^a-zA-Z0-9]/g, '_')?.substring(0, 20) || `fornecedor_${idx + 1}`;
+    
+    generateOrderPDF({
+      numero: data.numero,
+      created_at: data.created_at,
+      observacoes: data.observacoes,
+      total: g.total,
+      supplier: g.supplier,
+      items: g.items,
+      comprador: data.comprador,
+      aprovador: data.aprovador,
+      approved_at: data.approved_at,
+      unidadeSolicitante: data.unidadeSolicitante,
+      filenameSuffix: supplierLabel,
+    });
+  });
 }
 
 // ===== QUOTATION PDF =====
