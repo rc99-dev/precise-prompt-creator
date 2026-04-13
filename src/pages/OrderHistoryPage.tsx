@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,11 @@ export default function OrderHistoryPage() {
   const [previsaoData, setPrevisaoData] = useState("");
   const [previsaoObs, setPrevisaoObs] = useState("");
   const [savingPrevisao, setSavingPrevisao] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState<Order | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+
+  const { role } = useAuth();
 
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['order-history'],
