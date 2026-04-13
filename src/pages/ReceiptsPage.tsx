@@ -232,9 +232,22 @@ export default function ReceiptsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Recebimentos</h1>
-        <p className="text-muted-foreground text-sm mt-1">Registre o recebimento de pedidos emitidos</p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Recebimentos</h1>
+          <p className="text-muted-foreground text-sm mt-1">Registre o recebimento de pedidos emitidos</p>
+        </div>
+        <div className="w-52">
+          <Select value={filterUnidade} onValueChange={setFilterUnidade}>
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Filtrar por unidade" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas as unidades</SelectItem>
+              {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {isLoading ? (
