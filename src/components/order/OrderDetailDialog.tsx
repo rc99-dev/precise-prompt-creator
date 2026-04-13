@@ -127,7 +127,7 @@ export default function OrderDetailDialog({ open, onOpenChange, order, orderItem
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           <div><span className="text-muted-foreground">NF:</span> <span className="font-medium">{receiptData.numero_nf || '—'}</span></div>
           <div><span className="text-muted-foreground">Recebido em:</span> <span className="font-medium">{receiptData.received_at ? formatDateTime(receiptData.received_at) : '—'}</span></div>
-          <div><span className="text-muted-foreground">Estoquista:</span> <span className="font-medium">{receiptData.estoquista_nome}</span></div>
+          <div><span className="text-muted-foreground">Assistente de Suprimentos:</span> <span className="font-medium">{receiptData.estoquista_nome}</span></div>
           <div><span className="text-muted-foreground">Obs:</span> <span className="font-medium">{receiptData.observacoes || '—'}</span></div>
         </div>
         <table className="w-full text-sm">

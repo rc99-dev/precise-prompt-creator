@@ -167,7 +167,7 @@ export default function UsersPage() {
                   <SelectItem value="solicitante">Solicitante</SelectItem>
                   <SelectItem value="comprador">Comprador</SelectItem>
                   <SelectItem value="aprovador">Aprovador</SelectItem>
-                  <SelectItem value="estoquista">Estoquista</SelectItem>
+                  <SelectItem value="estoquista">Assistente de Suprimentos</SelectItem>
                   <SelectItem value="financeiro">Financeiro</SelectItem>
                   <SelectItem value="master">Master</SelectItem>
                 </SelectContent>

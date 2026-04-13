@@ -30,7 +30,7 @@ export const roleLabels: Record<AppRole, string> = {
   solicitante: 'Solicitante',
   comprador: 'Comprador',
   aprovador: 'Aprovador',
-  estoquista: 'Estoquista',
+  estoquista: 'Assistente de Suprimentos',
   financeiro: 'Financeiro',
   master: 'Master',
 };
@@ -74,9 +74,9 @@ export function canAccess(role: AppRole | null, page: string): boolean {
     comparativo: ['comprador', 'master'],
     aprovacoes: ['aprovador', 'master'],
     recebimentos: ['estoquista', 'master'],
-    fornecedores: ['comprador', 'aprovador', 'master'],
-    produtos: ['comprador', 'aprovador', 'master'],
-    precos: ['comprador', 'aprovador', 'master'],
+    fornecedores: ['comprador', 'aprovador', 'estoquista', 'master'],
+    produtos: ['comprador', 'aprovador', 'estoquista', 'master'],
+    precos: ['comprador', 'aprovador', 'estoquista', 'master'],
     usuarios: ['master'],
     relatorios: ['financeiro', 'master'],
   };

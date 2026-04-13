@@ -137,7 +137,7 @@ export default function ReceiptsPage() {
 
     // MELHORIA 12 — Notificações de recebimento
     const { data: myProfile } = await supabase.from('profiles').select('full_name').eq('user_id', user.id).single();
-    const estoquistaNome = myProfile?.full_name || 'Estoquista';
+    const estoquistaNome = myProfile?.full_name || 'Assistente de Suprimentos';
     const dataRecebimento = formatDate(new Date().toISOString());
 
     // Notify order creator
