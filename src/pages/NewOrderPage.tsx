@@ -61,6 +61,7 @@ export default function NewOrderPage() {
   const [unidadeSolicitante, setUnidadeSolicitante] = useState("");
   const [saving, setSaving] = useState(false);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [selectedReqImport, setSelectedReqImport] = useState<string | null>(null);
   const draftRestored = useRef(false);
   const { hasDraft, saveDraft, loadDraft, clearDraft } = useOrderDraft();
 
