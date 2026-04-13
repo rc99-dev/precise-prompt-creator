@@ -303,11 +303,19 @@ export default function ComparativePage() {
               <Select value={selectedReqId || ''} onValueChange={v => setSelectedReqId(v || null)}>
                 <SelectTrigger><SelectValue placeholder="Selecione a solicitação" /></SelectTrigger>
                 <SelectContent>
-                  {pendingReqs.map(r => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.products?.nome || '—'} — Saldo: {r.saldo_atual} ({new Date(r.created_at).toLocaleDateString('pt-BR')})
-                    </SelectItem>
-                  ))}
+                  {(() => {
+                    // Group requisitions by titulo to show one entry per solicitação
+                    const seen = new Map<string, RequisitionOption>();
+                    pendingReqs.forEach(r => {
+                      const key = `${r.titulo || ''}|${r.unidade || ''}|${r.created_at}`;
+                      if (!seen.has(key)) seen.set(key, r);
+                    });
+                    return Array.from(seen.values()).map(r => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.titulo || r.products?.nome || '—'} — {r.unidade || '—'} — {new Date(r.created_at).toLocaleDateString('pt-BR')}
+                      </SelectItem>
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
             </CardContent>
