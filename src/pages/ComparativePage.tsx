@@ -51,6 +51,7 @@ const fetchCompData = async () => {
 
 export default function ComparativePage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState<CompItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [unidadeSolicitante, setUnidadeSolicitante] = useState("");
@@ -58,6 +59,8 @@ export default function ComparativePage() {
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
   const [reqInfo, setReqInfo] = useState<{ solicitante: string; unidade: string; setor: string } | null>(null);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [selectedStrategy, setSelectedStrategy] = useState<"melhor_preco" | "melhor_fornecedor" | null>(null);
+  const [generatingOrder, setGeneratingOrder] = useState(false);
   const draftRestored = useRef(false);
   const { hasDraft, saveDraft, loadDraft, clearDraft } = useComparativeDraft();
 
