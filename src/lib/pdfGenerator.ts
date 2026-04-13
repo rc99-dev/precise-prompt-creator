@@ -327,6 +327,9 @@ export function generateOrderPDFBySupplier(data: OrderPDFBySupplierData) {
       approved_at: data.approved_at,
       unidadeSolicitante: data.unidadeSolicitante,
       filenameSuffix: supplierLabel,
+      showSaldo: data.showSaldo,
+      solicitante: data.solicitante,
+      setor: data.setor,
     });
   });
 }
