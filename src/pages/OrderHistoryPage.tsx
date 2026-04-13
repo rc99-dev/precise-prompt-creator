@@ -369,6 +369,11 @@ export default function OrderHistoryPage() {
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
+                          {role === 'master' && o.status === 'aprovado' && (
+                            <Button variant="ghost" size="icon" onClick={() => { setRejectTarget(o); setRejectReason(""); }} title="Reprovar">
+                              <XCircle className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -429,6 +434,24 @@ export default function OrderHistoryPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Dialog open={!!rejectTarget} onOpenChange={(open) => { if (!open) { setRejectTarget(null); setRejectReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Reprovar Pedido</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="text-sm text-muted-foreground">Pedido: <span className="font-medium text-foreground">{rejectTarget?.numero}</span></div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo da reprovação *</label>
+              <Textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Informe o motivo..." />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setRejectTarget(null)}>Cancelar</Button>
+              <Button variant="destructive" onClick={handleMasterReject} disabled={rejecting}>
+                {rejecting ? "Reprovando..." : "Reprovar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
