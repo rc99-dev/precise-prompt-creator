@@ -417,6 +417,27 @@ export default function NewOrderPage() {
         </CardContent>
       </Card>
 
+      {/* Requisition import */}
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />Importar Solicitação
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 pt-0">
+          <Select value={selectedReqImport || ''} onValueChange={v => { if (v) handleReqImport(v); }}>
+            <SelectTrigger><SelectValue placeholder="Selecione uma solicitação para importar itens" /></SelectTrigger>
+            <SelectContent>
+              {pendingReqs.map((r: any) => (
+                <SelectItem key={r.id} value={r.id}>
+                  {r.titulo || '—'} — {r.unidade || '—'} — {new Date(r.created_at).toLocaleDateString('pt-BR')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader className="py-3 px-4"><CardTitle className="text-base">Adicionar Produtos</CardTitle></CardHeader>
         <CardContent className="px-4 pb-4 pt-0">
