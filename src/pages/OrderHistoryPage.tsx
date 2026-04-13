@@ -234,7 +234,7 @@ export default function OrderHistoryPage() {
         tipo: 'info', lida: false,
       })));
     }
-    toast.success("Previsão registrada! Estoquista notificado.");
+    toast.success("Previsão registrada! Assistente de suprimentos notificado.");
     setSavingPrevisao(false);
     setPrevisaoTarget(null);
     setPrevisaoData("");
@@ -405,13 +405,13 @@ export default function OrderHistoryPage() {
               <Input type="date" value={previsaoData} onChange={e => setPrevisaoData(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Observação para o estoquista</label>
+              <label className="text-sm font-medium">Observação para o assistente de suprimentos</label>
               <Input placeholder="Ex: Entregar na portaria das 8h às 10h" value={previsaoObs} onChange={e => setPrevisaoObs(e.target.value)} />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setPrevisaoTarget(null)}>Cancelar</Button>
               <Button onClick={handleSalvarPrevisao} disabled={savingPrevisao}>
-                {savingPrevisao ? "Salvando..." : "Confirmar e notificar estoquista"}
+                {savingPrevisao ? "Salvando..." : "Confirmar e notificar assistente"}
               </Button>
             </div>
           </div>
