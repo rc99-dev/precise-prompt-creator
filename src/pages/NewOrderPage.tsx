@@ -76,6 +76,65 @@ export default function NewOrderPage() {
   const allPrices = data?.prices || [];
   const saldos = data?.saldos || {};
 
+  // Fetch pending requisitions for import dropdown
+  const { data: pendingReqs = [] } = useQuery({
+    queryKey: ['pending-reqs-for-order', unidadeSolicitante],
+    queryFn: async () => {
+      let query = supabase
+        .from('requisitions')
+        .select('id, titulo, unidade, created_at')
+        .eq('status', 'pendente')
+        .order('created_at', { ascending: false });
+      if (unidadeSolicitante) query = query.eq('unidade', unidadeSolicitante);
+      const { data } = await query;
+      // Deduplicate by titulo+unidade+created_at
+      const seen = new Map<string, any>();
+      (data || []).forEach((r: any) => {
+        const key = `${r.titulo}|${r.unidade}|${r.created_at}`;
+        if (!seen.has(key)) seen.set(key, r);
+      });
+      return Array.from(seen.values());
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const handleReqImport = useCallback(async (reqId: string) => {
+    setSelectedReqImport(reqId);
+    const { data: req } = await supabase.from('requisitions')
+      .select('id, unidade, titulo, created_at')
+      .eq('id', reqId).single();
+    // Find all reqs with same titulo+created_at to get all items
+    const matchingIds = pendingReqs
+      .filter((r: any) => r.titulo === req?.titulo && r.created_at === req?.created_at)
+      .map((r: any) => r.id);
+    if (matchingIds.length === 0) matchingIds.push(reqId);
+
+    const { data: reqItems } = await supabase
+      .from('requisition_items')
+      .select('product_id, saldo, products(nome, unidade_medida)')
+      .in('requisition_id', matchingIds);
+
+    if (reqItems && reqItems.length > 0) {
+      const newItems: OrderItem[] = reqItems.map((ri: any) => ({
+        product_id: ri.product_id,
+        product_name: ri.products?.nome || '',
+        unidade: ri.products?.unidade_medida || '',
+        quantidade: ri.saldo || 1,
+        supplier_id: '',
+        preco_unitario: 0,
+        subtotal: 0,
+        observacoes: '',
+      }));
+      // Merge avoiding duplicates
+      setItems(prev => {
+        const existingIds = new Set(prev.map(i => i.product_id));
+        return [...prev, ...newItems.filter(i => !existingIds.has(i.product_id))];
+      });
+      if (req?.unidade) setUnidadeSolicitante(req.unidade);
+      toast.success(`${reqItems.length} itens importados da solicitação.`);
+    }
+  }, [pendingReqs]);
+
   useEffect(() => {
     if (!data || draftRestored.current) return;
     draftRestored.current = true;
