@@ -20,7 +20,7 @@ type ReceiptOrder = {
   id: string; numero: string; status: string; total: number;
   created_at: string; user_id: string; previsao_entrega: string | null;
   obs_estoquista: string | null; observacoes: string | null;
-  comprador_nome?: string;
+  comprador_nome?: string; unidade_comprador?: string;
 };
 
 type OrderItemForReceipt = {
