@@ -203,7 +203,7 @@ export default function OrderHistoryPage() {
   const exportPDF = async (order: Order) => {
     const result = await fetchPDFData(order);
     if (!result) return;
-    const { items, buyerProfile, aprovadorName } = result;
+    const { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF } = result;
     const mainSupplier = items[0]?.suppliers as any;
     generateOrderPDF({
       numero: order.numero, created_at: order.created_at, observacoes: order.observacoes,
@@ -213,8 +213,12 @@ export default function OrderHistoryPage() {
         codigo: (i.products as any)?.codigo_interno, descricao: (i.products as any)?.nome || "",
         unidade: (i.products as any)?.unidade_medida || "", quantidade: i.quantidade,
         preco_unitario: i.preco_unitario, subtotal: i.subtotal,
+        saldo: saldoMap[i.product_id],
       })),
       comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (order as any).approved_at,
+      showSaldo: isInternalPDF,
+      solicitante: solicitante || undefined,
+      setor: setor || undefined,
     });
     await markAsEmitted(order);
     toast.success("PDF gerado!");
@@ -223,7 +227,7 @@ export default function OrderHistoryPage() {
   const exportPDFBySupplier = async (order: Order) => {
     const result = await fetchPDFData(order);
     if (!result) return;
-    const { items, buyerProfile, aprovadorName } = result;
+    const { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF } = result;
     generateOrderPDFBySupplier({
       numero: order.numero, created_at: order.created_at, observacoes: order.observacoes,
       unidadeSolicitante: (order as any).unidade_setor || undefined,
@@ -235,9 +239,13 @@ export default function OrderHistoryPage() {
           preco_unitario: i.preco_unitario, subtotal: i.subtotal,
           supplier_id: i.supplier_id,
           supplier_info: sup ? { razao_social: sup.razao_social, cnpj: sup.cnpj, telefone: sup.telefone, cidade: sup.cidade } : null,
+          saldo: saldoMap[i.product_id],
         };
       }),
       comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (order as any).approved_at,
+      showSaldo: isInternalPDF,
+      solicitante: solicitante || undefined,
+      setor: setor || undefined,
     });
     await markAsEmitted(order);
     toast.success("PDFs por fornecedor gerados!");
