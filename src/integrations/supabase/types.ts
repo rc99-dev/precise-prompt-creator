@@ -539,6 +539,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          observacoes: string | null
+          pedido: number
           product_id: string
           requisition_id: string
           saldo: number
@@ -546,6 +548,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          observacoes?: string | null
+          pedido?: number
           product_id: string
           requisition_id: string
           saldo?: number
@@ -553,6 +557,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          observacoes?: string | null
+          pedido?: number
           product_id?: string
           requisition_id?: string
           saldo?: number
