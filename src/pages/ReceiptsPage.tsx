@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { UNIDADES } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -105,6 +106,7 @@ export default function ReceiptsPage() {
   const [numeroNF, setNumeroNF] = useState("");
   const [obsGeral, setObsGeral] = useState("");
   const [saving, setSaving] = useState(false);
+  const [filterUnidade, setFilterUnidade] = useState("todas");
 
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['receipt-orders'],
@@ -112,8 +114,9 @@ export default function ReceiptsPage() {
     staleTime: 2 * 60 * 1000,
   });
 
-  const pendingOrders = orders.filter(o => o.status === 'emitido' && o.previsao_entrega);
-  const receivedOrders = orders.filter(o => o.status === 'recebido' || o.status === 'recebido_com_ocorrencia');
+  const filteredOrders = filterUnidade === 'todas' ? orders : orders.filter(o => o.unidade_comprador === filterUnidade);
+  const pendingOrders = filteredOrders.filter(o => o.status === 'emitido' && o.previsao_entrega);
+  const receivedOrders = filteredOrders.filter(o => o.status === 'recebido' || o.status === 'recebido_com_ocorrencia');
 
   const openReceipt = async (order: ReceiptOrder) => {
     setSelectedOrder(order);
