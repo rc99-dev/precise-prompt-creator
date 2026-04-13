@@ -37,32 +37,20 @@ type ReceiptItemForm = {
 
 const fetchReceiptOrders = async () => {
   const [{ data: orders, error }, { data: profiles }] = await Promise.all([
-    supabase.from('purchase_orders').select('*, profiles!inner(unidade)')
+    supabase.from('purchase_orders').select('*')
       .in('status', ['emitido', 'recebido', 'recebido_com_ocorrencia'])
       .order('created_at', { ascending: false }),
-    supabase.from('profiles').select('user_id, full_name'),
+    supabase.from('profiles').select('user_id, full_name, unidade'),
   ]);
-  if (error) {
-    // Fallback without join
-    const { data: ordersSimple, error: e2 } = await supabase.from('purchase_orders').select('*')
-      .in('status', ['emitido', 'recebido', 'recebido_com_ocorrencia'])
-      .order('created_at', { ascending: false });
-    if (e2) throw e2;
-    const profileMap: Record<string, string> = {};
-    const unidadeMap: Record<string, string> = {};
-    (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name; });
-    // Fetch unidades separately
-    const { data: allProfiles } = await supabase.from('profiles').select('user_id, unidade');
-    (allProfiles || []).forEach((p: any) => { unidadeMap[p.user_id] = p.unidade || ''; });
-    const mapped = (ordersSimple || []).map((o: any) => ({ ...o, comprador_nome: profileMap[o.user_id] || '—', unidade_comprador: unidadeMap[o.user_id] || '' })) as ReceiptOrder[];
-    return sortOrders(mapped);
-  }
-  const profileMap: Record<string, string> = {};
-  (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name; });
+  if (error) throw error;
+  const profileMap: Record<string, { name: string; unidade: string }> = {};
+  (profiles || []).forEach((p: any) => {
+    profileMap[p.user_id] = { name: p.full_name, unidade: p.unidade || '' };
+  });
   const mapped = (orders || []).map((o: any) => ({
     ...o,
-    comprador_nome: profileMap[o.user_id] || '—',
-    unidade_comprador: o.profiles?.unidade || '',
+    comprador_nome: profileMap[o.user_id]?.name || '—',
+    unidade_comprador: profileMap[o.user_id]?.unidade || '',
   })) as ReceiptOrder[];
   return sortOrders(mapped);
 };
