@@ -450,7 +450,17 @@ export default function ComparativePage() {
 
       {items.length > 0 && (
         <>
-          {analysis && <StrategyCards analysis={analysis} />}
+          {analysis && (
+            <div className="space-y-3">
+              <StrategyCards analysis={analysis} selectedStrategy={selectedStrategy} onSelect={handleSelectStrategy} showSelectButton />
+              <div className="flex justify-end">
+                <Button onClick={generateOrder} disabled={generatingOrder || !selectedStrategy} className="gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  {generatingOrder ? "Gerando..." : "Gerar Ordem de Compra"}
+                </Button>
+              </div>
+            </div>
+          )}
           <Card>
             <CardContent className="p-0 overflow-x-auto">
               <table className="w-full text-sm">
