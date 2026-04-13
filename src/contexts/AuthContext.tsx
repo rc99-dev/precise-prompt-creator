@@ -10,18 +10,20 @@ interface AuthContextType {
   user: User | null;
   role: AppRole | null;
   profileStatus: ProfileStatus;
+  customPermissions: Record<string, boolean> | null;
   loading: boolean;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
-  session: null, user: null, role: null, profileStatus: null, loading: true, signOut: async () => {},
+  session: null, user: null, role: null, profileStatus: null, customPermissions: null, loading: true, signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>(null);
+  const [customPermissions, setCustomPermissions] = useState<Record<string, boolean> | null>(null);
   const [loading, setLoading] = useState(true);
   const roleFetchedForUser = useRef<string | null>(null);
 
@@ -31,43 +33,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const resolveLoading = (source: string) => {
       if (!isMounted) return;
-      if (!authResolved) {
-        console.info(`[auth] loading resolvido por: ${source}`);
-      }
+      if (!authResolved) console.info(`[auth] loading resolvido por: ${source}`);
       authResolved = true;
       setLoading(false);
     };
 
     const fetchRoleAndStatus = (userId?: string) => {
       if (!userId) {
-        if (isMounted) { setRole(null); setProfileStatus(null); }
+        if (isMounted) { setRole(null); setProfileStatus(null); setCustomPermissions(null); }
         roleFetchedForUser.current = null;
         return;
       }
-
       if (roleFetchedForUser.current === userId) return;
-
       roleFetchedForUser.current = userId;
+
       Promise.all([
         getUserRole(userId),
-        supabase.from('profiles').select('status').eq('user_id', userId).single(),
+        supabase.from('profiles').select('status, permissoes_customizadas').eq('user_id', userId).single(),
       ]).then(([userRole, { data: profile }]) => {
         if (!isMounted) return;
         setRole(userRole);
         setProfileStatus((profile?.status as ProfileStatus) || 'pendente');
+        setCustomPermissions((profile?.permissoes_customizadas as Record<string, boolean>) || null);
       }).catch((error) => {
         console.error("[auth] falha ao buscar role/status", error);
-        if (isMounted) {
-          setRole(null);
-          setProfileStatus(null);
-          roleFetchedForUser.current = null;
-        }
+        if (isMounted) { setRole(null); setProfileStatus(null); setCustomPermissions(null); roleFetchedForUser.current = null; }
       });
     };
 
     const timeoutId = window.setTimeout(() => {
       if (!isMounted || authResolved) return;
-      setSession(null); setRole(null); setProfileStatus(null);
+      setSession(null); setRole(null); setProfileStatus(null); setCustomPermissions(null);
       resolveLoading("timeout-3s");
     }, 3000);
 
@@ -86,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(({ data: { session: restoredSession }, error }) => {
         if (!isMounted) return;
         if (error) {
-          setSession(null); setRole(null); setProfileStatus(null);
+          setSession(null); setRole(null); setProfileStatus(null); setCustomPermissions(null);
           resolveLoading("getSession-error");
           return;
         }
@@ -96,23 +92,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (!isMounted) return;
-        setSession(null); setRole(null); setProfileStatus(null);
+        setSession(null); setRole(null); setProfileStatus(null); setCustomPermissions(null);
         resolveLoading("getSession-catch");
       });
 
-    return () => {
-      isMounted = false;
-      window.clearTimeout(timeoutId);
-      subscription.unsubscribe();
-    };
+    return () => { isMounted = false; window.clearTimeout(timeoutId); subscription.unsubscribe(); };
   }, []);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
+  const signOut = async () => { await supabase.auth.signOut(); };
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, role, profileStatus, loading, signOut }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, role, profileStatus, customPermissions, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

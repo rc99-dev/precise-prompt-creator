@@ -15,7 +15,7 @@ import NotificationBell from "@/components/NotificationBell";
 type NavItem = { to: string; label: string; icon: any; page: string; badge?: number };
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, role, signOut } = useAuth();
+  const { user, role, customPermissions, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [pendingReqs, setPendingReqs] = useState(0);
@@ -48,7 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { to: "/relatorios", label: "Relatórios", icon: FileText, page: "relatorios" },
   ];
 
-  const navItems = allNavItems.filter(item => canAccess(role, item.page));
+  const navItems = allNavItems.filter(item => canAccess(role, item.page, customPermissions));
 
   return (
     <div className="flex h-screen overflow-hidden">
