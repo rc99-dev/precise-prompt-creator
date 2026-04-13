@@ -9,15 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Search, X, ClipboardList, ShoppingCart, Eye } from "lucide-react";
+import { Search, X, ClipboardList, ShoppingCart, Eye, Trash2, Copy, Pencil } from "lucide-react";
 import { formatDate, statusLabels } from "@/lib/helpers";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
+import { useAuth } from "@/contexts/AuthContext";
 
 type ReqItem = {
-  id: string; product_id: string; saldo: number;
+  id: string; product_id: string; saldo: number; pedido: number; observacoes: string | null;
   products?: { nome: string; unidade_medida: string } | null;
 };
 
@@ -29,6 +30,7 @@ type Requisition = {
 };
 
 export default function RequisitionsPage() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("pendente");
@@ -48,13 +50,12 @@ export default function RequisitionsPage() {
       if (error) throw error;
 
       const reqs = data || [];
-      // Load profiles and items
       const userIds = [...new Set(reqs.map(r => r.user_id))];
       const reqIds = reqs.map(r => r.id);
 
       const [{ data: profiles }, { data: items }] = await Promise.all([
         userIds.length > 0 ? supabase.from('profiles').select('user_id, full_name').in('user_id', userIds) : { data: [] },
-        reqIds.length > 0 ? supabase.from('requisition_items').select('id, requisition_id, product_id, saldo, products(nome, unidade_medida)').in('requisition_id', reqIds) : { data: [] },
+        reqIds.length > 0 ? supabase.from('requisition_items').select('id, requisition_id, product_id, saldo, pedido, observacoes, products(nome, unidade_medida)').in('requisition_id', reqIds) : { data: [] },
       ]);
 
       const profileMap: Record<string, string> = {};
@@ -91,6 +92,57 @@ export default function RequisitionsPage() {
     }
   };
 
+  const handleDelete = async (reqId: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta solicitação?")) return;
+    // Delete items first, then requisition
+    await supabase.from('requisition_items').delete().eq('requisition_id', reqId);
+    const { error } = await supabase.from('requisitions').delete().eq('id', reqId);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Solicitação excluída.");
+      queryClient.invalidateQueries({ queryKey: ['requisitions-list'] });
+    }
+  };
+
+  const handleDuplicate = async (req: Requisition) => {
+    // Create a copy with status pendente
+    const { data: newReq, error } = await supabase.from('requisitions').insert({
+      user_id: req.user_id,
+      titulo: req.titulo,
+      unidade: req.unidade,
+      setor: req.setor,
+      product_id: req.requisition_items?.[0]?.product_id || '',
+      saldo_atual: 0,
+      unidade_medida: 'unidade',
+      status: 'pendente',
+    } as any).select('id').single();
+    if (error || !newReq) { toast.error(error?.message || "Erro ao duplicar."); return; }
+
+    // Copy items
+    if (req.requisition_items?.length) {
+      await supabase.from('requisition_items').insert(
+        req.requisition_items.map(i => ({
+          requisition_id: newReq.id,
+          product_id: i.product_id,
+          saldo: i.saldo,
+          pedido: i.pedido || 0,
+          observacoes: i.observacoes,
+        }))
+      );
+    }
+
+    toast.success("Solicitação duplicada com status pendente.");
+    queryClient.invalidateQueries({ queryKey: ['requisitions-list'] });
+  };
+
+  const handleEdit = (reqId: string) => {
+    // Navigate to my-requisitions with edit param — or we handle inline
+    // For now, navigate to the requisition form page
+    navigate(`/minhas-solicitacoes?edit=${reqId}`);
+  };
+
+  const showActions = true; // always show actions column
+
   return (
     <div className="space-y-6">
       <div>
@@ -117,7 +169,7 @@ export default function RequisitionsPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <TableSkeleton columns={6} rows={6} />
+            <TableSkeleton columns={7} rows={6} />
           ) : isError ? (
             <QueryError onRetry={() => refetch()} />
           ) : filtered.length === 0 ? (
@@ -136,7 +188,7 @@ export default function RequisitionsPage() {
                     <th className="text-center py-3 px-4 font-medium text-muted-foreground">Itens</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Data</th>
                     <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
-                    {statusFilter === 'pendente' && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>}
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -152,19 +204,34 @@ export default function RequisitionsPage() {
                           {statusLabels[r.status] || r.status}
                         </Badge>
                       </td>
-                      {statusFilter === 'pendente' && (
-                        <td className="py-3 px-4 text-right space-x-1">
-                          <Button size="sm" variant="ghost" onClick={() => setDetailReq(r)} title="Ver itens">
-                            <Eye className="h-3 w-3" />
+                      <td className="py-3 px-4 text-right space-x-1">
+                        <Button size="sm" variant="ghost" onClick={() => setDetailReq(r)} title="Ver itens">
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                        {r.status === 'pendente' && (
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => handleInclude(r.id)}>
+                              <ShoppingCart className="h-3 w-3 mr-1" />Incluir
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => handleEdit(r.id)} title="Editar">
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setRejectDialog(r.id)}>
+                              <X className="h-3 w-3 mr-1" />Recusar
+                            </Button>
+                          </>
+                        )}
+                        {r.status === 'recusada' && (
+                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(r.id)} title="Excluir">
+                            <Trash2 className="h-3 w-3" />
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleInclude(r.id)}>
-                            <ShoppingCart className="h-3 w-3 mr-1" />Incluir
+                        )}
+                        {r.status === 'incluida_no_pedido' && (
+                          <Button size="sm" variant="ghost" onClick={() => handleDuplicate(r)} title="Duplicar">
+                            <Copy className="h-3 w-3 mr-1" />Duplicar
                           </Button>
-                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setRejectDialog(r.id)}>
-                            <X className="h-3 w-3 mr-1" />Recusar
-                          </Button>
-                        </td>
-                      )}
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -192,6 +259,8 @@ export default function RequisitionsPage() {
                     <th className="text-left py-2 font-medium text-muted-foreground">Produto</th>
                     <th className="text-left py-2 font-medium text-muted-foreground">Unidade</th>
                     <th className="text-right py-2 font-medium text-muted-foreground">Saldo</th>
+                    <th className="text-right py-2 font-medium text-muted-foreground">Pedido</th>
+                    <th className="text-left py-2 font-medium text-muted-foreground">Obs</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -200,6 +269,8 @@ export default function RequisitionsPage() {
                       <td className="py-2">{(i.products as any)?.nome || '—'}</td>
                       <td className="py-2 text-muted-foreground">{(i.products as any)?.unidade_medida || '—'}</td>
                       <td className="py-2 text-right">{i.saldo}</td>
+                      <td className="py-2 text-right">{i.pedido || '—'}</td>
+                      <td className="py-2 text-muted-foreground text-xs">{i.observacoes || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
