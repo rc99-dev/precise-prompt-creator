@@ -3,10 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar } from "lucide-react";
+import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar, XCircle } from "lucide-react";
 import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
 import { generateOrderPDF, generateOrderPDFBySupplier } from "@/lib/pdfGenerator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -60,6 +61,11 @@ export default function OrderHistoryPage() {
   const [previsaoData, setPrevisaoData] = useState("");
   const [previsaoObs, setPrevisaoObs] = useState("");
   const [savingPrevisao, setSavingPrevisao] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState<Order | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+
+  const { role } = useAuth();
 
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['order-history'],
@@ -106,6 +112,8 @@ export default function OrderHistoryPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
+    // Unlink any requisitions referencing this order to avoid FK violation
+    await supabase.from('requisitions').update({ order_id: null, status: 'pendente' } as any).eq('order_id', deleteTarget.id);
     await supabase.from('purchase_order_items').delete().eq('order_id', deleteTarget.id);
     const { error } = await supabase.from('purchase_orders').delete().eq('id', deleteTarget.id);
     if (error) { toast.error(error.message); } else { toast.success("Pedido excluído!"); }
@@ -234,6 +242,32 @@ export default function OrderHistoryPage() {
     queryClient.invalidateQueries({ queryKey: ['order-history'] });
   };
 
+  const handleMasterReject = async () => {
+    if (!rejectTarget || !rejectReason.trim()) { toast.error("Informe o motivo da reprovação."); return; }
+    setRejecting(true);
+    const { error } = await supabase.from('purchase_orders').update({
+      status: 'rejeitado', rejected_reason: rejectReason,
+    }).eq('id', rejectTarget.id);
+    if (error) { toast.error(error.message); setRejecting(false); return; }
+    // Log action
+    await supabase.from('approval_log').insert({
+      order_id: rejectTarget.id, user_id: user!.id,
+      action: 'rejeitado', motivo: rejectReason,
+    });
+    // Notify the buyer
+    await supabase.from('notifications').insert({
+      user_id: rejectTarget.user_id,
+      titulo: 'Pedido reprovado pelo master',
+      mensagem: `Pedido ${rejectTarget.numero} foi reprovado. Motivo: ${rejectReason}`,
+      tipo: 'alerta', lida: false,
+    });
+    toast.success("Pedido reprovado!");
+    setRejecting(false);
+    setRejectTarget(null);
+    setRejectReason("");
+    queryClient.invalidateQueries({ queryKey: ['order-history'] });
+  };
+
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
       rascunho: 'Rascunho', aguardando_aprovacao: 'Aguardando Aprovação',
@@ -335,6 +369,11 @@ export default function OrderHistoryPage() {
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
+                          {role === 'master' && o.status === 'aprovado' && (
+                            <Button variant="ghost" size="icon" onClick={() => { setRejectTarget(o); setRejectReason(""); }} title="Reprovar">
+                              <XCircle className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -395,6 +434,24 @@ export default function OrderHistoryPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Dialog open={!!rejectTarget} onOpenChange={(open) => { if (!open) { setRejectTarget(null); setRejectReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Reprovar Pedido</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="text-sm text-muted-foreground">Pedido: <span className="font-medium text-foreground">{rejectTarget?.numero}</span></div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo da reprovação *</label>
+              <Textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Informe o motivo..." />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setRejectTarget(null)}>Cancelar</Button>
+              <Button variant="destructive" onClick={handleMasterReject} disabled={rejecting}>
+                {rejecting ? "Reprovando..." : "Reprovar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

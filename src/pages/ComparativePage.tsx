@@ -25,6 +25,7 @@ type CompItem = DraftCompItem;
 type RequisitionOption = {
   id: string; product_id: string; saldo_atual: number; unidade_medida: string;
   unidade: string | null; setor: string | null; unidade_setor: string | null;
+  titulo: string | null;
   user_id: string; created_at: string;
   products?: { nome: string } | null;
   profiles?: { full_name: string } | null;
@@ -70,17 +71,19 @@ export default function ComparativePage() {
     queryFn: async () => {
       let query = supabase
         .from('requisitions')
-        .select('id, product_id, saldo_atual, unidade_medida, unidade, setor, unidade_setor, user_id, created_at, products(nome)')
+        .select('id, product_id, saldo_atual, unidade_medida, unidade, setor, unidade_setor, user_id, created_at, titulo, products(nome)')
         .eq('status', 'pendente')
         .order('created_at', { ascending: false });
       
-      // BUG 12: filter by unidade when selected
       if (unidadeSolicitante) {
         query = query.eq('unidade', unidadeSolicitante);
       }
       
       const { data, error } = await query;
       if (error) throw error;
+
+      // Group by unique requisition (titulo + user_id + created_at combo as proxy for "same requisition")
+      // Since requisitions table has one row per product, we group by titulo+unidade+created_at
       return (data || []) as unknown as RequisitionOption[];
     },
     staleTime: 30 * 1000,
@@ -123,40 +126,54 @@ export default function ComparativePage() {
     saveDraft({ items, unidadeSolicitante, showSaldo, selectedRequisitionId: selectedReqId });
   }, [items, unidadeSolicitante, showSaldo, selectedReqId, saveDraft]);
 
-  // Load requisition products
+  // Load requisition products — import ALL items from requisition_items
   useEffect(() => {
     if (!selectedReqId || !showSaldo) return;
-    const reqs = pendingReqs.filter(r => r.id === selectedReqId || selectedReqId === 'all');
-    // If single req selected, get user info
-    if (selectedReqId !== 'all' && reqs.length > 0) {
-      const req = reqs[0];
-      supabase.from('profiles').select('full_name').eq('user_id', req.user_id).single()
-        .then(({ data: profile }) => {
-          setReqInfo({
-            solicitante: profile?.full_name || '—',
-            unidade: (req as any).unidade || req.unidade_setor || '—',
-            setor: (req as any).setor || '—',
-          });
-        });
-    }
-    // Pre-load products
-    const newItems: CompItem[] = reqs.map(r => ({
-      product_id: r.product_id,
-      product_name: r.products?.nome || '—',
-      unidade: r.unidade_medida,
-      quantidade: 1,
-      saldo: r.saldo_atual,
-    }));
-    // Merge with existing, avoiding duplicates
-    setItems(prev => {
-      const existingIds = new Set(prev.map(i => i.product_id));
-      const toAdd = newItems.filter(i => !existingIds.has(i.product_id));
-      const updated = prev.map(p => {
-        const match = newItems.find(n => n.product_id === p.product_id);
-        return match ? { ...p, saldo: match.saldo } : p;
+    
+    (async () => {
+      // Get the selected requisition for header info
+      const selectedReq = pendingReqs.find(r => r.id === selectedReqId);
+      if (!selectedReq) return;
+
+      // Get user info
+      const { data: profile } = await supabase.from('profiles').select('full_name').eq('user_id', selectedReq.user_id).single();
+      setReqInfo({
+        solicitante: profile?.full_name || '—',
+        unidade: selectedReq.unidade || selectedReq.unidade_setor || '—',
+        setor: selectedReq.setor || '—',
       });
-      return [...updated, ...toAdd];
-    });
+
+      // Find all requisitions with same titulo+created_at to get all items
+      const matchingReqs = pendingReqs.filter(r => 
+        r.titulo === selectedReq.titulo && r.created_at === selectedReq.created_at
+      );
+
+      // Also load requisition_items for all matching requisition IDs
+      const reqIds = matchingReqs.map(r => r.id);
+      const { data: reqItems } = await supabase
+        .from('requisition_items')
+        .select('product_id, saldo, products(nome, unidade_medida)')
+        .in('requisition_id', reqIds);
+
+      const newItems: CompItem[] = (reqItems || []).map((ri: any) => ({
+        product_id: ri.product_id,
+        product_name: ri.products?.nome || '—',
+        unidade: ri.products?.unidade_medida || '',
+        quantidade: 1,
+        saldo: ri.saldo,
+      }));
+
+      // Merge with existing, avoiding duplicates
+      setItems(prev => {
+        const existingIds = new Set(prev.map(i => i.product_id));
+        const toAdd = newItems.filter(i => !existingIds.has(i.product_id));
+        const updated = prev.map(p => {
+          const match = newItems.find(n => n.product_id === p.product_id);
+          return match ? { ...p, saldo: match.saldo } : p;
+        });
+        return [...updated, ...toAdd];
+      });
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedReqId, showSaldo, pendingReqs]);
 
@@ -300,11 +317,19 @@ export default function ComparativePage() {
               <Select value={selectedReqId || ''} onValueChange={v => setSelectedReqId(v || null)}>
                 <SelectTrigger><SelectValue placeholder="Selecione a solicitação" /></SelectTrigger>
                 <SelectContent>
-                  {pendingReqs.map(r => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.products?.nome || '—'} — Saldo: {r.saldo_atual} ({new Date(r.created_at).toLocaleDateString('pt-BR')})
-                    </SelectItem>
-                  ))}
+                  {(() => {
+                    // Group requisitions by titulo to show one entry per solicitação
+                    const seen = new Map<string, RequisitionOption>();
+                    pendingReqs.forEach(r => {
+                      const key = `${r.titulo || ''}|${r.unidade || ''}|${r.created_at}`;
+                      if (!seen.has(key)) seen.set(key, r);
+                    });
+                    return Array.from(seen.values()).map(r => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.titulo || r.products?.nome || '—'} — {r.unidade || '—'} — {new Date(r.created_at).toLocaleDateString('pt-BR')}
+                      </SelectItem>
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
             </CardContent>
