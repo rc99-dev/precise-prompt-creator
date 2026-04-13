@@ -106,6 +106,8 @@ export default function OrderHistoryPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
+    // Unlink any requisitions referencing this order to avoid FK violation
+    await supabase.from('requisitions').update({ order_id: null, status: 'pendente' } as any).eq('order_id', deleteTarget.id);
     await supabase.from('purchase_order_items').delete().eq('order_id', deleteTarget.id);
     const { error } = await supabase.from('purchase_orders').delete().eq('id', deleteTarget.id);
     if (error) { toast.error(error.message); } else { toast.success("Pedido excluído!"); }

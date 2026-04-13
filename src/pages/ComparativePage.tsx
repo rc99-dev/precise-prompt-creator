@@ -25,6 +25,7 @@ type CompItem = DraftCompItem;
 type RequisitionOption = {
   id: string; product_id: string; saldo_atual: number; unidade_medida: string;
   unidade: string | null; setor: string | null; unidade_setor: string | null;
+  titulo: string | null;
   user_id: string; created_at: string;
   products?: { nome: string } | null;
   profiles?: { full_name: string } | null;

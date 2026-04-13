@@ -111,32 +111,41 @@ export default function NewOrderPage() {
       return;
     }
 
-    // Load from requisition param
+    // Load from requisition param — import ALL items
     if (requisitionId) {
       (async () => {
+        // Get the requisition header for unidade info
         const { data: req } = await supabase
           .from('requisitions')
-          .select('*, products(nome, unidade_medida)')
+          .select('id, unidade, unidade_setor, observacoes')
           .eq('id', requisitionId)
           .single();
-        if (req) {
-          const productName = (req.products as any)?.nome || '';
-          const unidade = (req.products as any)?.unidade_medida || '';
-          // Find best price
-          const pricesForProduct = allPrices.filter(p => p.product_id === req.product_id);
-          const min = pricesForProduct.length > 0
-            ? pricesForProduct.reduce((m, e) => e.preco_unitario < m.preco_unitario ? e : m, pricesForProduct[0])
-            : null;
-          setItems([{
-            product_id: req.product_id,
-            product_name: productName,
-            unidade,
-            quantidade: req.saldo_atual || 1,
-            supplier_id: min?.supplier_id || '',
-            preco_unitario: min?.preco_unitario || 0,
-            subtotal: (req.saldo_atual || 1) * (min?.preco_unitario || 0),
-            observacoes: req.observacoes || '',
-          }]);
+        // Get all requisition_items for this requisition
+        const { data: reqItems } = await supabase
+          .from('requisition_items')
+          .select('product_id, saldo, products(nome, unidade_medida)')
+          .eq('requisition_id', requisitionId);
+        if (req && reqItems && reqItems.length > 0) {
+          const newItems: OrderItem[] = reqItems.map((ri: any) => {
+            const productName = ri.products?.nome || '';
+            const unidade = ri.products?.unidade_medida || '';
+            const pricesForProduct = allPrices.filter(p => p.product_id === ri.product_id);
+            const min = pricesForProduct.length > 0
+              ? pricesForProduct.reduce((m, e) => e.preco_unitario < m.preco_unitario ? e : m, pricesForProduct[0])
+              : null;
+            const qty = ri.saldo || 1;
+            return {
+              product_id: ri.product_id,
+              product_name: productName,
+              unidade,
+              quantidade: qty,
+              supplier_id: min?.supplier_id || '',
+              preco_unitario: min?.preco_unitario || 0,
+              subtotal: qty * (min?.preco_unitario || 0),
+              observacoes: '',
+            };
+          });
+          setItems(newItems);
           if (req.unidade) setUnidadeSolicitante(req.unidade);
           else if (req.unidade_setor) setUnidadeSolicitante(req.unidade_setor);
         }
