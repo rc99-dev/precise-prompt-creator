@@ -228,6 +228,77 @@ export default function ComparativePage() {
 
   const analysis = useStrategyAnalysis(items, prices, suppliers);
 
+  const handleSelectStrategy = (s: "melhor_preco" | "melhor_fornecedor") => {
+    setSelectedStrategy(s);
+  };
+
+  const generateOrder = async () => {
+    if (!analysis || items.length === 0) return;
+    setGeneratingOrder(true);
+
+    try {
+      const { data: numData } = await supabase.rpc('generate_order_number');
+      const numero = numData || `PED-${Date.now()}`;
+      const strategy = selectedStrategy || analysis.recommendedStrategy;
+
+      // Build items with supplier/price based on strategy
+      const orderItems = items.map(item => {
+        let supplierId = '';
+        let precoUnitario = 0;
+
+        if (strategy === 'melhor_preco') {
+          const productPrices = prices.filter(p => p.product_id === item.product_id);
+          if (productPrices.length > 0) {
+            const best = productPrices.reduce((m, e) => e.preco_unitario < m.preco_unitario ? e : m);
+            supplierId = best.supplier_id;
+            precoUnitario = best.preco_unitario;
+          }
+        } else if (strategy === 'melhor_fornecedor' && analysis.bestSingle) {
+          supplierId = analysis.bestSingle.supplierId;
+          precoUnitario = prices.find(p => p.product_id === item.product_id && p.supplier_id === supplierId)?.preco_unitario || 0;
+        }
+
+        return {
+          product_id: item.product_id,
+          supplier_id: supplierId || null,
+          quantidade: item.quantidade,
+          preco_unitario: precoUnitario,
+          subtotal: item.quantidade * precoUnitario,
+        };
+      });
+
+      const total = orderItems.reduce((s, i) => s + i.subtotal, 0);
+
+      const { data: order, error } = await supabase.from('purchase_orders').insert({
+        numero,
+        user_id: user!.id,
+        modo: strategy,
+        status: 'rascunho',
+        total,
+        unidade_setor: unidadeSolicitante || null,
+      }).select('id').single();
+
+      if (error || !order) { toast.error(error?.message || "Erro ao criar ordem."); return; }
+
+      await supabase.from('purchase_order_items').insert(
+        orderItems.map(i => ({ ...i, order_id: order.id, observacoes: null }))
+      );
+
+      // Link requisition if exists
+      if (selectedReqId) {
+        await supabase.from('requisitions').update({
+          status: 'incluida_no_pedido', order_id: order.id,
+        } as any).eq('id', selectedReqId);
+      }
+
+      clearDraft();
+      toast.success("Ordem de compra criada como rascunho — você pode editá-la antes de enviar para aprovação.");
+      navigate(`/nova-ordem?edit=${order.id}`);
+    } finally {
+      setGeneratingOrder(false);
+    }
+  };
+
   const exportQuotPDF = async () => {
     if (items.length === 0) return;
     const { data: profile } = await supabase.from('profiles').select('full_name').eq('user_id', user!.id).single();
