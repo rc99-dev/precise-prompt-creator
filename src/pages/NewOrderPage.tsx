@@ -237,9 +237,9 @@ export default function NewOrderPage() {
   }, [clearDraft]);
 
   useEffect(() => {
-    if (editOrderId || requisitionId || !draftRestored.current) return;
+    if (editOrderId || requisitionId || !draftRestored.current || showDraftBanner) return;
     saveDraft({ items, observacoes, activeStrategy, editingOrderId: null });
-  }, [items, observacoes, activeStrategy, saveDraft, editOrderId, requisitionId]);
+  }, [items, observacoes, activeStrategy, saveDraft, editOrderId, requisitionId, showDraftBanner]);
 
   const pricesByProduct = useMemo(() => {
     const map: Record<string, { supplier_id: string; preco: number }[]> = {};
