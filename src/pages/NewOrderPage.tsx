@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/helpers";
+import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { UNIDADES } from "@/lib/constants";
@@ -17,7 +17,7 @@ import StrategyCards, { useStrategyAnalysis } from "@/components/order/StrategyC
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { useOrderDraft, DraftOrderItem } from "@/hooks/useOrderDraft";
-import { AlertTriangle, Trash2, RotateCcw } from "lucide-react";
+import { AlertTriangle, Trash2, RotateCcw, ClipboardList } from "lucide-react";
 
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
