@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/helpers";
+import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { UNIDADES } from "@/lib/constants";
@@ -17,7 +17,7 @@ import StrategyCards, { useStrategyAnalysis } from "@/components/order/StrategyC
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { useOrderDraft, DraftOrderItem } from "@/hooks/useOrderDraft";
-import { AlertTriangle, Trash2, RotateCcw } from "lucide-react";
+import { AlertTriangle, Trash2, RotateCcw, ClipboardList } from "lucide-react";
 
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
@@ -61,6 +61,7 @@ export default function NewOrderPage() {
   const [unidadeSolicitante, setUnidadeSolicitante] = useState("");
   const [saving, setSaving] = useState(false);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [selectedReqImport, setSelectedReqImport] = useState<string | null>(null);
   const draftRestored = useRef(false);
   const { hasDraft, saveDraft, loadDraft, clearDraft } = useOrderDraft();
 
@@ -74,6 +75,65 @@ export default function NewOrderPage() {
   const suppliers = data?.suppliers || [];
   const allPrices = data?.prices || [];
   const saldos = data?.saldos || {};
+
+  // Fetch pending requisitions for import dropdown
+  const { data: pendingReqs = [] } = useQuery({
+    queryKey: ['pending-reqs-for-order', unidadeSolicitante],
+    queryFn: async () => {
+      let query = supabase
+        .from('requisitions')
+        .select('id, titulo, unidade, created_at')
+        .eq('status', 'pendente')
+        .order('created_at', { ascending: false });
+      if (unidadeSolicitante) query = query.eq('unidade', unidadeSolicitante);
+      const { data } = await query;
+      // Deduplicate by titulo+unidade+created_at
+      const seen = new Map<string, any>();
+      (data || []).forEach((r: any) => {
+        const key = `${r.titulo}|${r.unidade}|${r.created_at}`;
+        if (!seen.has(key)) seen.set(key, r);
+      });
+      return Array.from(seen.values());
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const handleReqImport = useCallback(async (reqId: string) => {
+    setSelectedReqImport(reqId);
+    const { data: req } = await supabase.from('requisitions')
+      .select('id, unidade, titulo, created_at')
+      .eq('id', reqId).single();
+    // Find all reqs with same titulo+created_at to get all items
+    const matchingIds = pendingReqs
+      .filter((r: any) => r.titulo === req?.titulo && r.created_at === req?.created_at)
+      .map((r: any) => r.id);
+    if (matchingIds.length === 0) matchingIds.push(reqId);
+
+    const { data: reqItems } = await supabase
+      .from('requisition_items')
+      .select('product_id, saldo, products(nome, unidade_medida)')
+      .in('requisition_id', matchingIds);
+
+    if (reqItems && reqItems.length > 0) {
+      const newItems: OrderItem[] = reqItems.map((ri: any) => ({
+        product_id: ri.product_id,
+        product_name: ri.products?.nome || '',
+        unidade: ri.products?.unidade_medida || '',
+        quantidade: ri.saldo || 1,
+        supplier_id: '',
+        preco_unitario: 0,
+        subtotal: 0,
+        observacoes: '',
+      }));
+      // Merge avoiding duplicates
+      setItems(prev => {
+        const existingIds = new Set(prev.map(i => i.product_id));
+        return [...prev, ...newItems.filter(i => !existingIds.has(i.product_id))];
+      });
+      if (req?.unidade) setUnidadeSolicitante(req.unidade);
+      toast.success(`${reqItems.length} itens importados da solicitação.`);
+    }
+  }, [pendingReqs]);
 
   useEffect(() => {
     if (!data || draftRestored.current) return;
@@ -352,6 +412,27 @@ export default function NewOrderPage() {
             <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
             <SelectContent>
               {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      {/* Requisition import */}
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />Importar Solicitação
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 pt-0">
+          <Select value={selectedReqImport || ''} onValueChange={v => { if (v) handleReqImport(v); }}>
+            <SelectTrigger><SelectValue placeholder="Selecione uma solicitação para importar itens" /></SelectTrigger>
+            <SelectContent>
+              {pendingReqs.map((r: any) => (
+                <SelectItem key={r.id} value={r.id}>
+                  {r.titulo || '—'} — {r.unidade || '—'} — {new Date(r.created_at).toLocaleDateString('pt-BR')}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </CardContent>

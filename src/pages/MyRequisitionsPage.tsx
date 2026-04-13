@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { Plus, ClipboardList, X, Search } from "lucide-react";
 import { formatDate, statusLabels } from "@/lib/helpers";
 import { UNIDADES, SETORES, TITULOS_SOLICITACAO } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 
@@ -29,7 +30,10 @@ type DraftItem = { product_id: string; nome: string; unidade_medida: string; sal
 export default function MyRequisitionsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editId = searchParams.get("edit");
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [titulo, setTitulo] = useState("");
   const [unidade, setUnidade] = useState("");
   const [setor, setSetor] = useState("");
@@ -43,7 +47,7 @@ export default function MyRequisitionsPage() {
     queryKey: ['my-requisitions', user?.id],
     queryFn: async () => {
       const [{ data: reqs, error: e1 }, { data: prods, error: e2 }, { data: cats, error: e3 }] = await Promise.all([
-        supabase.from('requisitions').select('id, user_id, titulo, unidade, setor, status, motivo_recusa, created_at')
+        supabase.from('requisitions').select('id, user_id, titulo, unidade, setor, status, motivo_recusa, created_at, observacoes')
           .eq('user_id', user!.id).order('created_at', { ascending: false }),
         supabase.from('products').select('id, nome, unidade_medida, categoria').eq('status', 'ativo').order('nome'),
         supabase.from('product_categories').select('nome').order('nome'),
@@ -78,6 +82,48 @@ export default function MyRequisitionsPage() {
   const products = data?.products || [];
   const categories = data?.categories || [];
 
+  // Handle edit param — load existing requisition data
+  useEffect(() => {
+    if (!editId || !data) return;
+    const req = requisitions.find(r => r.id === editId);
+    if (!req) {
+      // Requisition might belong to another user — try fetching it
+      (async () => {
+        const { data: reqData } = await supabase.from('requisitions')
+          .select('id, titulo, unidade, setor, observacoes')
+          .eq('id', editId).single();
+        const { data: reqItems } = await supabase.from('requisition_items')
+          .select('product_id, saldo, pedido, observacoes, products(nome, unidade_medida)')
+          .eq('requisition_id', editId);
+        if (reqData) {
+          loadReqIntoForm(reqData, reqItems || []);
+        }
+      })();
+    } else {
+      loadReqIntoForm(req, req.requisition_items || []);
+    }
+    // Clear edit param from URL
+    setSearchParams({}, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId, data]);
+
+  const loadReqIntoForm = (req: any, reqItems: any[]) => {
+    setEditingId(req.id);
+    setTitulo(req.titulo || "");
+    setUnidade(req.unidade || "");
+    setSetor(req.setor || "");
+    setObservacoes(req.observacoes || "");
+    setItems(reqItems.map((i: any) => ({
+      product_id: i.product_id,
+      nome: i.products?.nome || '—',
+      unidade_medida: i.products?.unidade_medida || '',
+      saldo: String(i.saldo || ''),
+      pedido: String(i.pedido || ''),
+      observacoes: i.observacoes || '',
+    })));
+    setShowForm(true);
+  };
+
   const filteredProducts = products.filter(p =>
     p.nome.toLowerCase().includes(productSearch.toLowerCase()) &&
     !items.some(i => i.product_id === p.id)
@@ -110,6 +156,11 @@ export default function MyRequisitionsPage() {
     setItems(copy);
   };
 
+  const resetForm = () => {
+    setTitulo(""); setUnidade(""); setSetor(""); setCategoria(""); setObservacoes(""); setItems([]);
+    setShowForm(false); setEditingId(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!titulo) { toast.error("Selecione o título."); return; }
@@ -119,44 +170,68 @@ export default function MyRequisitionsPage() {
 
     setSaving(true);
 
-    const { data: profile } = await supabase.from('profiles').select('full_name').eq('user_id', user!.id).single();
+    if (editingId) {
+      // Update existing requisition
+      const { error } = await supabase.from('requisitions').update({
+        titulo, unidade, setor, unidade_setor: `${unidade} - ${setor}`,
+        observacoes: observacoes || null,
+        product_id: items[0].product_id,
+        saldo_atual: parseFloat(items[0].saldo) || 0,
+        unidade_medida: items[0].unidade_medida,
+      } as any).eq('id', editingId);
+      if (error) { toast.error(error.message); setSaving(false); return; }
 
-    const { data: req, error } = await supabase.from('requisitions').insert({
-      user_id: user!.id,
-      titulo,
-      unidade,
-      setor,
-      unidade_setor: `${unidade} - ${setor}`,
-      product_id: items[0].product_id,
-      saldo_atual: parseFloat(items[0].saldo) || 0,
-      unidade_medida: items[0].unidade_medida,
-      observacoes: observacoes || null,
-    } as any).select('id').single();
+      // Delete old items and re-insert
+      await supabase.from('requisition_items').delete().eq('requisition_id', editingId);
+      const itemsToInsert = items.map(i => ({
+        requisition_id: editingId,
+        product_id: i.product_id,
+        saldo: parseFloat(i.saldo) || 0,
+        pedido: parseFloat(i.pedido) || 0,
+        observacoes: i.observacoes || null,
+      }));
+      await supabase.from('requisition_items').insert(itemsToInsert);
 
-    if (error || !req) { toast.error(error?.message || "Erro ao criar solicitação."); setSaving(false); return; }
+      toast.success("Solicitação atualizada!");
+    } else {
+      // Create new requisition
+      const { data: profile } = await supabase.from('profiles').select('full_name').eq('user_id', user!.id).single();
 
-    const itemsToInsert = items.map(i => ({
-      requisition_id: req.id,
-      product_id: i.product_id,
-      saldo: parseFloat(i.saldo) || 0,
-      pedido: parseFloat(i.pedido) || 0,
-      observacoes: i.observacoes || null,
-    }));
-    await supabase.from('requisition_items').insert(itemsToInsert);
+      const { data: req, error } = await supabase.from('requisitions').insert({
+        user_id: user!.id,
+        titulo, unidade, setor,
+        unidade_setor: `${unidade} - ${setor}`,
+        product_id: items[0].product_id,
+        saldo_atual: parseFloat(items[0].saldo) || 0,
+        unidade_medida: items[0].unidade_medida,
+        observacoes: observacoes || null,
+      } as any).select('id').single();
 
-    const { data: buyers } = await supabase.from('user_roles').select('user_id').in('role', ['comprador', 'master']);
-    if (buyers?.length) {
-      await supabase.from('notifications').insert(buyers.map(b => ({
-        user_id: b.user_id,
-        titulo: 'Nova solicitação',
-        mensagem: `Nova solicitação: ${titulo} — ${unidade} — ${setor} — por ${profile?.full_name || 'Usuário'}`,
-        tipo: 'info',
-      })));
+      if (error || !req) { toast.error(error?.message || "Erro ao criar solicitação."); setSaving(false); return; }
+
+      const itemsToInsert = items.map(i => ({
+        requisition_id: req.id,
+        product_id: i.product_id,
+        saldo: parseFloat(i.saldo) || 0,
+        pedido: parseFloat(i.pedido) || 0,
+        observacoes: i.observacoes || null,
+      }));
+      await supabase.from('requisition_items').insert(itemsToInsert);
+
+      const { data: buyers } = await supabase.from('user_roles').select('user_id').in('role', ['comprador', 'master']);
+      if (buyers?.length) {
+        await supabase.from('notifications').insert(buyers.map(b => ({
+          user_id: b.user_id,
+          titulo: 'Nova solicitação',
+          mensagem: `Nova solicitação: ${titulo} — ${unidade} — ${setor} — por ${profile?.full_name || 'Usuário'}`,
+          tipo: 'info',
+        })));
+      }
+
+      toast.success("Solicitação enviada!");
     }
 
-    toast.success("Solicitação enviada!");
-    setTitulo(""); setUnidade(""); setSetor(""); setCategoria(""); setObservacoes(""); setItems([]);
-    setShowForm(false);
+    resetForm();
     queryClient.invalidateQueries({ queryKey: ['my-requisitions'] });
     queryClient.invalidateQueries({ queryKey: ['requisitions-list'] });
     queryClient.invalidateQueries({ queryKey: ['pending-requisitions-for-comp'] });
@@ -179,14 +254,14 @@ export default function MyRequisitionsPage() {
           <h1 className="text-2xl font-bold">Minhas Solicitações</h1>
           <p className="text-muted-foreground text-sm mt-1">Informe o saldo dos produtos que precisa</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)}>
-          <Plus className="h-4 w-4 mr-2" />Nova Solicitação
+        <Button onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}>
+          <Plus className="h-4 w-4 mr-2" />{showForm ? "Cancelar" : "Nova Solicitação"}
         </Button>
       </div>
 
       {showForm && (
         <Card>
-          <CardHeader><CardTitle className="text-lg">Nova Solicitação</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">{editingId ? "Editar Solicitação" : "Nova Solicitação"}</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -322,8 +397,8 @@ export default function MyRequisitionsPage() {
               </div>
 
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => { setShowForm(false); setItems([]); setCategoria(""); }}>Cancelar</Button>
-                <Button type="submit" disabled={saving}>{saving ? "Enviando..." : "Enviar Solicitação"}</Button>
+                <Button type="button" variant="outline" onClick={resetForm}>Cancelar</Button>
+                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar Alterações" : "Enviar Solicitação"}</Button>
               </div>
             </form>
           </CardContent>

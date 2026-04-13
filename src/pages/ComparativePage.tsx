@@ -6,16 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Trash2, TrendingDown, AlertTriangle, FileText, RotateCcw } from "lucide-react";
+import { Search, Plus, Trash2, TrendingDown, AlertTriangle, FileText, RotateCcw, ShoppingCart } from "lucide-react";
 import { formatCurrency } from "@/lib/helpers";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { UNIDADES } from "@/lib/constants";
 import StrategyCards, { useStrategyAnalysis } from "@/components/order/StrategyCards";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { useComparativeDraft, DraftCompItem } from "@/hooks/useComparativeDraft";
+import { toast } from "sonner";
 
 type Product = { id: string; nome: string; unidade_medida: string; codigo_interno: string | null };
 type Supplier = { id: string; razao_social: string };
@@ -49,6 +51,7 @@ const fetchCompData = async () => {
 
 export default function ComparativePage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState<CompItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [unidadeSolicitante, setUnidadeSolicitante] = useState("");
@@ -56,6 +59,8 @@ export default function ComparativePage() {
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
   const [reqInfo, setReqInfo] = useState<{ solicitante: string; unidade: string; setor: string } | null>(null);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [selectedStrategy, setSelectedStrategy] = useState<"melhor_preco" | "melhor_fornecedor" | null>(null);
+  const [generatingOrder, setGeneratingOrder] = useState(false);
   const draftRestored = useRef(false);
   const { hasDraft, saveDraft, loadDraft, clearDraft } = useComparativeDraft();
 
@@ -223,6 +228,77 @@ export default function ComparativePage() {
 
   const analysis = useStrategyAnalysis(items, prices, suppliers);
 
+  const handleSelectStrategy = (s: "melhor_preco" | "melhor_fornecedor") => {
+    setSelectedStrategy(s);
+  };
+
+  const generateOrder = async () => {
+    if (!analysis || items.length === 0) return;
+    setGeneratingOrder(true);
+
+    try {
+      const { data: numData } = await supabase.rpc('generate_order_number');
+      const numero = numData || `PED-${Date.now()}`;
+      const strategy = selectedStrategy || analysis.recommendedStrategy;
+
+      // Build items with supplier/price based on strategy
+      const orderItems = items.map(item => {
+        let supplierId = '';
+        let precoUnitario = 0;
+
+        if (strategy === 'melhor_preco') {
+          const productPrices = prices.filter(p => p.product_id === item.product_id);
+          if (productPrices.length > 0) {
+            const best = productPrices.reduce((m, e) => e.preco_unitario < m.preco_unitario ? e : m);
+            supplierId = best.supplier_id;
+            precoUnitario = best.preco_unitario;
+          }
+        } else if (strategy === 'melhor_fornecedor' && analysis.bestSingle) {
+          supplierId = analysis.bestSingle.supplierId;
+          precoUnitario = prices.find(p => p.product_id === item.product_id && p.supplier_id === supplierId)?.preco_unitario || 0;
+        }
+
+        return {
+          product_id: item.product_id,
+          supplier_id: supplierId || null,
+          quantidade: item.quantidade,
+          preco_unitario: precoUnitario,
+          subtotal: item.quantidade * precoUnitario,
+        };
+      });
+
+      const total = orderItems.reduce((s, i) => s + i.subtotal, 0);
+
+      const { data: order, error } = await supabase.from('purchase_orders').insert({
+        numero,
+        user_id: user!.id,
+        modo: strategy,
+        status: 'rascunho',
+        total,
+        unidade_setor: unidadeSolicitante || null,
+      }).select('id').single();
+
+      if (error || !order) { toast.error(error?.message || "Erro ao criar ordem."); return; }
+
+      await supabase.from('purchase_order_items').insert(
+        orderItems.map(i => ({ ...i, order_id: order.id, observacoes: null }))
+      );
+
+      // Link requisition if exists
+      if (selectedReqId) {
+        await supabase.from('requisitions').update({
+          status: 'incluida_no_pedido', order_id: order.id,
+        } as any).eq('id', selectedReqId);
+      }
+
+      clearDraft();
+      toast.success("Ordem de compra criada como rascunho — você pode editá-la antes de enviar para aprovação.");
+      navigate(`/nova-ordem?edit=${order.id}`);
+    } finally {
+      setGeneratingOrder(false);
+    }
+  };
+
   const exportQuotPDF = async () => {
     if (items.length === 0) return;
     const { data: profile } = await supabase.from('profiles').select('full_name').eq('user_id', user!.id).single();
@@ -374,7 +450,17 @@ export default function ComparativePage() {
 
       {items.length > 0 && (
         <>
-          {analysis && <StrategyCards analysis={analysis} />}
+          {analysis && (
+            <div className="space-y-3">
+              <StrategyCards analysis={analysis} selectedStrategy={selectedStrategy} onSelect={handleSelectStrategy} showSelectButton />
+              <div className="flex justify-end">
+                <Button onClick={generateOrder} disabled={generatingOrder || !selectedStrategy} className="gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  {generatingOrder ? "Gerando..." : "Gerar Ordem de Compra"}
+                </Button>
+              </div>
+            </div>
+          )}
           <Card>
             <CardContent className="p-0 overflow-x-auto">
               <table className="w-full text-sm">
