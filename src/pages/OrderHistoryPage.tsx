@@ -146,7 +146,7 @@ export default function OrderHistoryPage() {
       .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social, cnpj, telefone, cidade)')
       .eq('order_id', order.id);
     if (!items || items.length === 0) { toast.error("Sem itens para exportar."); return null; }
-    const { data: buyerProfile } = await supabase.from('profiles').select('full_name').eq('user_id', order.user_id).single();
+    const { data: buyerProfile } = await supabase.from('profiles').select('full_name, unidade, unidade_setor').eq('user_id', order.user_id).single();
     let aprovadorName: string | null = null;
     if (order.status === 'aprovado' || order.status === 'emitido' || order.status === 'recebido') {
       const { data: log } = await supabase.from('approval_log').select('user_id').eq('order_id', order.id).eq('action', 'aprovado').limit(1).single();
@@ -155,7 +155,33 @@ export default function OrderHistoryPage() {
         aprovadorName = ap?.full_name || null;
       }
     }
-    return { items, buyerProfile, aprovadorName };
+
+    // Fetch saldo from requisitions linked to this order's products
+    let saldoMap: Record<string, number> = {};
+    let solicitante: string | null = null;
+    let setor: string | null = null;
+    const isInternalPDF = order.status === 'rascunho' || order.status === 'aguardando_aprovacao';
+    if (isInternalPDF) {
+      // Find linked requisition
+      const { data: linkedReqs } = await supabase.from('requisitions')
+        .select('id, user_id, setor')
+        .eq('order_id', order.id)
+        .limit(1);
+      if (linkedReqs && linkedReqs.length > 0) {
+        const reqId = linkedReqs[0].id;
+        setor = linkedReqs[0].setor;
+        const { data: reqProfile } = await supabase.from('profiles').select('full_name').eq('user_id', linkedReqs[0].user_id).single();
+        solicitante = reqProfile?.full_name || null;
+        const { data: reqItems } = await supabase.from('requisition_items')
+          .select('product_id, saldo')
+          .eq('requisition_id', reqId);
+        (reqItems || []).forEach((ri: any) => {
+          saldoMap[ri.product_id] = ri.saldo;
+        });
+      }
+    }
+
+    return { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF };
   };
 
   const markAsEmitted = async (order: Order) => {
