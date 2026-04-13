@@ -72,7 +72,7 @@ export default function MyRequisitionsPage() {
       return {
         requisitions: enriched as Requisition[],
         products: (prods || []) as Product[],
-        categories: (cats || []).map((c: any) => c.nome as string),
+        categories: distinctCats,
       };
     },
     enabled: !!user,
