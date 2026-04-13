@@ -20,12 +20,13 @@ import ReceiptsPage from "@/pages/ReceiptsPage";
 import UsersPage from "@/pages/UsersPage";
 import ReportsPage from "@/pages/ReportsPage";
 import NotFound from "@/pages/NotFound";
+import PendingApprovalPage from "@/pages/PendingApprovalPage";
 import { canAccess } from "@/lib/helpers";
 
 const queryClient = new QueryClient();
 
 function ProtectedRoutes() {
-  const { session, loading, role } = useAuth();
+  const { session, loading, role, profileStatus } = useAuth();
 
   if (loading) {
     return (
@@ -36,6 +37,11 @@ function ProtectedRoutes() {
   }
 
   if (!session) return <Navigate to="/login" replace />;
+
+  // Pending approval screen
+  if (profileStatus === 'pendente') {
+    return <PendingApprovalPage />;
+  }
 
   // Solicitante only sees their page
   if (role === 'solicitante') {
