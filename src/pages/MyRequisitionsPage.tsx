@@ -46,13 +46,14 @@ export default function MyRequisitionsPage() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-requisitions', user?.id],
     queryFn: async () => {
-      const [{ data: reqs, error: e1 }, { data: prods, error: e2 }, { data: cats, error: e3 }] = await Promise.all([
+      const [{ data: reqs, error: e1 }, { data: prods, error: e2 }] = await Promise.all([
         supabase.from('requisitions').select('id, user_id, titulo, unidade, setor, status, motivo_recusa, created_at, observacoes')
           .eq('user_id', user!.id).order('created_at', { ascending: false }),
         supabase.from('products').select('id, nome, unidade_medida, categoria').eq('status', 'ativo').order('nome'),
-        supabase.from('product_categories').select('nome').order('nome'),
       ]);
-      if (e1 || e2 || e3) throw new Error("Erro ao carregar dados");
+      if (e1 || e2) throw new Error("Erro ao carregar dados");
+      // Extract distinct categories from products
+      const distinctCats = Array.from(new Set((prods || []).map((p: any) => p.categoria).filter(Boolean))).sort() as string[];
 
       const reqIds = (reqs || []).map(r => r.id);
       let reqItems: any[] = [];

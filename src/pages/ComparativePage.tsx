@@ -127,9 +127,9 @@ export default function ComparativePage() {
 
   // Auto-save draft
   useEffect(() => {
-    if (!draftRestored.current) return;
+    if (!draftRestored.current || showDraftBanner) return;
     saveDraft({ items, unidadeSolicitante, showSaldo, selectedRequisitionId: selectedReqId });
-  }, [items, unidadeSolicitante, showSaldo, selectedReqId, saveDraft]);
+  }, [items, unidadeSolicitante, showSaldo, selectedReqId, saveDraft, showDraftBanner]);
 
   // Load requisition products — import ALL items from requisition_items
   useEffect(() => {
