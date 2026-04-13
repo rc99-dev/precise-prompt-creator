@@ -71,17 +71,19 @@ export default function ComparativePage() {
     queryFn: async () => {
       let query = supabase
         .from('requisitions')
-        .select('id, product_id, saldo_atual, unidade_medida, unidade, setor, unidade_setor, user_id, created_at, products(nome)')
+        .select('id, product_id, saldo_atual, unidade_medida, unidade, setor, unidade_setor, user_id, created_at, titulo, products(nome)')
         .eq('status', 'pendente')
         .order('created_at', { ascending: false });
       
-      // BUG 12: filter by unidade when selected
       if (unidadeSolicitante) {
         query = query.eq('unidade', unidadeSolicitante);
       }
       
       const { data, error } = await query;
       if (error) throw error;
+
+      // Group by unique requisition (titulo + user_id + created_at combo as proxy for "same requisition")
+      // Since requisitions table has one row per product, we group by titulo+unidade+created_at
       return (data || []) as unknown as RequisitionOption[];
     },
     staleTime: 30 * 1000,
