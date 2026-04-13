@@ -36,16 +36,37 @@ type ReceiptItemForm = {
 
 const fetchReceiptOrders = async () => {
   const [{ data: orders, error }, { data: profiles }] = await Promise.all([
-    supabase.from('purchase_orders').select('*')
+    supabase.from('purchase_orders').select('*, profiles!inner(unidade)')
       .in('status', ['emitido', 'recebido', 'recebido_com_ocorrencia'])
       .order('created_at', { ascending: false }),
     supabase.from('profiles').select('user_id, full_name'),
   ]);
-  if (error) throw error;
+  if (error) {
+    // Fallback without join
+    const { data: ordersSimple, error: e2 } = await supabase.from('purchase_orders').select('*')
+      .in('status', ['emitido', 'recebido', 'recebido_com_ocorrencia'])
+      .order('created_at', { ascending: false });
+    if (e2) throw e2;
+    const profileMap: Record<string, string> = {};
+    const unidadeMap: Record<string, string> = {};
+    (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name; });
+    // Fetch unidades separately
+    const { data: allProfiles } = await supabase.from('profiles').select('user_id, unidade');
+    (allProfiles || []).forEach((p: any) => { unidadeMap[p.user_id] = p.unidade || ''; });
+    const mapped = (ordersSimple || []).map((o: any) => ({ ...o, comprador_nome: profileMap[o.user_id] || '—', unidade_comprador: unidadeMap[o.user_id] || '' })) as ReceiptOrder[];
+    return sortOrders(mapped);
+  }
   const profileMap: Record<string, string> = {};
   (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name; });
-  const mapped = (orders || []).map((o: any) => ({ ...o, comprador_nome: profileMap[o.user_id] || '—' })) as ReceiptOrder[];
-  // Sort emitido by previsao_entrega ASC (nulls last)
+  const mapped = (orders || []).map((o: any) => ({
+    ...o,
+    comprador_nome: profileMap[o.user_id] || '—',
+    unidade_comprador: o.profiles?.unidade || '',
+  })) as ReceiptOrder[];
+  return sortOrders(mapped);
+};
+
+function sortOrders(mapped: ReceiptOrder[]) {
   return mapped.sort((a, b) => {
     if (a.status === 'emitido' && b.status !== 'emitido') return -1;
     if (a.status !== 'emitido' && b.status === 'emitido') return 1;
@@ -56,7 +77,7 @@ const fetchReceiptOrders = async () => {
     }
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
-};
+}
 
 function getDeliveryBadge(previsao: string | null) {
   if (!previsao) return null;

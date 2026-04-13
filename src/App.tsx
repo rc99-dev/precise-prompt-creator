@@ -26,7 +26,7 @@ import { canAccess } from "@/lib/helpers";
 const queryClient = new QueryClient();
 
 function ProtectedRoutes() {
-  const { session, loading, role, profileStatus } = useAuth();
+  const { session, loading, role, profileStatus, customPermissions } = useAuth();
 
   if (loading) {
     return (
@@ -56,7 +56,7 @@ function ProtectedRoutes() {
     );
   }
 
-  const canOrLoading = (page: string) => loading || canAccess(role, page);
+  const canOrLoading = (page: string) => loading || canAccess(role, page, customPermissions);
 
   return (
     <AppLayout>
