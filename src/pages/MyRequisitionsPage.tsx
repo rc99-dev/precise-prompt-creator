@@ -131,8 +131,11 @@ export default function MyRequisitionsPage() {
 
   const handleCategoryChange = (cat: string) => {
     setCategoria(cat);
-    if (!cat) return;
-    const catProducts = products.filter(p => p.categoria === cat && !items.some(i => i.product_id === p.id));
+  };
+
+  const loadCategoryProducts = () => {
+    if (!categoria) return;
+    const catProducts = products.filter(p => p.categoria === categoria && !items.some(i => i.product_id === p.id));
     if (catProducts.length > 0) {
       setItems(prev => [
         ...prev,
@@ -141,6 +144,9 @@ export default function MyRequisitionsPage() {
           saldo: "", pedido: "", observacoes: "",
         })),
       ]);
+      toast.success(`${catProducts.length} produtos carregados da categoria ${categoria}`);
+    } else {
+      toast.info("Nenhum produto novo encontrado nesta categoria.");
     }
   };
 
@@ -296,13 +302,18 @@ export default function MyRequisitionsPage() {
 
               {/* Category selector */}
               <div className="space-y-2">
-                <Label>Categoria (opcional — carrega produtos automaticamente)</Label>
-                <Select value={categoria} onValueChange={handleCategoryChange}>
-                  <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
-                  <SelectContent>
-                    {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label>Categoria (opcional)</Label>
+                <div className="flex gap-2">
+                  <Select value={categoria} onValueChange={handleCategoryChange}>
+                    <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
+                    <SelectContent>
+                      {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" variant="outline" onClick={loadCategoryProducts} disabled={!categoria}>
+                    Carregar produtos
+                  </Button>
+                </div>
               </div>
 
               {/* Product search + add */}

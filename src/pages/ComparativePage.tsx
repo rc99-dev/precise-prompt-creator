@@ -157,14 +157,14 @@ export default function ComparativePage() {
       const reqIds = matchingReqs.map(r => r.id);
       const { data: reqItems } = await supabase
         .from('requisition_items')
-        .select('product_id, saldo, products(nome, unidade_medida)')
+        .select('product_id, saldo, pedido, products(nome, unidade_medida)')
         .in('requisition_id', reqIds);
 
       const newItems: CompItem[] = (reqItems || []).map((ri: any) => ({
         product_id: ri.product_id,
         product_name: ri.products?.nome || '—',
         unidade: ri.products?.unidade_medida || '',
-        quantidade: 1,
+        quantidade: ri.pedido > 0 ? ri.pedido : (ri.saldo || 1),
         saldo: ri.saldo,
       }));
 
