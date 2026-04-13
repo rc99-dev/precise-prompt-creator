@@ -180,6 +180,8 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
+          permissoes_customizadas: Json | null
+          status: string
           unidade: string | null
           unidade_setor: string | null
           updated_at: string
@@ -190,6 +192,8 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          permissoes_customizadas?: Json | null
+          status?: string
           unidade?: string | null
           unidade_setor?: string | null
           updated_at?: string
@@ -200,6 +204,8 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          permissoes_customizadas?: Json | null
+          status?: string
           unidade?: string | null
           unidade_setor?: string | null
           updated_at?: string

@@ -61,25 +61,54 @@ export const statusColors: Record<string, string> = {
   pendente: 'bg-warning/20 text-warning',
 };
 
-export function canAccess(role: AppRole | null, page: string): boolean {
+// All available pages for permission management
+export const ALL_PAGES = [
+  { key: 'dashboard', label: 'Dashboard' },
+  { key: 'solicitacoes', label: 'Solicitações' },
+  { key: 'minhas-solicitacoes', label: 'Minhas Solicitações' },
+  { key: 'nova-ordem', label: 'Nova Ordem' },
+  { key: 'historico', label: 'Histórico de Ordens' },
+  { key: 'comparativo', label: 'Comparativo' },
+  { key: 'aprovacoes', label: 'Aprovações' },
+  { key: 'recebimentos', label: 'Recebimentos' },
+  { key: 'fornecedores', label: 'Fornecedores' },
+  { key: 'produtos', label: 'Produtos' },
+  { key: 'precos', label: 'Preços' },
+  { key: 'usuarios', label: 'Usuários' },
+  { key: 'relatorios', label: 'Relatórios' },
+] as const;
+
+const defaultPermissions: Record<string, AppRole[]> = {
+  dashboard: ['comprador', 'aprovador', 'estoquista', 'financeiro', 'master'],
+  solicitacoes: ['solicitante', 'comprador', 'master'],
+  'minhas-solicitacoes': ['solicitante'],
+  'nova-ordem': ['comprador', 'estoquista', 'master'],
+  historico: ['comprador', 'aprovador', 'estoquista', 'financeiro', 'master'],
+  comparativo: ['comprador', 'estoquista', 'master'],
+  aprovacoes: ['aprovador', 'master'],
+  recebimentos: ['estoquista', 'master'],
+  fornecedores: ['comprador', 'aprovador', 'estoquista', 'master'],
+  produtos: ['comprador', 'aprovador', 'estoquista', 'master'],
+  precos: ['comprador', 'aprovador', 'estoquista', 'master'],
+  usuarios: ['master'],
+  relatorios: ['financeiro', 'master'],
+};
+
+export function getDefaultPagesForRole(role: AppRole): string[] {
+  if (role === 'master') return ALL_PAGES.map(p => p.key);
+  return Object.entries(defaultPermissions)
+    .filter(([, roles]) => roles.includes(role))
+    .map(([page]) => page);
+}
+
+export function canAccess(role: AppRole | null, page: string, customPermissions?: Record<string, boolean> | null): boolean {
   if (!role) return false;
   if (role === 'master') return true;
 
-  const permissions: Record<string, AppRole[]> = {
-    dashboard: ['comprador', 'aprovador', 'estoquista', 'financeiro', 'master'],
-    solicitacoes: ['solicitante', 'comprador', 'master'],
-    'minhas-solicitacoes': ['solicitante'],
-    'nova-ordem': ['comprador', 'master'],
-    historico: ['comprador', 'aprovador', 'estoquista', 'financeiro', 'master'],
-    comparativo: ['comprador', 'master'],
-    aprovacoes: ['aprovador', 'master'],
-    recebimentos: ['estoquista', 'master'],
-    fornecedores: ['comprador', 'aprovador', 'estoquista', 'master'],
-    produtos: ['comprador', 'aprovador', 'estoquista', 'master'],
-    precos: ['comprador', 'aprovador', 'estoquista', 'master'],
-    usuarios: ['master'],
-    relatorios: ['financeiro', 'master'],
-  };
+  // Custom permissions override defaults
+  if (customPermissions && page in customPermissions) {
+    return customPermissions[page];
+  }
 
-  return permissions[page]?.includes(role) || false;
+  return defaultPermissions[page]?.includes(role) || false;
 }

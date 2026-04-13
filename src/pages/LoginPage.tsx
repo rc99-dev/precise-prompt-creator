@@ -39,18 +39,29 @@ export default function LoginPage() {
     });
     if (error) { toast.error(error.message); setLoading(false); return; }
 
-    // Update profile with unidade and setor after signup
+    // Update profile with unidade and setor after signup + notify masters
     if (signUpData?.user) {
-      // Small delay to allow trigger to create profile
       setTimeout(async () => {
         await supabase.from('profiles').update({
           unidade: unidade || null,
           unidade_setor: setor || null,
         } as any).eq('user_id', signUpData.user!.id);
-      }, 1000);
+
+        // Notify all masters about new pending user
+        const { data: masters } = await supabase.from('user_roles').select('user_id').eq('role', 'master');
+        if (masters?.length) {
+          await supabase.from('notifications').insert(masters.map((m: any) => ({
+            user_id: m.user_id,
+            titulo: '👤 Novo usuário aguarda aprovação',
+            mensagem: `Novo usuário aguarda aprovação: ${fullName} — ${unidade || 'Sem unidade'} — ${setor || 'Sem setor'}`,
+            tipo: 'alerta',
+            lida: false,
+          })));
+        }
+      }, 1500);
     }
 
-    toast.success("Conta criada com sucesso!");
+    toast.success("Conta criada! Aguarde a aprovação do administrador.");
     setLoading(false);
   };
 

@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Users, Pencil, Search, Trash2 } from "lucide-react";
-import { roleLabels, AppRole } from "@/lib/helpers";
+import { Users, Pencil, Search, Trash2, CheckCircle, XCircle, Clock } from "lucide-react";
+import { roleLabels, AppRole, ALL_PAGES, getDefaultPagesForRole } from "@/lib/helpers";
 import { UNIDADES } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
@@ -19,6 +20,7 @@ import QueryError from "@/components/QueryError";
 type UserProfile = {
   id: string; user_id: string; full_name: string; email: string | null;
   unidade_setor: string | null; unidade: string | null; created_at: string;
+  status: string; permissoes_customizadas: Record<string, boolean> | null;
   role?: AppRole;
 };
 
@@ -29,8 +31,10 @@ export default function UsersPage() {
   const [editRole, setEditRole] = useState<AppRole>('solicitante');
   const [editSetor, setEditSetor] = useState("");
   const [editUnidade, setEditUnidade] = useState("");
+  const [editPermissions, setEditPermissions] = useState<Record<string, boolean>>({});
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
   const [cleaningUp, setCleaningUp] = useState(false);
+  const [approveRole, setApproveRole] = useState<AppRole>('solicitante');
 
   const { data: users = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['users-list'],
@@ -47,7 +51,9 @@ export default function UsersPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const filtered = users.filter(u =>
+  const pendingUsers = users.filter(u => u.status === 'pendente');
+  const activeUsers = users.filter(u => u.status !== 'pendente');
+  const filtered = activeUsers.filter(u =>
     u.full_name.toLowerCase().includes(search.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(search.toLowerCase())
   );
@@ -57,34 +63,81 @@ export default function UsersPage() {
     setEditRole(u.role || 'solicitante');
     setEditSetor(u.unidade_setor || '');
     setEditUnidade(u.unidade || '');
+    // Init permissions: start with defaults, then apply custom overrides
+    const defaults = getDefaultPagesForRole(u.role || 'solicitante');
+    const perms: Record<string, boolean> = {};
+    ALL_PAGES.forEach(p => { perms[p.key] = defaults.includes(p.key); });
+    if (u.permissoes_customizadas) {
+      Object.entries(u.permissoes_customizadas).forEach(([k, v]) => { perms[k] = v; });
+    }
+    setEditPermissions(perms);
+  };
+
+  const handleRoleChangeInEdit = (newRole: AppRole) => {
+    setEditRole(newRole);
+    const defaults = getDefaultPagesForRole(newRole);
+    const perms: Record<string, boolean> = {};
+    ALL_PAGES.forEach(p => { perms[p.key] = defaults.includes(p.key); });
+    setEditPermissions(perms);
   };
 
   const handleSave = async () => {
     if (!editDialog) return;
+    // Calculate custom permissions (diff from role defaults)
+    const defaults = getDefaultPagesForRole(editRole);
+    const customPerms: Record<string, boolean> = {};
+    let hasCustom = false;
+    ALL_PAGES.forEach(p => {
+      const defaultAccess = defaults.includes(p.key);
+      if (editPermissions[p.key] !== defaultAccess) {
+        customPerms[p.key] = editPermissions[p.key];
+        hasCustom = true;
+      }
+    });
+
     await supabase.from('user_roles').update({ role: editRole } as any).eq('user_id', editDialog.user_id);
-    await supabase.from('profiles').update({ unidade_setor: editSetor || null, unidade: editUnidade || null } as any).eq('user_id', editDialog.user_id);
+    await supabase.from('profiles').update({
+      unidade_setor: editSetor || null,
+      unidade: editUnidade || null,
+      permissoes_customizadas: hasCustom ? customPerms : null,
+    } as any).eq('user_id', editDialog.user_id);
     toast.success("Usuário atualizado!");
     setEditDialog(null);
     queryClient.invalidateQueries({ queryKey: ['users-list'] });
   };
 
-  // MELHORIA 4: Limpar solicitações recusadas
+  const handleApprove = async (u: UserProfile) => {
+    await supabase.from('profiles').update({ status: 'ativo' } as any).eq('user_id', u.user_id);
+    await supabase.from('user_roles').update({ role: approveRole } as any).eq('user_id', u.user_id);
+    await supabase.from('notifications').insert({
+      user_id: u.user_id,
+      titulo: '✅ Acesso aprovado!',
+      mensagem: 'Seu acesso ao sistema foi aprovado pelo administrador. Você já pode utilizar o sistema.',
+      tipo: 'info', lida: false,
+    } as any);
+    toast.success(`${u.full_name} aprovado como ${roleLabels[approveRole]}!`);
+    setApproveRole('solicitante');
+    queryClient.invalidateQueries({ queryKey: ['users-list'] });
+  };
+
+  const handleReject = async (u: UserProfile) => {
+    await supabase.from('profiles').update({ status: 'inativo' } as any).eq('user_id', u.user_id);
+    await supabase.from('notifications').insert({
+      user_id: u.user_id,
+      titulo: '❌ Acesso negado',
+      mensagem: 'Seu acesso ao sistema foi negado pelo administrador.',
+      tipo: 'alerta', lida: false,
+    } as any);
+    toast.success(`Acesso de ${u.full_name} recusado.`);
+    queryClient.invalidateQueries({ queryKey: ['users-list'] });
+  };
+
   const handleCleanupRefused = async () => {
     setCleaningUp(true);
-    // First count how many will be deleted
-    const { count } = await supabase
-      .from('requisitions')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'recusada');
-    
-    const { error } = await supabase
-      .from('requisitions')
-      .delete()
-      .eq('status', 'recusada');
-    
-    if (error) {
-      toast.error(`Erro ao limpar: ${error.message}`);
-    } else {
+    const { count } = await supabase.from('requisitions').select('*', { count: 'exact', head: true }).eq('status', 'recusada');
+    const { error } = await supabase.from('requisitions').delete().eq('status', 'recusada');
+    if (error) { toast.error(`Erro ao limpar: ${error.message}`); }
+    else {
       toast.success(`${count || 0} solicitação(ões) recusada(s) removida(s).`);
       queryClient.invalidateQueries({ queryKey: ['requisitions-list'] });
       queryClient.invalidateQueries({ queryKey: ['my-requisitions'] });
@@ -104,6 +157,49 @@ export default function UsersPage() {
           <Trash2 className="h-4 w-4 mr-2" />Limpar Recusadas
         </Button>
       </div>
+
+      {/* Pending Users Section */}
+      {pendingUsers.length > 0 && (
+        <Card className="border-warning/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Clock className="h-5 w-5 text-warning" />
+              Usuários Pendentes ({pendingUsers.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pendingUsers.map(u => (
+              <div key={u.id} className="flex items-center justify-between border rounded-lg p-3 bg-warning/5">
+                <div>
+                  <p className="font-medium">{u.full_name || '—'}</p>
+                  <p className="text-xs text-muted-foreground">{u.email} • {u.unidade || 'Sem unidade'} • {u.unidade_setor || 'Sem setor'}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={approveRole} onValueChange={v => setApproveRole(v as AppRole)}>
+                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                      <SelectValue placeholder="Perfil" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="solicitante">Solicitante</SelectItem>
+                      <SelectItem value="comprador">Comprador</SelectItem>
+                      <SelectItem value="aprovador">Aprovador</SelectItem>
+                      <SelectItem value="estoquista">Assistente de Suprimentos</SelectItem>
+                      <SelectItem value="financeiro">Financeiro</SelectItem>
+                      <SelectItem value="master">Master</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" variant="default" onClick={() => handleApprove(u)} className="gap-1">
+                    <CheckCircle className="h-3 w-3" />Aprovar
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => handleReject(u)} className="gap-1">
+                    <XCircle className="h-3 w-3" />Recusar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -154,14 +250,15 @@ export default function UsersPage() {
         </CardContent>
       </Card>
 
+      {/* Edit Dialog with Permission Toggles */}
       <Dialog open={!!editDialog} onOpenChange={() => setEditDialog(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Editar Usuário</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2"><Label>Nome</Label><Input value={editDialog?.full_name || ''} disabled /></div>
             <div className="space-y-2">
               <Label>Perfil de Acesso</Label>
-              <Select value={editRole} onValueChange={v => setEditRole(v as AppRole)}>
+              <Select value={editRole} onValueChange={v => handleRoleChangeInEdit(v as AppRole)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="solicitante">Solicitante</SelectItem>
@@ -186,6 +283,35 @@ export default function UsersPage() {
               <Label>Setor</Label>
               <Input value={editSetor} onChange={e => setEditSetor(e.target.value)} placeholder="Ex: Cozinha, Administrativo..." />
             </div>
+
+            {/* Permission Toggles */}
+            {editRole !== 'master' && (
+              <div className="space-y-3 border-t pt-4">
+                <Label className="text-sm font-semibold">Permissões de Acesso</Label>
+                <p className="text-xs text-muted-foreground">Ative ou desative o acesso a telas específicas para este usuário</p>
+                <div className="space-y-2">
+                  {ALL_PAGES.filter(p => p.key !== 'usuarios').map(page => {
+                    const defaultPages = getDefaultPagesForRole(editRole);
+                    const isDefault = defaultPages.includes(page.key);
+                    const isActive = editPermissions[page.key] ?? false;
+                    const isCustom = isActive !== isDefault;
+                    return (
+                      <div key={page.key} className="flex items-center justify-between py-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">{page.label}</span>
+                          {isCustom && <Badge variant="outline" className="text-[10px] px-1.5 py-0">Customizado</Badge>}
+                        </div>
+                        <Switch
+                          checked={isActive}
+                          onCheckedChange={v => setEditPermissions(prev => ({ ...prev, [page.key]: v }))}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setEditDialog(null)}>Cancelar</Button>
               <Button onClick={handleSave}>Salvar</Button>
@@ -199,7 +325,7 @@ export default function UsersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Limpar solicitações recusadas?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação irá excluir permanentemente todas as solicitações com status "Recusada" do sistema, incluindo os motivos de recusa. Esta ação não pode ser desfeita.
+              Esta ação irá excluir permanentemente todas as solicitações com status "Recusada" do sistema. Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

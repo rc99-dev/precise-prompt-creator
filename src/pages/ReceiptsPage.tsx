@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { UNIDADES } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ type ReceiptOrder = {
   id: string; numero: string; status: string; total: number;
   created_at: string; user_id: string; previsao_entrega: string | null;
   obs_estoquista: string | null; observacoes: string | null;
-  comprador_nome?: string;
+  comprador_nome?: string; unidade_comprador?: string;
 };
 
 type OrderItemForReceipt = {
@@ -39,13 +40,22 @@ const fetchReceiptOrders = async () => {
     supabase.from('purchase_orders').select('*')
       .in('status', ['emitido', 'recebido', 'recebido_com_ocorrencia'])
       .order('created_at', { ascending: false }),
-    supabase.from('profiles').select('user_id, full_name'),
+    supabase.from('profiles').select('user_id, full_name, unidade'),
   ]);
   if (error) throw error;
-  const profileMap: Record<string, string> = {};
-  (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name; });
-  const mapped = (orders || []).map((o: any) => ({ ...o, comprador_nome: profileMap[o.user_id] || '—' })) as ReceiptOrder[];
-  // Sort emitido by previsao_entrega ASC (nulls last)
+  const profileMap: Record<string, { name: string; unidade: string }> = {};
+  (profiles || []).forEach((p: any) => {
+    profileMap[p.user_id] = { name: p.full_name, unidade: p.unidade || '' };
+  });
+  const mapped = (orders || []).map((o: any) => ({
+    ...o,
+    comprador_nome: profileMap[o.user_id]?.name || '—',
+    unidade_comprador: profileMap[o.user_id]?.unidade || '',
+  })) as ReceiptOrder[];
+  return sortOrders(mapped);
+};
+
+function sortOrders(mapped: ReceiptOrder[]) {
   return mapped.sort((a, b) => {
     if (a.status === 'emitido' && b.status !== 'emitido') return -1;
     if (a.status !== 'emitido' && b.status === 'emitido') return 1;
@@ -56,7 +66,7 @@ const fetchReceiptOrders = async () => {
     }
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
-};
+}
 
 function getDeliveryBadge(previsao: string | null) {
   if (!previsao) return null;
@@ -84,6 +94,7 @@ export default function ReceiptsPage() {
   const [numeroNF, setNumeroNF] = useState("");
   const [obsGeral, setObsGeral] = useState("");
   const [saving, setSaving] = useState(false);
+  const [filterUnidade, setFilterUnidade] = useState("todas");
 
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['receipt-orders'],
@@ -91,8 +102,9 @@ export default function ReceiptsPage() {
     staleTime: 2 * 60 * 1000,
   });
 
-  const pendingOrders = orders.filter(o => o.status === 'emitido' && o.previsao_entrega);
-  const receivedOrders = orders.filter(o => o.status === 'recebido' || o.status === 'recebido_com_ocorrencia');
+  const filteredOrders = filterUnidade === 'todas' ? orders : orders.filter(o => o.unidade_comprador === filterUnidade);
+  const pendingOrders = filteredOrders.filter(o => o.status === 'emitido' && o.previsao_entrega);
+  const receivedOrders = filteredOrders.filter(o => o.status === 'recebido' || o.status === 'recebido_com_ocorrencia');
 
   const openReceipt = async (order: ReceiptOrder) => {
     setSelectedOrder(order);
@@ -208,9 +220,22 @@ export default function ReceiptsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Recebimentos</h1>
-        <p className="text-muted-foreground text-sm mt-1">Registre o recebimento de pedidos emitidos</p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Recebimentos</h1>
+          <p className="text-muted-foreground text-sm mt-1">Registre o recebimento de pedidos emitidos</p>
+        </div>
+        <div className="w-52">
+          <Select value={filterUnidade} onValueChange={setFilterUnidade}>
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Filtrar por unidade" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas as unidades</SelectItem>
+              {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {isLoading ? (
