@@ -242,6 +242,32 @@ export default function OrderHistoryPage() {
     queryClient.invalidateQueries({ queryKey: ['order-history'] });
   };
 
+  const handleMasterReject = async () => {
+    if (!rejectTarget || !rejectReason.trim()) { toast.error("Informe o motivo da reprovação."); return; }
+    setRejecting(true);
+    const { error } = await supabase.from('purchase_orders').update({
+      status: 'rejeitado', rejected_reason: rejectReason,
+    }).eq('id', rejectTarget.id);
+    if (error) { toast.error(error.message); setRejecting(false); return; }
+    // Log action
+    await supabase.from('approval_log').insert({
+      order_id: rejectTarget.id, user_id: user!.id,
+      action: 'rejeitado', motivo: rejectReason,
+    });
+    // Notify the buyer
+    await supabase.from('notifications').insert({
+      user_id: rejectTarget.user_id,
+      titulo: 'Pedido reprovado pelo master',
+      mensagem: `Pedido ${rejectTarget.numero} foi reprovado. Motivo: ${rejectReason}`,
+      tipo: 'alerta', lida: false,
+    });
+    toast.success("Pedido reprovado!");
+    setRejecting(false);
+    setRejectTarget(null);
+    setRejectReason("");
+    queryClient.invalidateQueries({ queryKey: ['order-history'] });
+  };
+
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
       rascunho: 'Rascunho', aguardando_aprovacao: 'Aguardando Aprovação',
