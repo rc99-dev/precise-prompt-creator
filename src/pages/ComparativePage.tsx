@@ -126,40 +126,54 @@ export default function ComparativePage() {
     saveDraft({ items, unidadeSolicitante, showSaldo, selectedRequisitionId: selectedReqId });
   }, [items, unidadeSolicitante, showSaldo, selectedReqId, saveDraft]);
 
-  // Load requisition products
+  // Load requisition products — import ALL items from requisition_items
   useEffect(() => {
     if (!selectedReqId || !showSaldo) return;
-    const reqs = pendingReqs.filter(r => r.id === selectedReqId || selectedReqId === 'all');
-    // If single req selected, get user info
-    if (selectedReqId !== 'all' && reqs.length > 0) {
-      const req = reqs[0];
-      supabase.from('profiles').select('full_name').eq('user_id', req.user_id).single()
-        .then(({ data: profile }) => {
-          setReqInfo({
-            solicitante: profile?.full_name || '—',
-            unidade: (req as any).unidade || req.unidade_setor || '—',
-            setor: (req as any).setor || '—',
-          });
-        });
-    }
-    // Pre-load products
-    const newItems: CompItem[] = reqs.map(r => ({
-      product_id: r.product_id,
-      product_name: r.products?.nome || '—',
-      unidade: r.unidade_medida,
-      quantidade: 1,
-      saldo: r.saldo_atual,
-    }));
-    // Merge with existing, avoiding duplicates
-    setItems(prev => {
-      const existingIds = new Set(prev.map(i => i.product_id));
-      const toAdd = newItems.filter(i => !existingIds.has(i.product_id));
-      const updated = prev.map(p => {
-        const match = newItems.find(n => n.product_id === p.product_id);
-        return match ? { ...p, saldo: match.saldo } : p;
+    
+    (async () => {
+      // Get the selected requisition for header info
+      const selectedReq = pendingReqs.find(r => r.id === selectedReqId);
+      if (!selectedReq) return;
+
+      // Get user info
+      const { data: profile } = await supabase.from('profiles').select('full_name').eq('user_id', selectedReq.user_id).single();
+      setReqInfo({
+        solicitante: profile?.full_name || '—',
+        unidade: selectedReq.unidade || selectedReq.unidade_setor || '—',
+        setor: selectedReq.setor || '—',
       });
-      return [...updated, ...toAdd];
-    });
+
+      // Find all requisitions with same titulo+created_at to get all items
+      const matchingReqs = pendingReqs.filter(r => 
+        r.titulo === selectedReq.titulo && r.created_at === selectedReq.created_at
+      );
+
+      // Also load requisition_items for all matching requisition IDs
+      const reqIds = matchingReqs.map(r => r.id);
+      const { data: reqItems } = await supabase
+        .from('requisition_items')
+        .select('product_id, saldo, products(nome, unidade_medida)')
+        .in('requisition_id', reqIds);
+
+      const newItems: CompItem[] = (reqItems || []).map((ri: any) => ({
+        product_id: ri.product_id,
+        product_name: ri.products?.nome || '—',
+        unidade: ri.products?.unidade_medida || '',
+        quantidade: 1,
+        saldo: ri.saldo,
+      }));
+
+      // Merge with existing, avoiding duplicates
+      setItems(prev => {
+        const existingIds = new Set(prev.map(i => i.product_id));
+        const toAdd = newItems.filter(i => !existingIds.has(i.product_id));
+        const updated = prev.map(p => {
+          const match = newItems.find(n => n.product_id === p.product_id);
+          return match ? { ...p, saldo: match.saldo } : p;
+        });
+        return [...updated, ...toAdd];
+      });
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedReqId, showSaldo, pendingReqs]);
 
