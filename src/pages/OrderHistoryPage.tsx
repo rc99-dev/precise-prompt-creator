@@ -146,7 +146,7 @@ export default function OrderHistoryPage() {
       .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social, cnpj, telefone, cidade)')
       .eq('order_id', order.id);
     if (!items || items.length === 0) { toast.error("Sem itens para exportar."); return null; }
-    const { data: buyerProfile } = await supabase.from('profiles').select('full_name').eq('user_id', order.user_id).single();
+    const { data: buyerProfile } = await supabase.from('profiles').select('full_name, unidade, unidade_setor').eq('user_id', order.user_id).single();
     let aprovadorName: string | null = null;
     if (order.status === 'aprovado' || order.status === 'emitido' || order.status === 'recebido') {
       const { data: log } = await supabase.from('approval_log').select('user_id').eq('order_id', order.id).eq('action', 'aprovado').limit(1).single();
@@ -155,7 +155,33 @@ export default function OrderHistoryPage() {
         aprovadorName = ap?.full_name || null;
       }
     }
-    return { items, buyerProfile, aprovadorName };
+
+    // Fetch saldo from requisitions linked to this order's products
+    let saldoMap: Record<string, number> = {};
+    let solicitante: string | null = null;
+    let setor: string | null = null;
+    const isInternalPDF = order.status === 'rascunho' || order.status === 'aguardando_aprovacao';
+    if (isInternalPDF) {
+      // Find linked requisition
+      const { data: linkedReqs } = await supabase.from('requisitions')
+        .select('id, user_id, setor')
+        .eq('order_id', order.id)
+        .limit(1);
+      if (linkedReqs && linkedReqs.length > 0) {
+        const reqId = linkedReqs[0].id;
+        setor = linkedReqs[0].setor;
+        const { data: reqProfile } = await supabase.from('profiles').select('full_name').eq('user_id', linkedReqs[0].user_id).single();
+        solicitante = reqProfile?.full_name || null;
+        const { data: reqItems } = await supabase.from('requisition_items')
+          .select('product_id, saldo')
+          .eq('requisition_id', reqId);
+        (reqItems || []).forEach((ri: any) => {
+          saldoMap[ri.product_id] = ri.saldo;
+        });
+      }
+    }
+
+    return { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF };
   };
 
   const markAsEmitted = async (order: Order) => {
@@ -177,7 +203,7 @@ export default function OrderHistoryPage() {
   const exportPDF = async (order: Order) => {
     const result = await fetchPDFData(order);
     if (!result) return;
-    const { items, buyerProfile, aprovadorName } = result;
+    const { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF } = result;
     const mainSupplier = items[0]?.suppliers as any;
     generateOrderPDF({
       numero: order.numero, created_at: order.created_at, observacoes: order.observacoes,
@@ -187,8 +213,12 @@ export default function OrderHistoryPage() {
         codigo: (i.products as any)?.codigo_interno, descricao: (i.products as any)?.nome || "",
         unidade: (i.products as any)?.unidade_medida || "", quantidade: i.quantidade,
         preco_unitario: i.preco_unitario, subtotal: i.subtotal,
+        saldo: saldoMap[i.product_id],
       })),
       comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (order as any).approved_at,
+      showSaldo: isInternalPDF,
+      solicitante: solicitante || undefined,
+      setor: setor || undefined,
     });
     await markAsEmitted(order);
     toast.success("PDF gerado!");
@@ -197,7 +227,7 @@ export default function OrderHistoryPage() {
   const exportPDFBySupplier = async (order: Order) => {
     const result = await fetchPDFData(order);
     if (!result) return;
-    const { items, buyerProfile, aprovadorName } = result;
+    const { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF } = result;
     generateOrderPDFBySupplier({
       numero: order.numero, created_at: order.created_at, observacoes: order.observacoes,
       unidadeSolicitante: (order as any).unidade_setor || undefined,
@@ -209,9 +239,13 @@ export default function OrderHistoryPage() {
           preco_unitario: i.preco_unitario, subtotal: i.subtotal,
           supplier_id: i.supplier_id,
           supplier_info: sup ? { razao_social: sup.razao_social, cnpj: sup.cnpj, telefone: sup.telefone, cidade: sup.cidade } : null,
+          saldo: saldoMap[i.product_id],
         };
       }),
       comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (order as any).approved_at,
+      showSaldo: isInternalPDF,
+      solicitante: solicitante || undefined,
+      setor: setor || undefined,
     });
     await markAsEmitted(order);
     toast.success("PDFs por fornecedor gerados!");

@@ -100,6 +100,7 @@ interface OrderPDFItem {
   quantidade: number;
   preco_unitario: number;
   subtotal: number;
+  saldo?: number;
 }
 
 interface OrderPDFData {
@@ -114,13 +115,18 @@ interface OrderPDFData {
   approved_at?: string | null;
   unidadeSolicitante?: string;
   filenameSuffix?: string;
+  showSaldo?: boolean;
+  solicitante?: string;
+  setor?: string;
 }
 
 export function generateOrderPDF(data: OrderPDFData) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const w = doc.internal.pageSize.getWidth();
 
-  let y = drawHeader(doc, "ORDEM DE COMPRA", data.numero, formatDate(data.created_at), data.unidadeSolicitante);
+  let y = drawHeader(doc, "ORDEM DE COMPRA", data.numero, formatDate(data.created_at), data.unidadeSolicitante,
+    data.showSaldo && data.solicitante ? { solicitante: data.solicitante, unidade: data.unidadeSolicitante || '—', setor: data.setor || '—' } : undefined
+  );
 
   // Supplier block
   if (data.supplier) {
@@ -144,19 +150,47 @@ export function generateOrderPDF(data: OrderPDFData) {
   }
 
   // Items table with automatic page break
-  const tableBody = data.items.map((item, idx) => [
-    String(idx + 1),
-    item.codigo || "—",
-    item.descricao,
-    item.unidade,
-    String(item.quantidade),
-    formatCurrency(item.preco_unitario),
-    formatCurrency(item.subtotal),
-  ]);
+  const headRow = data.showSaldo
+    ? ["#", "Código", "Descrição", "Unidade", "Saldo", "Qtd", "Preço Unit.", "Subtotal"]
+    : ["#", "Código", "Descrição", "Unidade", "Qtd", "Preço Unit.", "Subtotal"];
+
+  const tableBody = data.items.map((item, idx) => {
+    const row = [
+      String(idx + 1),
+      item.codigo || "—",
+      item.descricao,
+      item.unidade,
+    ];
+    if (data.showSaldo) row.push(item.saldo !== undefined ? String(item.saldo) : "—");
+    row.push(
+      String(item.quantidade),
+      formatCurrency(item.preco_unitario),
+      formatCurrency(item.subtotal),
+    );
+    return row;
+  });
+
+  const colStyles: Record<number, any> = {
+    0: { cellWidth: 8, halign: "center" },
+    1: { cellWidth: 20 },
+    2: { cellWidth: "auto" },
+    3: { cellWidth: 18, halign: "center" },
+  };
+
+  if (data.showSaldo) {
+    colStyles[4] = { cellWidth: 14, halign: "center" };
+    colStyles[5] = { cellWidth: 14, halign: "center" };
+    colStyles[6] = { cellWidth: 26, halign: "right" };
+    colStyles[7] = { cellWidth: 26, halign: "right" };
+  } else {
+    colStyles[4] = { cellWidth: 14, halign: "center" };
+    colStyles[5] = { cellWidth: 26, halign: "right" };
+    colStyles[6] = { cellWidth: 26, halign: "right" };
+  }
 
   autoTable(doc, {
     startY: y,
-    head: [["#", "Código", "Descrição", "Unidade", "Qtd", "Preço Unit.", "Subtotal"]],
+    head: [headRow],
     body: tableBody,
     margin: { left: 14, right: 14, bottom: 30 },
     styles: { fontSize: 8, cellPadding: 2.5, textColor: DARK as any },
@@ -167,15 +201,7 @@ export function generateOrderPDF(data: OrderPDFData) {
       fontSize: 8,
     },
     alternateRowStyles: { fillColor: [250, 245, 248] },
-    columnStyles: {
-      0: { cellWidth: 8, halign: "center" },
-      1: { cellWidth: 20 },
-      2: { cellWidth: "auto" },
-      3: { cellWidth: 18, halign: "center" },
-      4: { cellWidth: 14, halign: "center" },
-      5: { cellWidth: 26, halign: "right" },
-      6: { cellWidth: 26, halign: "right" },
-    },
+    columnStyles: colStyles,
     rowPageBreak: 'auto',
     didDrawPage: () => { drawFooterLine(doc); },
   });
@@ -301,6 +327,9 @@ export function generateOrderPDFBySupplier(data: OrderPDFBySupplierData) {
       approved_at: data.approved_at,
       unidadeSolicitante: data.unidadeSolicitante,
       filenameSuffix: supplierLabel,
+      showSaldo: data.showSaldo,
+      solicitante: data.solicitante,
+      setor: data.setor,
     });
   });
 }

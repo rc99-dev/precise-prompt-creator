@@ -111,7 +111,7 @@ export default function NewOrderPage() {
 
     const { data: reqItems } = await supabase
       .from('requisition_items')
-      .select('product_id, saldo, products(nome, unidade_medida)')
+      .select('product_id, saldo, pedido, products(nome, unidade_medida)')
       .in('requisition_id', matchingIds);
 
     if (reqItems && reqItems.length > 0) {
@@ -119,7 +119,7 @@ export default function NewOrderPage() {
         product_id: ri.product_id,
         product_name: ri.products?.nome || '',
         unidade: ri.products?.unidade_medida || '',
-        quantidade: ri.saldo || 1,
+        quantidade: ri.pedido > 0 ? ri.pedido : (ri.saldo || 1),
         supplier_id: '',
         preco_unitario: 0,
         subtotal: 0,
@@ -183,7 +183,7 @@ export default function NewOrderPage() {
         // Get all requisition_items for this requisition
         const { data: reqItems } = await supabase
           .from('requisition_items')
-          .select('product_id, saldo, products(nome, unidade_medida)')
+          .select('product_id, saldo, pedido, products(nome, unidade_medida)')
           .eq('requisition_id', requisitionId);
         if (req && reqItems && reqItems.length > 0) {
           const newItems: OrderItem[] = reqItems.map((ri: any) => {
@@ -193,7 +193,7 @@ export default function NewOrderPage() {
             const min = pricesForProduct.length > 0
               ? pricesForProduct.reduce((m, e) => e.preco_unitario < m.preco_unitario ? e : m, pricesForProduct[0])
               : null;
-            const qty = ri.saldo || 1;
+            const qty = ri.pedido > 0 ? ri.pedido : (ri.saldo || 1);
             return {
               product_id: ri.product_id,
               product_name: productName,
