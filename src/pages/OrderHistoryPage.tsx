@@ -214,8 +214,8 @@ export default function OrderHistoryPage() {
     }
   };
 
-  const exportPDF = async (order: Order) => {
-    const result = await fetchPDFData(order);
+  const exportPDF = async (order: Order, forceSaldo = false) => {
+    const result = await fetchPDFData(order, forceSaldo);
     if (!result) return;
     const { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF } = result;
     const mainSupplier = items[0]?.suppliers as any;
@@ -233,8 +233,9 @@ export default function OrderHistoryPage() {
       showSaldo: isInternalPDF,
       solicitante: solicitante || undefined,
       setor: setor || undefined,
+      filenameSuffix: forceSaldo ? 'com_saldo' : undefined,
     });
-    await markAsEmitted(order);
+    if (!forceSaldo) await markAsEmitted(order);
     toast.success("PDF gerado!");
   };
 
