@@ -4,6 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/helpers";
+import {
+  FileText, Send, CheckCircle2, XCircle, Ban, CalendarClock,
+  PackageCheck, AlertTriangle, ClipboardList, Edit3,
+} from "lucide-react";
 
 type Order = {
   id: string; numero: string; user_id: string; modo: string;
@@ -29,6 +33,16 @@ type ReceiptData = {
     tipo_ocorrencia: string | null; observacoes: string | null;
     product_nome: string; product_unidade: string; quantidade_esperada: number;
   }[];
+};
+
+type TimelineEvent = {
+  key: string;
+  icon: React.ComponentType<{ className?: string }>;
+  iconClass: string;
+  title: string;
+  user: string;
+  date: string;
+  detail?: string;
 };
 
 interface Props {
