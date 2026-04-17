@@ -324,6 +324,36 @@ export default function OrderDetailDialog({ open, onOpenChange, order, orderItem
     );
   };
 
+  const renderTimelineTab = () => {
+    if (loadingTimeline) return <p className="text-sm text-muted-foreground py-4">Carregando histórico...</p>;
+    if (timeline.length === 0) return <p className="text-sm text-muted-foreground py-4">Nenhum evento registrado para este pedido.</p>;
+    return (
+      <div className="relative pl-2 py-2">
+        <div className="absolute left-[22px] top-2 bottom-2 w-px bg-border" />
+        <ul className="space-y-4">
+          {timeline.map(ev => {
+            const Icon = ev.icon;
+            return (
+              <li key={ev.key} className="relative flex gap-4">
+                <div className={`relative z-10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${ev.iconClass}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="flex-1 pt-1">
+                  <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                    <p className="text-sm font-semibold">{ev.title}</p>
+                    <p className="text-xs text-muted-foreground">{formatDateTime(ev.date)}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">por <span className="font-medium text-foreground">{ev.user}</span></p>
+                  {ev.detail && <p className="text-xs text-muted-foreground mt-1 italic">{ev.detail}</p>}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -340,18 +370,16 @@ export default function OrderDetailDialog({ open, onOpenChange, order, orderItem
             {order.observacoes && (
               <div className="text-sm"><span className="text-muted-foreground">Observações:</span> {order.observacoes}</div>
             )}
-            {hasReceipt ? (
-              <Tabs defaultValue="itens">
-                <TabsList>
-                  <TabsTrigger value="itens">Itens do Pedido</TabsTrigger>
-                  <TabsTrigger value="recebimento">Recebimento</TabsTrigger>
-                </TabsList>
-                <TabsContent value="itens">{renderItemsTable()}</TabsContent>
-                <TabsContent value="recebimento">{renderReceiptTab()}</TabsContent>
-              </Tabs>
-            ) : (
-              renderItemsTable()
-            )}
+            <Tabs defaultValue="itens">
+              <TabsList>
+                <TabsTrigger value="itens">Itens do Pedido</TabsTrigger>
+                {hasReceipt && <TabsTrigger value="recebimento">Recebimento</TabsTrigger>}
+                <TabsTrigger value="historico">Histórico</TabsTrigger>
+              </TabsList>
+              <TabsContent value="itens">{renderItemsTable()}</TabsContent>
+              {hasReceipt && <TabsContent value="recebimento">{renderReceiptTab()}</TabsContent>}
+              <TabsContent value="historico">{renderTimelineTab()}</TabsContent>
+            </Tabs>
           </div>
         )}
       </DialogContent>
