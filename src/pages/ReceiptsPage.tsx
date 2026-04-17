@@ -35,11 +35,15 @@ type ReceiptItemForm = {
   tipo_ocorrencia: string; observacoes: string;
 };
 
-const fetchReceiptOrders = async () => {
+const fetchReceiptOrders = async (filterUnidade: string) => {
+  let query = supabase.from('purchase_orders').select('*')
+    .in('status', ['emitido', 'recebido', 'recebido_com_ocorrencia'])
+    .order('created_at', { ascending: false });
+  if (filterUnidade && filterUnidade !== 'todas') {
+    query = query.eq('unidade_setor', filterUnidade);
+  }
   const [{ data: orders, error }, { data: profiles }] = await Promise.all([
-    supabase.from('purchase_orders').select('*')
-      .in('status', ['emitido', 'recebido', 'recebido_com_ocorrencia'])
-      .order('created_at', { ascending: false }),
+    query,
     supabase.from('profiles').select('user_id, full_name, unidade'),
   ]);
   if (error) throw error;
@@ -50,7 +54,7 @@ const fetchReceiptOrders = async () => {
   const mapped = (orders || []).map((o: any) => ({
     ...o,
     comprador_nome: profileMap[o.user_id]?.name || '—',
-    unidade_comprador: profileMap[o.user_id]?.unidade || '',
+    unidade_comprador: o.unidade_setor || profileMap[o.user_id]?.unidade || '',
   })) as ReceiptOrder[];
   return sortOrders(mapped);
 };
@@ -97,14 +101,13 @@ export default function ReceiptsPage() {
   const [filterUnidade, setFilterUnidade] = useState("todas");
 
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ['receipt-orders'],
-    queryFn: fetchReceiptOrders,
+    queryKey: ['receipt-orders', filterUnidade],
+    queryFn: () => fetchReceiptOrders(filterUnidade),
     staleTime: 2 * 60 * 1000,
   });
 
-  const filteredOrders = filterUnidade === 'todas' ? orders : orders.filter(o => o.unidade_comprador === filterUnidade);
-  const pendingOrders = filteredOrders.filter(o => o.status === 'emitido' && o.previsao_entrega);
-  const receivedOrders = filteredOrders.filter(o => o.status === 'recebido' || o.status === 'recebido_com_ocorrencia');
+  const pendingOrders = orders.filter(o => o.status === 'emitido' && o.previsao_entrega);
+  const receivedOrders = orders.filter(o => o.status === 'recebido' || o.status === 'recebido_com_ocorrencia');
 
   const openReceipt = async (order: ReceiptOrder) => {
     setSelectedOrder(order);
