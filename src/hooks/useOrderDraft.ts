@@ -7,6 +7,7 @@ export interface DraftOrderItem {
   product_name: string;
   unidade: string;
   quantidade: number;
+  saldo?: number;
   supplier_id: string;
   preco_unitario: number;
   subtotal: number;
