@@ -9,8 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Search, X, ClipboardList, ShoppingCart, Eye, Trash2, Copy, Pencil } from "lucide-react";
+import { Search, X, ClipboardList, ShoppingCart, Eye, Trash2, Copy, Pencil, FileText } from "lucide-react";
 import { formatDate, statusLabels } from "@/lib/helpers";
+import { generateRequisitionPDF } from "@/lib/pdfGenerator";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
@@ -139,6 +140,28 @@ export default function RequisitionsPage() {
     // Navigate to my-requisitions with edit param — or we handle inline
     // For now, navigate to the requisition form page
     navigate(`/minhas-solicitacoes?edit=${reqId}`);
+  };
+
+  const handlePDF = (req: Requisition) => {
+    if (!req.requisition_items || req.requisition_items.length === 0) {
+      toast.error("Solicitação sem itens.");
+      return;
+    }
+    generateRequisitionPDF({
+      titulo: req.titulo || '—',
+      unidade: req.unidade || '—',
+      setor: req.setor || '—',
+      solicitante: req.profiles?.full_name || '—',
+      created_at: req.created_at,
+      items: req.requisition_items.map(i => ({
+        produto: (i.products as any)?.nome || '—',
+        unidade: (i.products as any)?.unidade_medida || '',
+        saldo: i.saldo,
+        pedido: i.pedido || 0,
+        observacoes: i.observacoes,
+      })),
+    });
+    toast.success("PDF gerado!");
   };
 
   const showActions = true; // always show actions column
