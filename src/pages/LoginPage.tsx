@@ -47,12 +47,10 @@ export default function LoginPage() {
           unidade_setor: setor || null,
         } as any).eq('user_id', signUpData.user!.id);
 
-        // Notify all masters about new pending user (via secure RPC — users can't write to others' inboxes directly)
-        await supabase.rpc('notify_users' as any, {
-          _target_role: 'master',
+        // Notify all masters via signup-specific RPC (only callable by pending users)
+        await supabase.rpc('notify_masters_new_signup' as any, {
           _titulo: '👤 Novo usuário aguarda aprovação',
           _mensagem: `Novo usuário aguarda aprovação: ${fullName} — ${unidade || 'Sem unidade'} — ${setor || 'Sem setor'}`,
-          _tipo: 'alerta',
         });
       }, 1500);
     }
