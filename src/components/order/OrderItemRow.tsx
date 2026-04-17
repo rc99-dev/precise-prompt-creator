@@ -40,7 +40,7 @@ function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, o
         <span className="text-muted-foreground ml-1 text-xs">({item.unidade})</span>
       </td>
       <td className="py-2.5 px-3 text-center text-sm text-muted-foreground">
-        {saldo !== undefined && saldo > 0 ? saldo : '—'}
+        {saldo !== undefined && saldo !== null ? saldo : '—'}
       </td>
       <td className="py-2.5 px-3">
         <Input

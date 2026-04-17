@@ -120,6 +120,7 @@ export default function NewOrderPage() {
         product_name: ri.products?.nome || '',
         unidade: ri.products?.unidade_medida || '',
         quantidade: ri.pedido > 0 ? ri.pedido : (ri.saldo || 1),
+        saldo: ri.saldo,
         supplier_id: '',
         preco_unitario: 0,
         subtotal: 0,
@@ -128,7 +129,11 @@ export default function NewOrderPage() {
       // Merge avoiding duplicates
       setItems(prev => {
         const existingIds = new Set(prev.map(i => i.product_id));
-        return [...prev, ...newItems.filter(i => !existingIds.has(i.product_id))];
+        const updated = prev.map(item => {
+          const imported = newItems.find(newItem => newItem.product_id === item.product_id);
+          return imported ? { ...item, saldo: imported.saldo } : item;
+        });
+        return [...updated, ...newItems.filter(i => !existingIds.has(i.product_id))];
       });
       if (req?.unidade) setUnidadeSolicitante(req.unidade);
       toast.success(`${reqItems.length} itens importados da solicitação.`);
@@ -141,21 +146,42 @@ export default function NewOrderPage() {
 
     if (editOrderId) {
       (async () => {
-        const { data: orderItems } = await supabase
-          .from('purchase_order_items')
-          .select('*, products(nome, unidade_medida)')
-          .eq('order_id', editOrderId);
-        const { data: order } = await supabase
-          .from('purchase_orders')
-          .select('observacoes, modo, unidade_setor')
-          .eq('id', editOrderId)
-          .single();
+        const [{ data: orderItems }, { data: order }, { data: linkedReqs }] = await Promise.all([
+          supabase
+            .from('purchase_order_items')
+            .select('*, products(nome, unidade_medida)')
+            .eq('order_id', editOrderId),
+          supabase
+            .from('purchase_orders')
+            .select('observacoes, modo, unidade_setor')
+            .eq('id', editOrderId)
+            .single(),
+          supabase
+            .from('requisitions')
+            .select('id')
+            .eq('order_id', editOrderId),
+        ]);
+
+        let saldoByProduct: Record<string, number> = {};
+        if (linkedReqs && linkedReqs.length > 0) {
+          const { data: linkedReqItems } = await supabase
+            .from('requisition_items')
+            .select('product_id, saldo')
+            .in('requisition_id', linkedReqs.map((req: any) => req.id));
+
+          saldoByProduct = (linkedReqItems || []).reduce((acc: Record<string, number>, reqItem: any) => {
+            acc[reqItem.product_id] = reqItem.saldo;
+            return acc;
+          }, {});
+        }
+
         if (orderItems && orderItems.length > 0) {
           setItems(orderItems.map(i => ({
             product_id: i.product_id,
             product_name: (i.products as any)?.nome || '',
             unidade: (i.products as any)?.unidade_medida || '',
             quantidade: i.quantidade,
+            saldo: saldoByProduct[i.product_id],
             supplier_id: i.supplier_id || '',
             preco_unitario: i.preco_unitario,
             subtotal: i.subtotal,
@@ -199,6 +225,7 @@ export default function NewOrderPage() {
               product_name: productName,
               unidade,
               quantidade: qty,
+              saldo: ri.saldo,
               supplier_id: min?.supplier_id || '',
               preco_unitario: min?.preco_unitario || 0,
               subtotal: qty * (min?.preco_unitario || 0),
@@ -472,7 +499,7 @@ export default function NewOrderPage() {
                 <tbody>
                   {items.map((item, idx) => {
                     const min = getMinPrice(item.product_id);
-                    const saldo = saldos[item.product_id] || 0;
+                    const saldo = item.saldo ?? saldos[item.product_id];
                     return (
                       <OrderItemRow key={item.product_id} item={item} index={idx}
                         isMinPrice={!!min && item.preco_unitario === min.preco}
