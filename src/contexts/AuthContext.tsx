@@ -49,12 +49,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       Promise.all([
         getUserRole(userId),
-        supabase.from('profiles').select('status, permissoes_customizadas').eq('user_id', userId).single(),
-      ]).then(([userRole, { data: profile }]) => {
+        supabase.from('profiles').select('status').eq('user_id', userId).single(),
+        supabase.rpc('get_profile_sensitive', { _user_id: userId } as any),
+      ]).then(([userRole, { data: profile }, { data: sensitive }]: any) => {
         if (!isMounted) return;
         setRole(userRole);
         setProfileStatus((profile?.status as ProfileStatus) || 'pendente');
-        setCustomPermissions((profile?.permissoes_customizadas as Record<string, boolean>) || null);
+        const perms = Array.isArray(sensitive) && sensitive[0]?.permissoes_customizadas
+          ? sensitive[0].permissoes_customizadas
+          : null;
+        setCustomPermissions(perms as Record<string, boolean> | null);
       }).catch((error) => {
         console.error("[auth] falha ao buscar role/status", error);
         if (isMounted) { setRole(null); setProfileStatus(null); setCustomPermissions(null); roleFetchedForUser.current = null; }

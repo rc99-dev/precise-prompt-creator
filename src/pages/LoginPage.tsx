@@ -47,17 +47,13 @@ export default function LoginPage() {
           unidade_setor: setor || null,
         } as any).eq('user_id', signUpData.user!.id);
 
-        // Notify all masters about new pending user
-        const { data: masters } = await supabase.from('user_roles').select('user_id').eq('role', 'master');
-        if (masters?.length) {
-          await supabase.from('notifications').insert(masters.map((m: any) => ({
-            user_id: m.user_id,
-            titulo: '👤 Novo usuário aguarda aprovação',
-            mensagem: `Novo usuário aguarda aprovação: ${fullName} — ${unidade || 'Sem unidade'} — ${setor || 'Sem setor'}`,
-            tipo: 'alerta',
-            lida: false,
-          })));
-        }
+        // Notify all masters about new pending user (via secure RPC — users can't write to others' inboxes directly)
+        await supabase.rpc('notify_users' as any, {
+          _target_role: 'master',
+          _titulo: '👤 Novo usuário aguarda aprovação',
+          _mensagem: `Novo usuário aguarda aprovação: ${fullName} — ${unidade || 'Sem unidade'} — ${setor || 'Sem setor'}`,
+          _tipo: 'alerta',
+        });
       }, 1500);
     }
 
