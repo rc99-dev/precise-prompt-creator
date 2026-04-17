@@ -222,6 +222,7 @@ export default function NewOrderPage() {
   const restoreDraft = useCallback(() => {
     const draft = loadDraft();
     if (draft) {
+      console.log('[draft ordem] restaurando:', draft);
       setItems(draft.items);
       setObservacoes(draft.observacoes);
       setActiveStrategy(draft.activeStrategy);
