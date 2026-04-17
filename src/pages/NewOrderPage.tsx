@@ -408,7 +408,7 @@ export default function NewOrderPage() {
       {isError && <QueryError onRetry={() => refetch()} />}
 
       <Card>
-        <CardHeader className="py-3 px-4"><CardTitle className="text-sm">Unidade Solicitante</CardTitle></CardHeader>
+        <CardHeader className="py-3 px-4"><CardTitle className="text-sm">Unidade Solicitante <span className="text-destructive">*</span></CardTitle></CardHeader>
         <CardContent className="px-4 pb-4 pt-0">
           <Select value={unidadeSolicitante} onValueChange={setUnidadeSolicitante}>
             <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
