@@ -10,8 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Truck, Package, CheckCircle, AlertTriangle, Clock } from "lucide-react";
+import { Truck, Package, CheckCircle, AlertTriangle, Clock, Ban } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
@@ -92,7 +93,7 @@ const OCORRENCIA_TIPOS = [
 ];
 
 export default function ReceiptsPage() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<ReceiptOrder | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItemForReceipt[]>([]);
@@ -101,6 +102,9 @@ export default function ReceiptsPage() {
   const [obsGeral, setObsGeral] = useState("");
   const [saving, setSaving] = useState(false);
   const [filterUnidade, setFilterUnidade] = useState("todas");
+  const [cancelTarget, setCancelTarget] = useState<ReceiptOrder | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['receipt-orders', filterUnidade],
@@ -190,10 +194,39 @@ export default function ReceiptsPage() {
     queryClient.invalidateQueries({ queryKey: ['receipt-orders'] });
   };
 
+  const handleCancelOrder = async () => {
+    if (!cancelTarget || !user) return;
+    if (!cancelReason.trim()) { toast.error("Informe o motivo do cancelamento."); return; }
+    setCancelling(true);
+    const { error } = await supabase.from('purchase_orders').update({
+      status: 'cancelado',
+      obs_estoquista: `[CANCELADO NO RECEBIMENTO] ${cancelReason}`,
+    } as any).eq('id', cancelTarget.id);
+    if (error) { toast.error(error.message); setCancelling(false); return; }
+    await supabase.from('approval_log').insert({
+      order_id: cancelTarget.id, user_id: user.id,
+      action: 'cancelado', motivo: cancelReason,
+    });
+    await supabase.from('notifications').insert({
+      user_id: cancelTarget.user_id,
+      titulo: 'Pedido cancelado no recebimento',
+      mensagem: `Pedido ${cancelTarget.numero} foi cancelado. Motivo: ${cancelReason}`,
+      tipo: 'alerta', lida: false,
+    });
+    toast.success("Pedido cancelado e removido dos recebimentos.");
+    setCancelling(false);
+    setCancelTarget(null);
+    setCancelReason("");
+    queryClient.invalidateQueries({ queryKey: ['receipt-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['order-history'] });
+  };
+
+  const canCancel = role === 'master' || role === 'estoquista';
+
   const renderOrderCard = (o: ReceiptOrder, showReceiveButton: boolean) => (
-    <Card key={o.id} className="hover:border-primary/30 transition-colors cursor-pointer" onClick={() => showReceiveButton ? openReceipt(o) : null}>
+    <Card key={o.id} className="hover:border-primary/30 transition-colors">
       <CardContent className="flex items-center justify-between py-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => showReceiveButton ? openReceipt(o) : null}>
           <div className="rounded-lg bg-primary/10 p-2">
             <Package className="h-5 w-5 text-primary" />
           </div>
@@ -214,6 +247,18 @@ export default function ReceiptsPage() {
             <div className="flex items-center gap-2">
               {getDeliveryBadge(o.previsao_entrega)}
               <Badge className="bg-info/20 text-info">Emitido</Badge>
+              {canCancel && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-destructive hover:text-destructive"
+                  onClick={(e) => { e.stopPropagation(); setCancelTarget(o); setCancelReason(""); }}
+                  title="Marcar como não recebido / cancelar pedido"
+                >
+                  <Ban className="h-4 w-4 mr-1" />
+                  Não recebido
+                </Button>
+              )}
             </div>
           ) : (
             <Badge className={o.status === 'recebido' ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'}>
