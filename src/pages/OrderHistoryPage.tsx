@@ -25,6 +25,8 @@ type Order = {
   status: string; observacoes: string | null; total: number;
   created_at: string; profiles?: { full_name: string } | null;
   comprador_nome?: string;
+  unidade_setor?: string | null;
+  has_requisition?: boolean;
 };
 
 type OrderItem = {
@@ -36,14 +38,20 @@ type OrderItem = {
 };
 
 const fetchOrders = async () => {
-  const [{ data: orders, error }, { data: profiles }] = await Promise.all([
+  const [{ data: orders, error }, { data: profiles }, { data: linkedReqs }] = await Promise.all([
     supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }),
     supabase.from('profiles').select('user_id, full_name'),
+    supabase.from('requisitions').select('order_id').not('order_id', 'is', null),
   ]);
   if (error) throw error;
   const profileMap: Record<string, string> = {};
   (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name; });
-  return (orders || []).map((o: any) => ({ ...o, comprador_nome: profileMap[o.user_id] || '—' })) as unknown as Order[];
+  const reqOrderIds = new Set((linkedReqs || []).map((r: any) => r.order_id));
+  return (orders || []).map((o: any) => ({
+    ...o,
+    comprador_nome: profileMap[o.user_id] || '—',
+    has_requisition: reqOrderIds.has(o.id),
+  })) as unknown as Order[];
 };
 
 export default function OrderHistoryPage() {
@@ -146,7 +154,7 @@ export default function OrderHistoryPage() {
     toast.success("CSV exportado!");
   };
 
-  const fetchPDFData = async (order: Order) => {
+  const fetchPDFData = async (order: Order, forceSaldo = false) => {
     const { data: items } = await supabase
       .from('purchase_order_items')
       .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social, cnpj, telefone, cidade)')
@@ -163,12 +171,12 @@ export default function OrderHistoryPage() {
     }
 
     // Fetch saldo from requisitions linked to this order's products
-    let saldoMap: Record<string, number> = {};
+    const saldoMap: Record<string, number> = {};
     let solicitante: string | null = null;
     let setor: string | null = null;
     const isInternalPDF = order.status === 'rascunho' || order.status === 'aguardando_aprovacao';
-    if (isInternalPDF) {
-      // Find linked requisition
+    const includeSaldoData = isInternalPDF || forceSaldo;
+    if (includeSaldoData) {
       const { data: linkedReqs } = await supabase.from('requisitions')
         .select('id, user_id, setor')
         .eq('order_id', order.id)
@@ -187,7 +195,7 @@ export default function OrderHistoryPage() {
       }
     }
 
-    return { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF };
+    return { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF: includeSaldoData };
   };
 
   const markAsEmitted = async (order: Order) => {
@@ -206,8 +214,8 @@ export default function OrderHistoryPage() {
     }
   };
 
-  const exportPDF = async (order: Order) => {
-    const result = await fetchPDFData(order);
+  const exportPDF = async (order: Order, forceSaldo = false) => {
+    const result = await fetchPDFData(order, forceSaldo);
     if (!result) return;
     const { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF } = result;
     const mainSupplier = items[0]?.suppliers as any;
@@ -225,8 +233,9 @@ export default function OrderHistoryPage() {
       showSaldo: isInternalPDF,
       solicitante: solicitante || undefined,
       setor: setor || undefined,
+      filenameSuffix: forceSaldo ? 'com_saldo' : undefined,
     });
-    await markAsEmitted(order);
+    if (!forceSaldo) await markAsEmitted(order);
     toast.success("PDF gerado!");
   };
 
@@ -362,6 +371,7 @@ export default function OrderHistoryPage() {
                   <tr className="border-b">
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Número</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Data</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Unidade</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Modo</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Comprador</th>
                     <th className="text-right py-3 px-4 font-medium text-muted-foreground">Total</th>
@@ -371,11 +381,12 @@ export default function OrderHistoryPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">Nenhuma ordem encontrada.</td></tr>
+                    <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">Nenhuma ordem encontrada.</td></tr>
                   ) : filtered.map(o => (
                     <tr key={o.id} className="border-b last:border-0 hover:bg-muted/50">
                       <td className="py-3 px-4 font-medium">{o.numero}</td>
                       <td className="py-3 px-4 text-muted-foreground">{formatDate(o.created_at)}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{o.unidade_setor || '—'}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{modoLabel(o.modo)}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{o.comprador_nome || '—'}</td>
                       <td className="py-3 px-4 text-right currency font-medium">{formatCurrency(o.total)}</td>
@@ -390,6 +401,9 @@ export default function OrderHistoryPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => exportPDF(o)}>PDF Completo</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => exportPDFBySupplier(o)}>PDF por Fornecedor</DropdownMenuItem>
+                              {(o.status === 'aprovado' || o.status === 'emitido') && o.has_requisition && (
+                                <DropdownMenuItem onClick={() => exportPDF(o, true)}>PDF com saldo</DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                           <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)} title="Duplicar"><Copy className="h-4 w-4" /></Button>

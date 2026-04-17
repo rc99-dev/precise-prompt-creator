@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, ClipboardList, X, Search } from "lucide-react";
+import { Plus, ClipboardList, X, Search, FileText } from "lucide-react";
 import { formatDate, statusLabels } from "@/lib/helpers";
+import { generateRequisitionPDF } from "@/lib/pdfGenerator";
 import { UNIDADES, SETORES, TITULOS_SOLICITACAO } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
@@ -440,6 +441,7 @@ export default function MyRequisitionsPage() {
                     <th className="text-center py-3 px-4 font-medium text-muted-foreground">Itens</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Data</th>
                     <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -451,6 +453,29 @@ export default function MyRequisitionsPage() {
                       <td className="py-3 px-4 text-center">{r.requisition_items?.length || 0}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{formatDate(r.created_at)}</td>
                       <td className="py-3 px-4 text-center">{statusBadge(r.status)}</td>
+                      <td className="py-3 px-4 text-right">
+                        <Button size="sm" variant="ghost" onClick={async () => {
+                          if (!r.requisition_items?.length) { toast.error("Solicitação sem itens."); return; }
+                          const { data: profile } = await supabase.from('profiles').select('full_name').eq('user_id', user!.id).single();
+                          generateRequisitionPDF({
+                            titulo: r.titulo || '—',
+                            unidade: r.unidade || '—',
+                            setor: r.setor || '—',
+                            solicitante: profile?.full_name || '—',
+                            created_at: r.created_at,
+                            items: r.requisition_items.map(i => ({
+                              produto: (i.products as any)?.nome || '—',
+                              unidade: (i.products as any)?.unidade_medida || '',
+                              saldo: i.saldo,
+                              pedido: i.pedido || 0,
+                              observacoes: i.observacoes,
+                            })),
+                          });
+                          toast.success("PDF gerado!");
+                        }} title="Gerar PDF">
+                          <FileText className="h-3 w-3" />
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

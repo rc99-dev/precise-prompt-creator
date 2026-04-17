@@ -320,6 +320,7 @@ export default function NewOrderPage() {
   }, [items, pricesByProduct, total]);
 
   const handleSave = async (status: 'rascunho' | 'aguardando_aprovacao') => {
+    if (!unidadeSolicitante) { toast.error("Selecione a unidade solicitante."); return; }
     if (items.length === 0) { toast.error("Adicione pelo menos um item."); return; }
     setSaving(true);
 
@@ -407,7 +408,7 @@ export default function NewOrderPage() {
       {isError && <QueryError onRetry={() => refetch()} />}
 
       <Card>
-        <CardHeader className="py-3 px-4"><CardTitle className="text-sm">Unidade Solicitante</CardTitle></CardHeader>
+        <CardHeader className="py-3 px-4"><CardTitle className="text-sm">Unidade Solicitante <span className="text-destructive">*</span></CardTitle></CardHeader>
         <CardContent className="px-4 pb-4 pt-0">
           <Select value={unidadeSolicitante} onValueChange={setUnidadeSolicitante}>
             <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>

@@ -49,6 +49,17 @@ export default function ProductsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: allProducts = [] } = useQuery({
+    queryKey: ['products-categories-source'],
+    queryFn: async () => {
+      const { data } = await supabase.from('products').select('categoria').not('categoria', 'is', null);
+      return (data || []) as { categoria: string | null }[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const categories = Array.from(new Set(allProducts.map(p => p.categoria).filter(Boolean) as string[])).sort();
+
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['products'] });
 
   const filtered = products.filter(p =>
@@ -175,7 +186,19 @@ export default function ProductsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Categoria</Label>
-                <Input value={form.categoria} onChange={e => setForm({...form, categoria: e.target.value})} />
+                <Select value={form.categoria || "__none__"} onValueChange={v => setForm({...form, categoria: v === "__new__" ? "" : v === "__none__" ? "" : v})}>
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Sem categoria —</SelectItem>
+                    {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Ou digite uma nova categoria"
+                  value={form.categoria}
+                  onChange={e => setForm({...form, categoria: e.target.value})}
+                  className="text-xs"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Unidade de Medida</Label>

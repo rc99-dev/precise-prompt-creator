@@ -478,3 +478,100 @@ export function generateQuotationPDF(data: QuotPDFData) {
 
   doc.save(`${data.numero}.pdf`);
 }
+
+// ===== REQUISITION PDF =====
+
+interface RequisitionPDFItem {
+  produto: string;
+  unidade: string;
+  saldo: number;
+  pedido: number;
+  observacoes?: string | null;
+}
+
+interface RequisitionPDFData {
+  titulo: string;
+  unidade: string;
+  setor: string;
+  solicitante: string;
+  created_at: string;
+  observacoes?: string | null;
+  items: RequisitionPDFItem[];
+}
+
+export function generateRequisitionPDF(data: RequisitionPDFData) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const w = doc.internal.pageSize.getWidth();
+  const numero = `SOL-${formatDate(data.created_at).replace(/\//g, '')}`;
+
+  let y = drawHeader(doc, "SOLICITAÇÃO", numero, formatDate(data.created_at), data.unidade);
+
+  // Info block
+  doc.setFillColor(...GRAY_LIGHT);
+  doc.roundedRect(14, y, w - 28, 24, 2, 2, "F");
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...DARK);
+  doc.text("Título:", 18, y + 6);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.titulo, 32, y + 6);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Solicitante:", 18, y + 12);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.solicitante, 40, y + 12);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Setor:", 18, y + 18);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.setor, 30, y + 18);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Data:", w - 60, y + 18);
+  doc.setFont("helvetica", "normal");
+  doc.text(formatDate(data.created_at), w - 48, y + 18);
+
+  y += 30;
+
+  autoTable(doc, {
+    startY: y,
+    head: [["#", "Produto", "Unidade", "Saldo", "Pedido", "Observações"]],
+    body: data.items.map((item, idx) => [
+      String(idx + 1),
+      item.produto,
+      item.unidade,
+      String(item.saldo),
+      String(item.pedido),
+      item.observacoes || "—",
+    ]),
+    margin: { left: 14, right: 14, bottom: 30 },
+    styles: { fontSize: 8, cellPadding: 2.5, textColor: DARK as any },
+    headStyles: { fillColor: BRAND as any, textColor: WHITE as any, fontStyle: "bold", fontSize: 8 },
+    alternateRowStyles: { fillColor: [250, 245, 248] },
+    columnStyles: {
+      0: { cellWidth: 8, halign: "center" },
+      1: { cellWidth: "auto" },
+      2: { cellWidth: 20, halign: "center" },
+      3: { cellWidth: 20, halign: "right" },
+      4: { cellWidth: 20, halign: "right" },
+      5: { cellWidth: 50 },
+    },
+    rowPageBreak: 'auto',
+    didDrawPage: () => { drawFooterLine(doc); },
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 8;
+
+  if (data.observacoes) {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...DARK);
+    doc.text("OBSERVAÇÕES", 14, y);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    const lines = doc.splitTextToSize(data.observacoes, w - 28);
+    doc.text(lines, 14, y + 5);
+  }
+
+  doc.save(`solicitacao_${data.titulo.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+}

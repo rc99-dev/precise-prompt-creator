@@ -9,6 +9,7 @@ type Order = {
   id: string; numero: string; user_id: string; modo: string;
   status: string; observacoes: string | null; total: number;
   created_at: string; comprador_nome?: string;
+  unidade_setor?: string | null;
 };
 
 type OrderItem = {
@@ -164,6 +165,7 @@ export default function OrderDetailDialog({ open, onOpenChange, order, orderItem
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div><span className="text-muted-foreground">Data:</span> <span className="font-medium">{formatDate(order.created_at)}</span></div>
+              <div><span className="text-muted-foreground">Unidade:</span> <span className="font-medium">{order.unidade_setor || '—'}</span></div>
               <div><span className="text-muted-foreground">Modo:</span> <span className="font-medium">{modoLabel(order.modo)}</span></div>
               <div><span className="text-muted-foreground">Status:</span> <Badge className={statusBadgeClass(order.status)}>{statusLabel(order.status)}</Badge></div>
               <div><span className="text-muted-foreground">Total:</span> <span className="font-bold currency">{formatCurrency(order.total)}</span></div>
