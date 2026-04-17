@@ -820,6 +820,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      notify_masters_new_signup: {
+        Args: { _mensagem: string; _titulo: string }
+        Returns: undefined
+      }
       notify_users: {
         Args: {
           _mensagem: string
