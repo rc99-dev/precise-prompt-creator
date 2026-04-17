@@ -112,6 +112,7 @@ export default function ComparativePage() {
   const restoreDraft = useCallback(() => {
     const draft = loadDraft();
     if (draft) {
+      console.log('[draft comparativo] restaurando:', draft);
       setItems(draft.items);
       setUnidadeSolicitante(draft.unidadeSolicitante || "");
       setShowSaldo(draft.showSaldo);
