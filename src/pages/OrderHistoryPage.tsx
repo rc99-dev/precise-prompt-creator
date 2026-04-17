@@ -38,14 +38,20 @@ type OrderItem = {
 };
 
 const fetchOrders = async () => {
-  const [{ data: orders, error }, { data: profiles }] = await Promise.all([
+  const [{ data: orders, error }, { data: profiles }, { data: linkedReqs }] = await Promise.all([
     supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }),
     supabase.from('profiles').select('user_id, full_name'),
+    supabase.from('requisitions').select('order_id').not('order_id', 'is', null),
   ]);
   if (error) throw error;
   const profileMap: Record<string, string> = {};
   (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name; });
-  return (orders || []).map((o: any) => ({ ...o, comprador_nome: profileMap[o.user_id] || '—' })) as unknown as Order[];
+  const reqOrderIds = new Set((linkedReqs || []).map((r: any) => r.order_id));
+  return (orders || []).map((o: any) => ({
+    ...o,
+    comprador_nome: profileMap[o.user_id] || '—',
+    has_requisition: reqOrderIds.has(o.id),
+  })) as unknown as Order[];
 };
 
 export default function OrderHistoryPage() {
