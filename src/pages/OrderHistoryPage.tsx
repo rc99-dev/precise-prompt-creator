@@ -154,7 +154,7 @@ export default function OrderHistoryPage() {
     toast.success("CSV exportado!");
   };
 
-  const fetchPDFData = async (order: Order) => {
+  const fetchPDFData = async (order: Order, forceSaldo = false) => {
     const { data: items } = await supabase
       .from('purchase_order_items')
       .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social, cnpj, telefone, cidade)')
@@ -171,12 +171,12 @@ export default function OrderHistoryPage() {
     }
 
     // Fetch saldo from requisitions linked to this order's products
-    let saldoMap: Record<string, number> = {};
+    const saldoMap: Record<string, number> = {};
     let solicitante: string | null = null;
     let setor: string | null = null;
     const isInternalPDF = order.status === 'rascunho' || order.status === 'aguardando_aprovacao';
-    if (isInternalPDF) {
-      // Find linked requisition
+    const includeSaldoData = isInternalPDF || forceSaldo;
+    if (includeSaldoData) {
       const { data: linkedReqs } = await supabase.from('requisitions')
         .select('id, user_id, setor')
         .eq('order_id', order.id)
@@ -195,7 +195,7 @@ export default function OrderHistoryPage() {
       }
     }
 
-    return { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF };
+    return { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF: includeSaldoData };
   };
 
   const markAsEmitted = async (order: Order) => {
