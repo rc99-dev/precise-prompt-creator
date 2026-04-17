@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar, XCircle } from "lucide-react";
+import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar, XCircle, Ban } from "lucide-react";
 import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
 import { generateOrderPDF, generateOrderPDFBySupplier } from "@/lib/pdfGenerator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -72,6 +72,9 @@ export default function OrderHistoryPage() {
   const [rejectTarget, setRejectTarget] = useState<Order | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   const { role } = useAuth();
 
@@ -327,6 +330,32 @@ export default function OrderHistoryPage() {
     queryClient.invalidateQueries({ queryKey: ['order-history'] });
   };
 
+  const handleMasterCancel = async () => {
+    if (!cancelTarget || !cancelReason.trim()) { toast.error("Informe o motivo do cancelamento."); return; }
+    setCancelling(true);
+    const { error } = await supabase.from('purchase_orders').update({
+      status: 'cancelado',
+      obs_estoquista: `[CANCELADO PELO MASTER] ${cancelReason}`,
+    } as any).eq('id', cancelTarget.id);
+    if (error) { toast.error(error.message); setCancelling(false); return; }
+    await supabase.from('approval_log').insert({
+      order_id: cancelTarget.id, user_id: user!.id,
+      action: 'cancelado', motivo: cancelReason,
+    });
+    await supabase.from('notifications').insert({
+      user_id: cancelTarget.user_id,
+      titulo: 'Pedido cancelado',
+      mensagem: `Pedido ${cancelTarget.numero} foi cancelado pelo master. Motivo: ${cancelReason}`,
+      tipo: 'alerta', lida: false,
+    });
+    toast.success("Pedido cancelado!");
+    setCancelling(false);
+    setCancelTarget(null);
+    setCancelReason("");
+    queryClient.invalidateQueries({ queryKey: ['order-history'] });
+    queryClient.invalidateQueries({ queryKey: ['receipt-orders'] });
+  };
+
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
       rascunho: 'Rascunho', aguardando_aprovacao: 'Aguardando Aprovação',
@@ -438,6 +467,11 @@ export default function OrderHistoryPage() {
                               <XCircle className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
+                          {role === 'master' && (o.status === 'emitido' || o.status === 'recebido' || o.status === 'recebido_com_ocorrencia') && (
+                            <Button variant="ghost" size="icon" onClick={() => { setCancelTarget(o); setCancelReason(""); }} title="Cancelar pedido">
+                              <Ban className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -498,6 +532,30 @@ export default function OrderHistoryPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Dialog open={!!cancelTarget} onOpenChange={(open) => { if (!open) { setCancelTarget(null); setCancelReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Cancelar Pedido</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="text-sm text-muted-foreground">
+              Pedido: <span className="font-medium text-foreground">{cancelTarget?.numero}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O pedido será marcado como <strong>cancelado</strong> e removido da tela de Recebimentos.
+              O comprador será notificado.
+            </p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo do cancelamento *</label>
+              <Textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)} placeholder="Ex: fornecedor cancelou, pedido duplicado, etc." />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCancelTarget(null)}>Voltar</Button>
+              <Button variant="destructive" onClick={handleMasterCancel} disabled={cancelling}>
+                {cancelling ? "Cancelando..." : "Cancelar pedido"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={!!rejectTarget} onOpenChange={(open) => { if (!open) { setRejectTarget(null); setRejectReason(""); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Reprovar Pedido</DialogTitle></DialogHeader>
