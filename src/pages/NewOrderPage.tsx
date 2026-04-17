@@ -320,6 +320,7 @@ export default function NewOrderPage() {
   }, [items, pricesByProduct, total]);
 
   const handleSave = async (status: 'rascunho' | 'aguardando_aprovacao') => {
+    if (!unidadeSolicitante) { toast.error("Selecione a unidade solicitante."); return; }
     if (items.length === 0) { toast.error("Adicione pelo menos um item."); return; }
     setSaving(true);
 
