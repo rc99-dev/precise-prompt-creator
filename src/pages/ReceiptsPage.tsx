@@ -106,6 +106,8 @@ export default function ReceiptsPage() {
     queryKey: ['receipt-orders', filterUnidade],
     queryFn: () => fetchReceiptOrders(filterUnidade),
     staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: 'always',
   });
 
   const pendingOrders = orders.filter(o => o.status === 'emitido' && o.previsao_entrega);
