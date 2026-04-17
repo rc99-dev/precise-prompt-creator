@@ -119,18 +119,28 @@ export default function OrderHistoryPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    // Guard: only rascunho or rejeitado can be deleted
+    // Guard: only rascunho or rejeitado can be deleted (also enforced by RLS at DB level)
     if (deleteTarget.status !== 'rascunho' && deleteTarget.status !== 'rejeitado') {
-      toast.error("Apenas pedidos em rascunho ou rejeitados podem ser excluídos.");
+      toast.error("Pedidos emitidos, aprovados ou recebidos não podem ser excluídos. Reprove ou cancele primeiro.");
       setDeleteTarget(null);
       return;
     }
     setDeleting(true);
     // Unlink any requisitions referencing this order to avoid FK violation
     await supabase.from('requisitions').update({ order_id: null, status: 'pendente' } as any).eq('order_id', deleteTarget.id);
-    await supabase.from('purchase_order_items').delete().eq('order_id', deleteTarget.id);
+    const { error: itemsError } = await supabase.from('purchase_order_items').delete().eq('order_id', deleteTarget.id);
+    if (itemsError) {
+      toast.error("Não foi possível excluir os itens deste pedido. Status atual não permite exclusão.");
+      setDeleting(false);
+      setDeleteTarget(null);
+      return;
+    }
     const { error } = await supabase.from('purchase_orders').delete().eq('id', deleteTarget.id);
-    if (error) { toast.error(error.message); } else { toast.success("Pedido excluído!"); }
+    if (error) {
+      toast.error("Pedidos emitidos, aprovados ou recebidos não podem ser excluídos. Reprove ou cancele primeiro.");
+    } else {
+      toast.success("Pedido excluído!");
+    }
     setDeleting(false);
     setDeleteTarget(null);
     queryClient.invalidateQueries({ queryKey: ['order-history'] });
