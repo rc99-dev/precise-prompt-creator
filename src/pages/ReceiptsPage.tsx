@@ -406,6 +406,35 @@ export default function ReceiptsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!cancelTarget} onOpenChange={(open) => { if (!open) { setCancelTarget(null); setCancelReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Marcar pedido como não recebido</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="text-sm text-muted-foreground">
+              Pedido: <span className="font-medium text-foreground">{cancelTarget?.numero}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O pedido será marcado como <strong>cancelado</strong> e removido da lista de recebimentos pendentes.
+              O comprador será notificado.
+            </p>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Motivo *</Label>
+              <Textarea
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                placeholder="Ex: fornecedor não entregou, pedido cancelado pelo fornecedor, etc."
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCancelTarget(null)}>Voltar</Button>
+              <Button variant="destructive" onClick={handleCancelOrder} disabled={cancelling}>
+                {cancelling ? "Cancelando..." : "Confirmar cancelamento"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
