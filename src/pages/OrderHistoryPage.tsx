@@ -25,6 +25,8 @@ type Order = {
   status: string; observacoes: string | null; total: number;
   created_at: string; profiles?: { full_name: string } | null;
   comprador_nome?: string;
+  unidade_setor?: string | null;
+  has_requisition?: boolean;
 };
 
 type OrderItem = {
