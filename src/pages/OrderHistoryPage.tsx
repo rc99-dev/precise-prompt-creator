@@ -111,6 +111,12 @@ export default function OrderHistoryPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    // Guard: only rascunho or rejeitado can be deleted
+    if (deleteTarget.status !== 'rascunho' && deleteTarget.status !== 'rejeitado') {
+      toast.error("Apenas pedidos em rascunho ou rejeitados podem ser excluídos.");
+      setDeleteTarget(null);
+      return;
+    }
     setDeleting(true);
     // Unlink any requisitions referencing this order to avoid FK violation
     await supabase.from('requisitions').update({ order_id: null, status: 'pendente' } as any).eq('order_id', deleteTarget.id);

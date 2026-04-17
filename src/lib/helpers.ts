@@ -81,7 +81,7 @@ export const ALL_PAGES = [
 const defaultPermissions: Record<string, AppRole[]> = {
   dashboard: ['comprador', 'aprovador', 'estoquista', 'financeiro', 'master'],
   solicitacoes: ['solicitante', 'comprador', 'master'],
-  'minhas-solicitacoes': ['solicitante'],
+  'minhas-solicitacoes': ['solicitante', 'comprador', 'estoquista'],
   'nova-ordem': ['comprador', 'estoquista', 'master'],
   historico: ['comprador', 'aprovador', 'estoquista', 'financeiro', 'master'],
   comparativo: ['comprador', 'estoquista', 'master'],
