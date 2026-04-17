@@ -792,12 +792,42 @@ export type Database = {
       generate_order_number: { Args: never; Returns: string }
       generate_quotation_number: { Args: never; Returns: string }
       generate_receipt_number: { Args: never; Returns: string }
+      get_profile_sensitive: {
+        Args: { _user_id: string }
+        Returns: {
+          email: string
+          permissoes_customizadas: Json
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      list_profiles_for_master: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          full_name: string
+          permissoes_customizadas: Json
+          status: string
+          unidade: string
+          unidade_setor: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      notify_users: {
+        Args: {
+          _mensagem: string
+          _target_role: Database["public"]["Enums"]["app_role"]
+          _tipo?: string
+          _titulo: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

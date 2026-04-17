@@ -40,13 +40,13 @@ export default function UsersPage() {
     queryKey: ['users-list'],
     queryFn: async () => {
       const [{ data: profiles, error: e1 }, { data: roles, error: e2 }] = await Promise.all([
-        supabase.from('profiles').select('*').order('full_name'),
+        supabase.rpc('list_profiles_for_master' as any),
         supabase.from('user_roles').select('user_id, role'),
       ]);
       if (e1 || e2) throw new Error("Erro ao carregar usuários");
       const roleMap: Record<string, AppRole> = {};
       (roles || []).forEach((r: any) => { roleMap[r.user_id] = r.role; });
-      return (profiles || []).map((p: any) => ({ ...p, role: roleMap[p.user_id] || 'solicitante' })) as UserProfile[];
+      return ((profiles as any[]) || []).map((p: any) => ({ ...p, id: p.user_id, role: roleMap[p.user_id] || 'solicitante' })) as UserProfile[];
     },
     staleTime: 5 * 60 * 1000,
   });
