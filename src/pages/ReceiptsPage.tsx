@@ -36,6 +36,7 @@ type ReceiptItemForm = {
 };
 
 const fetchReceiptOrders = async (filterUnidade: string) => {
+  console.info('[recebimentos] filtro unidade:', filterUnidade);
   let query = supabase.from('purchase_orders').select('*')
     .in('status', ['emitido', 'recebido', 'recebido_com_ocorrencia'])
     .order('created_at', { ascending: false });
@@ -56,6 +57,7 @@ const fetchReceiptOrders = async (filterUnidade: string) => {
     comprador_nome: profileMap[o.user_id]?.name || '—',
     unidade_comprador: o.unidade_setor || profileMap[o.user_id]?.unidade || '',
   })) as ReceiptOrder[];
+  console.info('[recebimentos] resultados:', mapped.length);
   return sortOrders(mapped);
 };
 
