@@ -401,6 +401,9 @@ export default function OrderHistoryPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => exportPDF(o)}>PDF Completo</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => exportPDFBySupplier(o)}>PDF por Fornecedor</DropdownMenuItem>
+                              {(o.status === 'aprovado' || o.status === 'emitido') && o.has_requisition && (
+                                <DropdownMenuItem onClick={() => exportPDF(o, true)}>PDF com saldo</DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                           <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)} title="Duplicar"><Copy className="h-4 w-4" /></Button>
