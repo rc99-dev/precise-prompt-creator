@@ -231,6 +231,9 @@ export default function RequisitionsPage() {
                         <Button size="sm" variant="ghost" onClick={() => setDetailReq(r)} title="Ver itens">
                           <Eye className="h-3 w-3" />
                         </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handlePDF(r)} title="Gerar PDF">
+                          <FileText className="h-3 w-3" />
+                        </Button>
                         {r.status === 'pendente' && (
                           <>
                             <Button size="sm" variant="outline" onClick={() => handleInclude(r.id)}>
