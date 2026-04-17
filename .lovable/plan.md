@@ -1,86 +1,61 @@
 
+## Diagnóstico
 
-# Grupo B: Recebimentos, Cores de Status e Notificações
+Investigando os 5 pontos + o sintoma "master não consegue excluir emitido/aprovado":
 
-## Resumo
+| # | Estado real no código | Ação necessária |
+|---|---|---|
+| 1 | `ReceiptsPage` já filtra por `unidade_setor` (a coluna correta — não existe `unidade` em `purchase_orders`). O filtro funciona, mas o select do profile usa só `unidade` para o fallback do "comprador". | Manter filtro; garantir refetch e adicionar log se necessário. **Sem mudança funcional.** |
+| 2 | UI de Histórico já esconde o botão Excluir para status ≠ rascunho/rejeitado (linha 421). RLS atual dá `ALL` ao master → master poderia excluir via API. | Adicionar policy restritiva no banco bloqueando DELETE de pedidos não-rascunho/rejeitado **inclusive para master**. |
+| 3 | `defaultPermissions['minhas-solicitacoes']` já inclui `solicitante, comprador, estoquista`. Sidebar já usa `canAccess` → link já aparece. | **Sem mudança.** |
+| 4 | `RequisitionsPage` faz query sem filtro por `user_id`; RLS já libera para comprador/master. | **Sem mudança.** |
+| 5 | `MyRequisitionsPage` filtra por `user_id = user.id`. | **Sem mudança.** |
+| **+** | "Master não consegue excluir emitido/aprovado" | **Esse comportamento É a regra correta solicitada no item 2.** Para excluir, o pedido precisa primeiro ser movido para rascunho ou rejeitado. |
 
-Implementar 3 melhorias focadas no fluxo de recebimento: reformular a tela do estoquista (MELHORIA 6), corrigir cores de status e adicionar aba de recebimento no modal do Histórico (MELHORIA 10), e criar notificações automáticas de previsão e recebimento (MELHORIA 12).
+## Plano de implementação
 
----
+### 1. Migração de banco — blindar DELETE em `purchase_orders`
+Adicionar policy restritiva que se aplica a TODOS os perfis (inclusive master):
 
-## MELHORIA 6 — Tela de Recebimentos reformulada
+```sql
+CREATE POLICY "Block delete unless rascunho or rejeitado"
+ON public.purchase_orders
+AS RESTRICTIVE
+FOR DELETE
+TO authenticated
+USING (status IN ('rascunho','rejeitado'));
+```
 
-**Arquivo:** `src/pages/ReceiptsPage.tsx` (reescrever)
+Mesma proteção para `purchase_order_items` (evitar deletar itens de pedido emitido):
 
-Mudanças na query principal:
-- Buscar pedidos com status `emitido` que tenham `previsao_entrega` preenchida, E pedidos com status `recebido` ou `recebido_com_ocorrencia` (para visualização do histórico)
-- Ordenar por `previsao_entrega` ascendente (mais próxima primeiro)
-- Incluir join com `profiles` para mostrar o comprador
+```sql
+CREATE POLICY "Block delete items unless parent rascunho/rejeitado"
+ON public.purchase_order_items
+AS RESTRICTIVE
+FOR DELETE
+TO authenticated
+USING (EXISTS (
+  SELECT 1 FROM public.purchase_orders po
+  WHERE po.id = order_id AND po.status IN ('rascunho','rejeitado')
+));
+```
 
-Mudanças na listagem:
-- Exibir: número, comprador (via profile), data prevista de entrega, observação do comprador (`obs_estoquista`)
-- Badge de alerta vermelho para entregas atrasadas (previsão < hoje) e âmbar para entregas de hoje
-- Separar visualmente pedidos pendentes (emitidos) dos já recebidos com abas ou seções
+### 2. `ReceiptsPage.tsx` — reforçar o filtro
+- Manter `eq('unidade_setor', filterUnidade)` (já está).
+- Adicionar `refetchOnWindowFocus: false` e `refetchOnMount: 'always'` no `useQuery` para garantir refetch ao trocar filtro (já garantido pela `queryKey`, mas reforçar).
+- Adicionar `console.info('[recebimentos] filtro unidade:', filterUnidade)` para diagnóstico.
 
-Modal de recebimento (mantém lógica atual, melhorada):
-- Mostrar itens com descrição, unidade e quantidade esperada
-- Opções por item: "Recebido conforme", "Recebido parcialmente" (campo qtd), "Ocorrência" (tipo: avaria, quantidade errada, produto errado, NF incorreta)
-- Campo NF no topo
-- Botão "Confirmar recebimento" atualiza status e envia notificações
+### 3. `OrderHistoryPage.tsx` — mensagem amigável quando master tentar excluir
+No `handleDelete`, se a RLS bloquear (erro `new row violates...` ou afetadas=0), mostrar toast: "Pedidos emitidos/aprovados/recebidos não podem ser excluídos. Reprove ou cancele primeiro."
 
----
+## Comunicação ao usuário
 
-## MELHORIA 10 — Status recebido: cores e aba no modal
+Sobre "não consigo excluir emitido/aprovado como master": **isso é o comportamento correto pedido no item 2**. Para apagar um pedido nesses status, o caminho é:
+- Aprovado → usar o botão "Reprovar" (vira rejeitado) → excluir.
+- Emitido/Recebido → não devem ser excluídos (integridade de auditoria). Caso precise, apenas o histórico fica registrado.
 
-**Arquivo:** `src/pages/OrderHistoryPage.tsx`
+## Arquivos afetados
 
-Cores de status (função `statusVariant`):
-- `recebido` → badge com classe `bg-success/20 text-success` (verde)
-- `recebido_com_ocorrencia` → badge com classe `bg-warning/20 text-warning` (amarelo)
-- Usar classes CSS diretas no Badge em vez do sistema de variants limitado
-
-Aba "Recebimento" no modal de detalhes:
-- Quando status é `recebido` ou `recebido_com_ocorrencia`, adicionar Tabs com "Itens do Pedido" e "Recebimento"
-- Aba Recebimento busca dados de `receipts` + `receipt_items` (join com `purchase_order_items` → `products`)
-- Exibir: número NF, data/hora do recebimento, nome do estoquista (via profiles), observação geral
-- Tabela de itens: descrição, qtd esperada, qtd recebida, status do item, tipo de ocorrência
-
----
-
-## MELHORIA 12 — Notificações de previsão e recebimento
-
-**Arquivo:** `src/pages/ReceiptsPage.tsx` (dentro de `handleSave`)
-
-Ao confirmar recebimento:
-- Notificar o criador do pedido (`purchase_orders.user_id`): "Pedido [número] foi recebido por [nome estoquista] em [data]."
-- Se houver ocorrência: "⚠️ Recebido com ocorrências — verifique os detalhes." com tipo `alerta`
-- Notificar todos os aprovadores sobre ocorrências
-
-**Arquivo:** `src/pages/OrderHistoryPage.tsx` (dentro de `exportPDF` quando muda para emitido)
-
-Já existe notificação ao emitir. Adicionar notificação de previsão obrigatória ao aprovar:
-
-**Arquivo:** `src/components/NotificationBell.tsx`
-
-Destaque visual diferente por tipo de notificação:
-- `alerta` → borda esquerda vermelha
-- `previsao` → borda esquerda âmbar com ícone de calendário
-- Padrão → sem destaque extra
-
----
-
-## Detalhes técnicos
-
-### Banco de dados
-Nenhuma migração necessária — todas as tabelas (`receipts`, `receipt_items`, `notifications`, `purchase_orders`) já existem com as colunas necessárias.
-
-### Arquivos a editar
-1. `src/pages/ReceiptsPage.tsx` — reescrever com previsão de entrega, badges de alerta, histórico de recebidos
-2. `src/pages/OrderHistoryPage.tsx` — cores de status com classes CSS, aba Recebimento no modal
-3. `src/components/NotificationBell.tsx` — destaque visual por tipo de notificação
-4. `src/lib/helpers.ts` — já tem `statusColors` corretos (recebido=success, ocorrência=warning), manter
-
-### Dependências
-- Nenhuma nova dependência necessária
-- Usa componentes UI existentes: Tabs, Badge, Card, Dialog
-
+- `supabase/migrations/<nova>.sql` — policies restritivas de DELETE.
+- `src/pages/ReceiptsPage.tsx` — log de debug + reforço de refetch.
+- `src/pages/OrderHistoryPage.tsx` — mensagem amigável no `handleDelete`.
