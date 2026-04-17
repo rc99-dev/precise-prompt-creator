@@ -58,6 +58,8 @@ interface Props {
 export default function OrderDetailDialog({ open, onOpenChange, order, orderItems, statusLabel, statusBadgeClass, modoLabel }: Props) {
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [loadingTimeline, setLoadingTimeline] = useState(false);
 
   const hasReceipt = order && (order.status === 'recebido' || order.status === 'recebido_com_ocorrencia');
 
@@ -96,6 +98,157 @@ export default function OrderDetailDialog({ open, onOpenChange, order, orderItem
       setLoadingReceipt(false);
     };
     fetchReceipt();
+  }, [open, order?.id]);
+
+  // Build the timeline of events for the order
+  useEffect(() => {
+    if (!open || !order) { setTimeline([]); return; }
+    const buildTimeline = async () => {
+      setLoadingTimeline(true);
+      const fullOrder = order as any;
+
+      const [
+        { data: linkedReq },
+        { data: approvalLogs },
+        { data: receipt },
+      ] = await Promise.all([
+        supabase.from('requisitions')
+          .select('id, user_id, created_at')
+          .eq('order_id', order.id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+        supabase.from('approval_log')
+          .select('id, user_id, action, motivo, created_at')
+          .eq('order_id', order.id)
+          .order('created_at', { ascending: true }),
+        supabase.from('receipts')
+          .select('id, user_id, status, observacoes, received_at, created_at, numero_nf')
+          .eq('order_id', order.id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      const userIds = new Set<string>();
+      userIds.add(order.user_id);
+      if (linkedReq?.user_id) userIds.add(linkedReq.user_id);
+      (approvalLogs || []).forEach((a: any) => userIds.add(a.user_id));
+      if (receipt?.user_id) userIds.add(receipt.user_id);
+      if (fullOrder.previsao_registrada_por) userIds.add(fullOrder.previsao_registrada_por);
+
+      const { data: profilesData } = await supabase.from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', Array.from(userIds));
+      const profileMap: Record<string, string> = {};
+      (profilesData || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name || '—'; });
+      const nameOf = (uid?: string | null) => (uid && profileMap[uid]) || '—';
+
+      const events: TimelineEvent[] = [];
+
+      if (linkedReq) {
+        events.push({
+          key: `req-${linkedReq.id}`,
+          icon: ClipboardList,
+          iconClass: 'bg-muted text-muted-foreground',
+          title: 'Solicitação vinculada',
+          user: nameOf(linkedReq.user_id),
+          date: linkedReq.created_at,
+        });
+      }
+
+      events.push({
+        key: 'created',
+        icon: FileText,
+        iconClass: 'bg-info/20 text-info',
+        title: 'Pedido criado',
+        user: nameOf(order.user_id),
+        date: order.created_at,
+      });
+
+      const sentLog = (approvalLogs || []).find((a: any) => a.action === 'enviado' || a.action === 'aguardando_aprovacao');
+      if (sentLog) {
+        events.push({
+          key: `sent-${sentLog.id}`,
+          icon: Send,
+          iconClass: 'bg-info/20 text-info',
+          title: 'Enviado para aprovação',
+          user: nameOf(sentLog.user_id),
+          date: sentLog.created_at,
+        });
+      } else if (
+        ['aguardando_aprovacao', 'aprovado', 'rejeitado', 'emitido', 'recebido', 'recebido_com_ocorrencia', 'cancelado'].includes(order.status)
+      ) {
+        events.push({
+          key: 'sent-inferred',
+          icon: Send,
+          iconClass: 'bg-info/20 text-info',
+          title: 'Enviado para aprovação',
+          user: nameOf(order.user_id),
+          date: order.created_at,
+          detail: 'Data aproximada (criação do pedido)',
+        });
+      }
+
+      (approvalLogs || []).forEach((a: any) => {
+        if (a.action === 'aprovado') {
+          events.push({
+            key: `approved-${a.id}`, icon: CheckCircle2, iconClass: 'bg-success/20 text-success',
+            title: 'Aprovado', user: nameOf(a.user_id), date: a.created_at,
+            detail: a.motivo || undefined,
+          });
+        } else if (a.action === 'aprovado_com_alteracao') {
+          events.push({
+            key: `approved-edit-${a.id}`, icon: Edit3, iconClass: 'bg-success/20 text-success',
+            title: 'Aprovado com alteração', user: nameOf(a.user_id), date: a.created_at,
+            detail: a.motivo || undefined,
+          });
+        } else if (a.action === 'rejeitado') {
+          events.push({
+            key: `rejected-${a.id}`, icon: XCircle, iconClass: 'bg-destructive/20 text-destructive',
+            title: 'Rejeitado', user: nameOf(a.user_id), date: a.created_at,
+            detail: a.motivo ? `Motivo: ${a.motivo}` : undefined,
+          });
+        } else if (a.action === 'cancelado') {
+          events.push({
+            key: `cancelled-${a.id}`, icon: Ban, iconClass: 'bg-destructive/20 text-destructive',
+            title: 'Cancelado', user: nameOf(a.user_id), date: a.created_at,
+            detail: a.motivo ? `Motivo: ${a.motivo}` : undefined,
+          });
+        }
+      });
+
+      if (fullOrder.previsao_entrega) {
+        events.push({
+          key: 'previsao', icon: CalendarClock, iconClass: 'bg-warning/20 text-warning',
+          title: 'Previsão de entrega registrada',
+          user: nameOf(fullOrder.previsao_registrada_por),
+          date: fullOrder.updated_at || order.created_at,
+          detail: `Entrega prevista para ${formatDate(fullOrder.previsao_entrega)}${fullOrder.obs_estoquista ? ` — ${fullOrder.obs_estoquista}` : ''}`,
+        });
+      }
+
+      if (receipt) {
+        const isOccurrence = receipt.status === 'recebido_com_ocorrencia';
+        events.push({
+          key: `received-${receipt.id}`,
+          icon: isOccurrence ? AlertTriangle : PackageCheck,
+          iconClass: isOccurrence ? 'bg-warning/20 text-warning' : 'bg-success/20 text-success',
+          title: isOccurrence ? 'Recebido com ocorrência' : 'Recebido',
+          user: nameOf(receipt.user_id),
+          date: receipt.received_at || receipt.created_at,
+          detail: [
+            receipt.numero_nf ? `NF ${receipt.numero_nf}` : null,
+            receipt.observacoes || null,
+          ].filter(Boolean).join(' · ') || undefined,
+        });
+      }
+
+      events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      setTimeline(events);
+      setLoadingTimeline(false);
+    };
+    buildTimeline();
   }, [open, order?.id]);
 
   const receiptItemStatusLabel = (s: string) => {
