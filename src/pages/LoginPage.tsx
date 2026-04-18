@@ -147,7 +147,7 @@ export default function LoginPage() {
                   <Select value={setor} onValueChange={setSetor}>
                     <SelectTrigger><SelectValue placeholder="Selecione o setor" /></SelectTrigger>
                     <SelectContent>
-                      {SIGNUP_SETORES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      {setorOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
