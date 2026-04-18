@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,30 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [unidade, setUnidade] = useState("");
   const [setor, setSetor] = useState("");
+  const [setorOptions, setSetorOptions] = useState<string[]>([]);
+
+  // Fetch distinct setores from existing profiles to populate the dropdown
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('unidade_setor')
+        .not('unidade_setor', 'is', null);
+      const distinct = Array.from(
+        new Set((data || []).map((p: any) => (p.unidade_setor || '').trim()).filter(Boolean))
+      );
+      // Merge DB values with the canonical fallback list and dedupe (case-insensitive)
+      const merged = [...SIGNUP_SETORES, ...distinct];
+      const seen = new Set<string>();
+      const unique: string[] = [];
+      for (const s of merged) {
+        const key = s.toLowerCase();
+        if (!seen.has(key)) { seen.add(key); unique.push(s); }
+      }
+      unique.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      setSetorOptions(unique);
+    })();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
