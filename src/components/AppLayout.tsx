@@ -128,7 +128,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             backgroundImage: 'url(/back.png)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            opacity: 0.06,
+            opacity: 0.16,
           }}
         />
         <header className="relative z-10 flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">

@@ -72,7 +72,7 @@ export default function LoginPage() {
             />
           </div>
           <CardTitle className="text-2xl font-bold">Point do Açaí D'Amazônia</CardTitle>
-          <CardDescription>Sistema de Gestão de Compras</CardDescription>
+          <CardDescription>Sistema de Gestão de Suprimentos</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login">
