@@ -499,7 +499,10 @@ export default function NewOrderPage() {
                 <tbody>
                   {items.map((item, idx) => {
                     const min = getMinPrice(item.product_id);
-                    const saldo = item.saldo ?? saldos[item.product_id];
+                    // Use only the per-item saldo. Do NOT fall back to the aggregated `saldos` map,
+                    // because that map is built from requisitions.saldo_atual (which only stores the
+                    // first item's saldo) and was causing the first item's saldo to "leak" into others.
+                    const saldo = item.saldo;
                     return (
                       <OrderItemRow key={item.product_id} item={item} index={idx}
                         isMinPrice={!!min && item.preco_unitario === min.preco}
