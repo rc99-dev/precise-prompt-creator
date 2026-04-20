@@ -285,11 +285,23 @@ export default function OrderHistoryPage() {
   const handleSalvarPrevisao = async () => {
     if (!previsaoTarget || !previsaoData) { toast.error("Informe a data prevista."); return; }
     setSavingPrevisao(true);
-    await supabase.from('purchase_orders').update({
+    console.info('[previsao] salvando', {
+      orderId: previsaoTarget.id,
+      numero: previsaoTarget.numero,
+      previsaoData,
+      previsaoObs,
+    });
+    const { error: updErr } = await supabase.from('purchase_orders').update({
       previsao_entrega: previsaoData,
       obs_estoquista: previsaoObs || null,
       previsao_registrada_por: user?.id || null,
     } as any).eq('id', previsaoTarget.id);
+    if (updErr) {
+      console.error('[previsao] erro ao salvar', updErr);
+      toast.error(`Erro ao salvar previsão: ${updErr.message}`);
+      setSavingPrevisao(false);
+      return;
+    }
     const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
     if (estoquistas?.length) {
       await supabase.from('notifications').insert(estoquistas.map(e => ({

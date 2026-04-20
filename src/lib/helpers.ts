@@ -7,7 +7,13 @@ export function formatCurrency(value: number): string {
 }
 
 export function formatDate(date: string): string {
-  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(date));
+  // For plain YYYY-MM-DD strings (date-only fields like previsao_entrega),
+  // parse as local to avoid UTC timezone shifts that move the day backwards.
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(date);
+  const d = isDateOnly
+    ? new Date(`${date}T12:00:00`)
+    : new Date(date);
+  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
 }
 
 export function formatDateTime(date: string): string {
@@ -55,7 +61,7 @@ export const statusColors: Record<string, string> = {
   aprovado: 'bg-success/20 text-success',
   rejeitado: 'bg-destructive/20 text-destructive',
   emitido: 'bg-info/20 text-info',
-  recebido: 'bg-success/20 text-success',
+  recebido: 'bg-sky-500/20 text-sky-300',
   recebido_com_ocorrencia: 'bg-warning/20 text-warning',
   cancelado: 'bg-muted text-muted-foreground',
   pendente: 'bg-warning/20 text-warning',
