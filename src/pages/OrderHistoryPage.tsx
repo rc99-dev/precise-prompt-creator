@@ -120,7 +120,7 @@ export default function OrderHistoryPage() {
       await supabase.from('purchase_order_items').insert(newItems);
     }
     toast.success("Ordem duplicada como rascunho!");
-    queryClient.invalidateQueries({ queryKey: ['order-history'] });
+    invalidateOrderQueries(queryClient);
   };
 
   const handleDelete = async () => {
@@ -149,7 +149,7 @@ export default function OrderHistoryPage() {
     }
     setDeleting(false);
     setDeleteTarget(null);
-    queryClient.invalidateQueries({ queryKey: ['order-history'] });
+    invalidateOrderQueries(queryClient);
   };
 
   const exportCSV = async (order: Order) => {
@@ -226,7 +226,7 @@ export default function OrderHistoryPage() {
           tipo: 'info', lida: false,
         })));
       }
-      queryClient.invalidateQueries({ queryKey: ['order-history'] });
+      invalidateOrderQueries(queryClient);
     }
   };
 
@@ -304,7 +304,7 @@ export default function OrderHistoryPage() {
     setPrevisaoTarget(null);
     setPrevisaoData("");
     setPrevisaoObs("");
-    queryClient.invalidateQueries({ queryKey: ['order-history'] });
+    invalidateOrderQueries(queryClient);
   };
 
   const handleMasterReject = async () => {
@@ -330,7 +330,7 @@ export default function OrderHistoryPage() {
     setRejecting(false);
     setRejectTarget(null);
     setRejectReason("");
-    queryClient.invalidateQueries({ queryKey: ['order-history'] });
+    invalidateOrderQueries(queryClient);
   };
 
   const handleMasterCancel = async () => {
@@ -355,8 +355,7 @@ export default function OrderHistoryPage() {
     setCancelling(false);
     setCancelTarget(null);
     setCancelReason("");
-    queryClient.invalidateQueries({ queryKey: ['order-history'] });
-    queryClient.invalidateQueries({ queryKey: ['receipt-orders'] });
+    invalidateOrderQueries(queryClient);
   };
 
   const statusLabel = (s: string) => {
