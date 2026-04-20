@@ -12,11 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Truck, Package, CheckCircle, AlertTriangle, Clock, Ban } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/helpers";
+import { Truck, Package, CheckCircle, AlertTriangle, Clock, Ban, Eye } from "lucide-react";
+import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
+import OrderDetailDialog from "@/components/order/OrderDetailDialog";
 
 type ReceiptOrder = {
   id: string; numero: string; status: string; total: number;
@@ -105,6 +106,9 @@ export default function ReceiptsPage() {
   const [cancelTarget, setCancelTarget] = useState<ReceiptOrder | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [detailOrder, setDetailOrder] = useState<ReceiptOrder | null>(null);
+  const [detailItems, setDetailItems] = useState<any[]>([]);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['receipt-orders', filterUnidade],
@@ -222,6 +226,26 @@ export default function ReceiptsPage() {
   };
 
   const canCancel = role === 'master' || role === 'estoquista';
+
+  const openDetails = async (o: ReceiptOrder) => {
+    setDetailOrder(o);
+    const { data } = await supabase.from('purchase_order_items')
+      .select('*, products(nome, unidade_medida), suppliers(razao_social)')
+      .eq('order_id', o.id);
+    setDetailItems((data || []) as any[]);
+    setDetailOpen(true);
+  };
+
+  const statusLabel = (s: string) => {
+    const m: Record<string, string> = {
+      rascunho: 'Rascunho', aguardando_aprovacao: 'Aguardando Aprovação',
+      aprovado: 'Aprovado', rejeitado: 'Rejeitado', emitido: 'Emitido',
+      recebido: 'Recebido', recebido_com_ocorrencia: 'Recebido c/ Ocorrência', cancelado: 'Cancelado',
+    };
+    return m[s] || s;
+  };
+  const statusBadgeClass = (s: string) => statusColors[s] || 'bg-muted text-muted-foreground';
+  const modoLabel = (m: string) => m === 'manual' ? 'Manual' : m === 'melhor_preco' ? 'Melhor Preço' : 'Melhor Fornecedor';
 
   const renderOrderCard = (o: ReceiptOrder, showReceiveButton: boolean) => (
     <Card key={o.id} className="hover:border-primary/30 transition-colors">
