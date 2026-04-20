@@ -440,7 +440,7 @@ export default function OrderHistoryPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => exportPDF(o)}>PDF Completo</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => exportPDFBySupplier(o)}>PDF por Fornecedor</DropdownMenuItem>
-                              {(o.status === 'aprovado' || o.status === 'emitido') && o.has_requisition && (
+                              {['aprovado','emitido','recebido','recebido_com_ocorrencia'].includes(o.status) && o.has_requisition && (
                                 <DropdownMenuItem onClick={() => exportPDF(o, true)}>PDF com saldo</DropdownMenuItem>
                               )}
                             </DropdownMenuContent>

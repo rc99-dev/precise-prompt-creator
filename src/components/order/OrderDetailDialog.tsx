@@ -230,6 +230,7 @@ export default function OrderDetailDialog({ open, onOpenChange, order, orderItem
 
       if (receipt) {
         const isOccurrence = receipt.status === 'recebido_com_ocorrencia';
+        const summary = isOccurrence ? 'Ocorrência no recebimento' : 'Recebimento normal, sem ocorrência';
         events.push({
           key: `received-${receipt.id}`,
           icon: isOccurrence ? AlertTriangle : PackageCheck,
@@ -238,9 +239,9 @@ export default function OrderDetailDialog({ open, onOpenChange, order, orderItem
           user: nameOf(receipt.user_id),
           date: receipt.received_at || receipt.created_at,
           detail: [
-            receipt.numero_nf ? `NF ${receipt.numero_nf}` : null,
-            receipt.observacoes || null,
-          ].filter(Boolean).join(' · ') || undefined,
+            summary,
+            receipt.numero_nf ? `NF ${receipt.numero_nf}` : 'NF não informada',
+          ].filter(Boolean).join(' · '),
         });
       }
 
