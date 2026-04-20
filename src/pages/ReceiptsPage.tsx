@@ -479,6 +479,16 @@ export default function ReceiptsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <OrderDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        order={detailOrder as any}
+        orderItems={detailItems as any}
+        statusLabel={statusLabel}
+        statusBadgeClass={statusBadgeClass}
+        modoLabel={modoLabel}
+      />
     </div>
   );
 }
