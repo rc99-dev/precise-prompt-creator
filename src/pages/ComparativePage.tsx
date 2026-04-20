@@ -53,6 +53,7 @@ const fetchCompData = async () => {
 export default function ComparativePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [items, setItems] = useState<CompItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [unidadeSolicitante, setUnidadeSolicitante] = useState("");

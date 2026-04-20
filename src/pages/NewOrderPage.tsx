@@ -53,6 +53,7 @@ const fetchOrderData = async () => {
 export default function NewOrderPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const editOrderId = searchParams.get("edit");
   const requisitionId = searchParams.get("requisition");
