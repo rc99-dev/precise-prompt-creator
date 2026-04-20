@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,7 @@ import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
+import OrderTimeline from "@/components/order/OrderTimeline";
 
 type Order = {
   id: string; numero: string; user_id: string; modo: string;
