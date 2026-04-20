@@ -243,6 +243,8 @@ export default function NewOrderPage() {
     const draft = loadDraft();
     if (draft && draft.items.length > 0) {
       setShowDraftBanner(true);
+    } else {
+      draftDecided.current = true;
     }
   }, [data, editOrderId, requisitionId, loadDraft, allPrices]);
 
@@ -254,6 +256,7 @@ export default function NewOrderPage() {
       setObservacoes(draft.observacoes);
       setActiveStrategy(draft.activeStrategy);
       setShowDraftBanner(false);
+      draftDecided.current = true;
       toast.success("Rascunho restaurado!");
     }
   }, [loadDraft]);
@@ -261,11 +264,12 @@ export default function NewOrderPage() {
   const discardDraft = useCallback(() => {
     clearDraft();
     setShowDraftBanner(false);
+    draftDecided.current = true;
     toast.info("Rascunho descartado.");
   }, [clearDraft]);
 
   useEffect(() => {
-    if (editOrderId || requisitionId || !draftRestored.current || showDraftBanner) return;
+    if (editOrderId || requisitionId || !draftRestored.current || !draftDecided.current || showDraftBanner) return;
     saveDraft({ items, observacoes, activeStrategy, editingOrderId: null });
   }, [items, observacoes, activeStrategy, saveDraft, editOrderId, requisitionId, showDraftBanner]);
 

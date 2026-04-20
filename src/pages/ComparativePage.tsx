@@ -99,6 +99,8 @@ export default function ComparativePage() {
   const suppliers = data?.suppliers || [];
   const prices = data?.prices || [];
 
+  const draftDecided = useRef(false);
+
   // Draft restore
   useEffect(() => {
     if (!data || draftRestored.current) return;
@@ -106,6 +108,8 @@ export default function ComparativePage() {
     const draft = loadDraft();
     if (draft && draft.items.length > 0) {
       setShowDraftBanner(true);
+    } else {
+      draftDecided.current = true;
     }
   }, [data, loadDraft]);
 
@@ -118,17 +122,21 @@ export default function ComparativePage() {
       setShowSaldo(draft.showSaldo);
       setSelectedReqId(draft.selectedRequisitionId);
       setShowDraftBanner(false);
+      draftDecided.current = true;
+      toast.success("Rascunho restaurado!");
     }
   }, [loadDraft]);
 
   const discardDraft = useCallback(() => {
     clearDraft();
     setShowDraftBanner(false);
+    draftDecided.current = true;
+    toast.info("Rascunho descartado.");
   }, [clearDraft]);
 
-  // Auto-save draft
+  // Auto-save draft (only after user decided about existing draft)
   useEffect(() => {
-    if (!draftRestored.current || showDraftBanner) return;
+    if (!draftRestored.current || !draftDecided.current || showDraftBanner) return;
     saveDraft({ items, unidadeSolicitante, showSaldo, selectedRequisitionId: selectedReqId });
   }, [items, unidadeSolicitante, showSaldo, selectedReqId, saveDraft, showDraftBanner]);
 
