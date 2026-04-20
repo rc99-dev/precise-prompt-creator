@@ -49,8 +49,6 @@ interface Props {
 export default function OrderDetailDialog({ open, onOpenChange, order, orderItems, statusLabel, statusBadgeClass, modoLabel }: Props) {
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
-  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
-  const [loadingTimeline, setLoadingTimeline] = useState(false);
 
   const hasReceipt = order && (order.status === 'recebido' || order.status === 'recebido_com_ocorrencia');
 
