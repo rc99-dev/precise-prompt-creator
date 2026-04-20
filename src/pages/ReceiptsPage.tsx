@@ -271,6 +271,15 @@ export default function ReceiptsPage() {
             <div className="flex items-center gap-2">
               {getDeliveryBadge(o.previsao_entrega)}
               <Badge className="bg-info/20 text-info">Emitido</Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={(e) => { e.stopPropagation(); openDetails(o); }}
+                title="Ver detalhes e histórico"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
               {canCancel && (
                 <Button
                   variant="ghost"
@@ -285,9 +294,20 @@ export default function ReceiptsPage() {
               )}
             </div>
           ) : (
-            <Badge className={o.status === 'recebido' ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'}>
-              {o.status === 'recebido' ? 'Recebido' : 'Recebido c/ Ocorrência'}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className={statusBadgeClass(o.status)}>
+                {o.status === 'recebido' ? 'Recebido' : 'Recebido c/ Ocorrência'}
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={(e) => { e.stopPropagation(); openDetails(o); }}
+                title="Ver detalhes e histórico"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            </div>
           )}
         </div>
       </CardContent>
