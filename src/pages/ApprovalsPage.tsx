@@ -17,6 +17,7 @@ import QueryError from "@/components/QueryError";
 type Order = {
   id: string; numero: string; user_id: string; modo: string;
   status: string; total: number; created_at: string; observacoes: string | null;
+  unidade_setor: string | null;
 };
 
 type OrderItem = {
@@ -186,10 +187,11 @@ export default function ApprovalsPage() {
           </DialogHeader>
           {detailOrder && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div><span className="text-muted-foreground">Data:</span> <span className="font-medium">{formatDate(detailOrder.created_at)}</span></div>
-                <div><span className="text-muted-foreground">Total:</span> <span className="font-bold currency">{formatCurrency(isEditing || hasEdits ? computeEditedTotal() : detailOrder.total)}</span></div>
+                <div><span className="text-muted-foreground">Unidade:</span> <span className="font-medium">{detailOrder.unidade_setor || '—'}</span></div>
                 <div><span className="text-muted-foreground">Modo:</span> <span className="font-medium capitalize">{detailOrder.modo}</span></div>
+                <div><span className="text-muted-foreground">Total:</span> <span className="font-bold currency">{formatCurrency(isEditing || hasEdits ? computeEditedTotal() : detailOrder.total)}</span></div>
               </div>
               {detailOrder.observacoes && (
                 <p className="text-sm text-muted-foreground">Obs: {detailOrder.observacoes}</p>
