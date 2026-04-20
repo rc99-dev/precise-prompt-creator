@@ -198,52 +198,68 @@ export default function ApprovalsPage() {
               {detailOrder.observacoes && (
                 <p className="text-sm text-muted-foreground">Obs: {detailOrder.observacoes}</p>
               )}
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 font-medium text-muted-foreground">Produto</th>
-                    <th className="text-left py-2 font-medium text-muted-foreground">Fornecedor</th>
-                    <th className="text-center py-2 font-medium text-muted-foreground">Qtd</th>
-                    <th className="text-right py-2 font-medium text-muted-foreground">Preço Unit.</th>
-                    <th className="text-right py-2 font-medium text-muted-foreground">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orderItems.map(i => {
-                    const qty = getItemQty(i);
-                    return (
-                      <tr key={i.id} className="border-b last:border-0">
-                        <td className="py-2 font-medium">{i.products?.nome}</td>
-                        <td className="py-2 text-muted-foreground">{i.suppliers?.razao_social || '—'}</td>
-                        <td className="py-2 text-center">
-                          {isEditing ? (
-                            <Input
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              className="w-20 h-7 text-center text-sm mx-auto"
-                              value={qty}
-                              onChange={e => {
-                                const val = parseFloat(e.target.value);
-                                if (!isNaN(val) && val >= 0) {
-                                  setEditedItems(prev => ({ ...prev, [i.id]: val }));
-                                }
-                              }}
-                            />
-                          ) : (
-                            <>{qty} {i.products?.unidade_medida}</>
-                          )}
-                        </td>
-                        <td className="py-2 text-right currency">{formatCurrency(i.preco_unitario)}</td>
-                        <td className="py-2 text-right currency font-medium">{formatCurrency(qty * i.preco_unitario)}</td>
+              <Tabs defaultValue="itens">
+                <TabsList>
+                  <TabsTrigger value="itens">Itens do Pedido</TabsTrigger>
+                  <TabsTrigger value="historico">Histórico</TabsTrigger>
+                </TabsList>
+                <TabsContent value="itens">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 font-medium text-muted-foreground">Produto</th>
+                        <th className="text-left py-2 font-medium text-muted-foreground">Fornecedor</th>
+                        <th className="text-center py-2 font-medium text-muted-foreground">Qtd</th>
+                        <th className="text-right py-2 font-medium text-muted-foreground">Preço Unit.</th>
+                        <th className="text-right py-2 font-medium text-muted-foreground">Subtotal</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {hasEdits && (
-                <p className="text-xs text-warning font-medium">⚠️ Quantidades editadas — o total será atualizado ao aprovar.</p>
-              )}
+                    </thead>
+                    <tbody>
+                      {orderItems.map(i => {
+                        const qty = getItemQty(i);
+                        return (
+                          <tr key={i.id} className="border-b last:border-0">
+                            <td className="py-2 font-medium">{i.products?.nome}</td>
+                            <td className="py-2 text-muted-foreground">{i.suppliers?.razao_social || '—'}</td>
+                            <td className="py-2 text-center">
+                              {isEditing ? (
+                                <Input
+                                  type="number"
+                                  min="0.01"
+                                  step="0.01"
+                                  className="w-20 h-7 text-center text-sm mx-auto"
+                                  value={qty}
+                                  onChange={e => {
+                                    const val = parseFloat(e.target.value);
+                                    if (!isNaN(val) && val >= 0) {
+                                      setEditedItems(prev => ({ ...prev, [i.id]: val }));
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <>{qty} {i.products?.unidade_medida}</>
+                              )}
+                            </td>
+                            <td className="py-2 text-right currency">{formatCurrency(i.preco_unitario)}</td>
+                            <td className="py-2 text-right currency font-medium">{formatCurrency(qty * i.preco_unitario)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {hasEdits && (
+                    <p className="text-xs text-warning font-medium mt-2">⚠️ Quantidades editadas — o total será atualizado ao aprovar.</p>
+                  )}
+                </TabsContent>
+                <TabsContent value="historico">
+                  <OrderTimeline
+                    orderId={detailOrder.id}
+                    orderUserId={detailOrder.user_id}
+                    orderCreatedAt={detailOrder.created_at}
+                    orderStatus={detailOrder.status}
+                  />
+                </TabsContent>
+              </Tabs>
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="destructive" onClick={() => { setRejectDialog(detailOrder.id); }}>
                   <XCircle className="h-4 w-4 mr-2" />Rejeitar
