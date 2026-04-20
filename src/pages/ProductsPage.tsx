@@ -27,7 +27,7 @@ const emptyProduct = { nome: "", codigo_interno: "", categoria: "", unidade_medi
 
 export default function ProductsPage() {
   const { role } = useAuth();
-  const isAdmin = role === 'master';
+  const isAdmin = role === 'master' || role === 'comprador';
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");

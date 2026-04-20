@@ -48,7 +48,7 @@ const fetchPricesData = async () => {
 
 export default function PricesPage() {
   const { role } = useAuth();
-  const canEdit = role === 'master' || role === 'comprador';
+  const canEdit = role === 'master' || role === 'comprador' || role === 'estoquista';
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("todos");

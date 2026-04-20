@@ -30,7 +30,7 @@ const emptySupplier = {
 
 export default function SuppliersPage() {
   const { role } = useAuth();
-  const isAdmin = role === 'master';
+  const isAdmin = role === 'master' || role === 'comprador';
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
