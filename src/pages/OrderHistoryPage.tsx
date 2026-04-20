@@ -19,6 +19,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
+import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 
 type Order = {
   id: string; numero: string; user_id: string; modo: string;
@@ -81,7 +82,9 @@ export default function OrderHistoryPage() {
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['order-history'],
     queryFn: fetchOrders,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const filtered = orders.filter(o => {

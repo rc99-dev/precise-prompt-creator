@@ -15,6 +15,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import OrderTimeline from "@/components/order/OrderTimeline";
+import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 
 type Order = {
   id: string; numero: string; user_id: string; modo: string;
@@ -49,7 +50,9 @@ export default function ApprovalsPage() {
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['approval-orders'],
     queryFn: fetchApprovalOrders,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const viewDetails = async (order: Order) => {
@@ -62,7 +65,7 @@ export default function ApprovalsPage() {
     setOrderItems((data || []) as unknown as OrderItem[]);
   };
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['approval-orders'] });
+  const invalidate = () => invalidateOrderQueries(queryClient);
 
   const getItemQty = (item: OrderItem) => editedItems[item.id] ?? item.quantidade;
 

@@ -18,6 +18,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import OrderDetailDialog from "@/components/order/OrderDetailDialog";
+import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 
 type ReceiptOrder = {
   id: string; numero: string; status: string; total: number;
@@ -195,7 +196,7 @@ export default function ReceiptsPage() {
     toast.success("Recebimento registrado!");
     setSaving(false);
     setSelectedOrder(null);
-    queryClient.invalidateQueries({ queryKey: ['receipt-orders'] });
+    invalidateOrderQueries(queryClient);
   };
 
   const handleCancelOrder = async () => {
@@ -221,8 +222,7 @@ export default function ReceiptsPage() {
     setCancelling(false);
     setCancelTarget(null);
     setCancelReason("");
-    queryClient.invalidateQueries({ queryKey: ['receipt-orders'] });
-    queryClient.invalidateQueries({ queryKey: ['order-history'] });
+    invalidateOrderQueries(queryClient);
   };
 
   const canCancel = role === 'master' || role === 'estoquista';
