@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { UNIDADES } from "@/lib/constants";
 import OrderProductSearch from "@/components/order/OrderProductSearch";
 import OrderItemRow from "@/components/order/OrderItemRow";
@@ -17,6 +17,7 @@ import StrategyCards, { useStrategyAnalysis } from "@/components/order/StrategyC
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { useOrderDraft, DraftOrderItem } from "@/hooks/useOrderDraft";
+import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 import { AlertTriangle, Trash2, RotateCcw, ClipboardList } from "lucide-react";
 
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
@@ -52,6 +53,7 @@ const fetchOrderData = async () => {
 export default function NewOrderPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const editOrderId = searchParams.get("edit");
   const requisitionId = searchParams.get("requisition");
@@ -400,6 +402,7 @@ export default function NewOrderPage() {
     }
 
     clearDraft();
+    invalidateOrderQueries(queryClient);
     setSaving(false);
     navigate('/historico');
   };

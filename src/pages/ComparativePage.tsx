@@ -10,13 +10,14 @@ import { Search, Plus, Trash2, TrendingDown, AlertTriangle, FileText, RotateCcw,
 import { formatCurrency } from "@/lib/helpers";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { UNIDADES } from "@/lib/constants";
 import StrategyCards, { useStrategyAnalysis } from "@/components/order/StrategyCards";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { useComparativeDraft, DraftCompItem } from "@/hooks/useComparativeDraft";
+import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 import { toast } from "sonner";
 
 type Product = { id: string; nome: string; unidade_medida: string; codigo_interno: string | null };
@@ -52,6 +53,7 @@ const fetchCompData = async () => {
 export default function ComparativePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [items, setItems] = useState<CompItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [unidadeSolicitante, setUnidadeSolicitante] = useState("");
@@ -301,6 +303,7 @@ export default function ComparativePage() {
       }
 
       clearDraft();
+      invalidateOrderQueries(queryClient);
       toast.success("Ordem de compra criada como rascunho — você pode editá-la antes de enviar para aprovação.");
       navigate(`/nova-ordem?edit=${order.id}`);
     } finally {
