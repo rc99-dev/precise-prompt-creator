@@ -262,6 +262,8 @@ export default function NewOrderPage() {
       setItems(draft.items);
       setObservacoes(draft.observacoes);
       setActiveStrategy(draft.activeStrategy);
+      if (draft.titulo) setTitulo(draft.titulo);
+      if (draft.unidadeSolicitante) setUnidadeSolicitante(draft.unidadeSolicitante);
       setShowDraftBanner(false);
       draftDecided.current = true;
       toast.success("Rascunho restaurado!");
@@ -277,8 +279,8 @@ export default function NewOrderPage() {
 
   useEffect(() => {
     if (editOrderId || requisitionId || !draftRestored.current || !draftDecided.current || showDraftBanner) return;
-    saveDraft({ items, observacoes, activeStrategy, editingOrderId: null });
-  }, [items, observacoes, activeStrategy, saveDraft, editOrderId, requisitionId, showDraftBanner]);
+    saveDraft({ items, observacoes, activeStrategy, editingOrderId: null, titulo, unidadeSolicitante });
+  }, [items, observacoes, activeStrategy, titulo, unidadeSolicitante, saveDraft, editOrderId, requisitionId, showDraftBanner]);
 
   const pricesByProduct = useMemo(() => {
     const map: Record<string, { supplier_id: string; preco: number }[]> = {};
