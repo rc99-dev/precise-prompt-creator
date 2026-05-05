@@ -89,6 +89,13 @@ export default function OrderHistoryPage() {
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [batchReceiveOpen, setBatchReceiveOpen] = useState(false);
+  const [batchReceiveDate, setBatchReceiveDate] = useState("");
+  const [batchReceiving, setBatchReceiving] = useState(false);
+  const [batchForecastOpen, setBatchForecastOpen] = useState(false);
+  const [batchForecastDate, setBatchForecastDate] = useState("");
+  const [batchForecastObs, setBatchForecastObs] = useState("");
+  const [batchForecasting, setBatchForecasting] = useState(false);
 
   const { role } = useAuth();
 
