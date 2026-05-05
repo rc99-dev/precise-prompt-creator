@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar, XCircle, Ban, Filter, FileDown } from "lucide-react";
 import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
 import { generateOrderPDF, generateOrderPDFBySupplier, generateMultipleOrdersPDF, TimelineEntry } from "@/lib/pdfGenerator";
-import { UNIDADES } from "@/lib/constants";
+import { UNIDADES, TITULOS_SOLICITACAO } from "@/lib/constants";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import OrderDetailDialog from "@/components/order/OrderDetailDialog";
