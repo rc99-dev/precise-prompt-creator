@@ -193,6 +193,7 @@ export default function NewOrderPage() {
           })));
           if (order?.observacoes) setObservacoes(order.observacoes);
           if (order?.unidade_setor) setUnidadeSolicitante(order.unidade_setor);
+          if ((order as any)?.titulo) setTitulo((order as any).titulo);
           if (order?.modo === 'melhor_preco' || order?.modo === 'melhor_fornecedor') {
             setActiveStrategy(order.modo as any);
           }
