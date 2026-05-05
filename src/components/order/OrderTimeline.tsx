@@ -69,9 +69,9 @@ export default function OrderTimeline({
       if (receipt?.user_id) userIds.add(receipt.user_id);
       if (previsaoRegistradaPor) userIds.add(previsaoRegistradaPor);
 
-      const { data: profilesData } = await supabase.from('profiles')
-        .select('user_id, full_name')
-        .in('user_id', Array.from(userIds));
+      const { data: profilesData } = await supabase.rpc('get_profile_names', {
+        _user_ids: Array.from(userIds),
+      } as any);
       const profileMap: Record<string, string> = {};
       (profilesData || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name || '—'; });
       const nameOf = (uid?: string | null) => (uid && profileMap[uid]) || '—';
