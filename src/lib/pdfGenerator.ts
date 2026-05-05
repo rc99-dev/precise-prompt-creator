@@ -1,6 +1,13 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { formatCurrency, formatDate } from "./helpers";
+import { formatCurrency, formatDate, formatDateTime } from "./helpers";
+
+export interface TimelineEntry {
+  date: string;
+  user: string;
+  action: string;
+  detail?: string;
+}
 
 const COMPANY = "Point do Açaí D'Amazônia";
 const BRAND = [92, 27, 67] as const; // #5c1b43
