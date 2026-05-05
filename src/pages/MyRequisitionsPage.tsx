@@ -196,15 +196,15 @@ export default function MyRequisitionsPage() {
       const { error } = await supabase.from('requisitions').update({
         titulo, unidade, setor, unidade_setor: `${unidade} - ${setor}`,
         observacoes: observacoes || null,
-        product_id: items[0].product_id,
-        saldo_atual: parseFloat(items[0].saldo) || 0,
-        unidade_medida: items[0].unidade_medida,
+        product_id: validItems[0].product_id,
+        saldo_atual: parseFloat(validItems[0].saldo) || 0,
+        unidade_medida: validItems[0].unidade_medida,
       } as any).eq('id', editingId);
       if (error) { toast.error(error.message); setSaving(false); return; }
 
       // Delete old items and re-insert
       await supabase.from('requisition_items').delete().eq('requisition_id', editingId);
-      const itemsToInsert = items.map(i => ({
+      const itemsToInsert = validItems.map(i => ({
         requisition_id: editingId,
         product_id: i.product_id,
         saldo: parseFloat(i.saldo) || 0,
@@ -222,15 +222,15 @@ export default function MyRequisitionsPage() {
         user_id: user!.id,
         titulo, unidade, setor,
         unidade_setor: `${unidade} - ${setor}`,
-        product_id: items[0].product_id,
-        saldo_atual: parseFloat(items[0].saldo) || 0,
-        unidade_medida: items[0].unidade_medida,
+        product_id: validItems[0].product_id,
+        saldo_atual: parseFloat(validItems[0].saldo) || 0,
+        unidade_medida: validItems[0].unidade_medida,
         observacoes: observacoes || null,
       } as any).select('id').single();
 
       if (error || !req) { toast.error(error?.message || "Erro ao criar solicitação."); setSaving(false); return; }
 
-      const itemsToInsert = items.map(i => ({
+      const itemsToInsert = validItems.map(i => ({
         requisition_id: req.id,
         product_id: i.product_id,
         saldo: parseFloat(i.saldo) || 0,
@@ -480,7 +480,7 @@ export default function MyRequisitionsPage() {
                             setor: r.setor || '—',
                             solicitante: profile?.full_name || '—',
                             created_at: r.created_at,
-                            items: r.requisition_items.map(i => ({
+                            items: r.requisition_validItems.map(i => ({
                               produto: (i.products as any)?.nome || '—',
                               unidade: (i.products as any)?.unidade_medida || '',
                               saldo: i.saldo,
