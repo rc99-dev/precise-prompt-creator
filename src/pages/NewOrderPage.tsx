@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { UNIDADES } from "@/lib/constants";
+import { UNIDADES, TITULOS_SOLICITACAO } from "@/lib/constants";
 import OrderProductSearch from "@/components/order/OrderProductSearch";
 import OrderItemRow from "@/components/order/OrderItemRow";
 import OrderStickyFooter from "@/components/order/OrderStickyFooter";
