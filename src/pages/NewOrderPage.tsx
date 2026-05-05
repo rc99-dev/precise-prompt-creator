@@ -157,7 +157,7 @@ export default function NewOrderPage() {
             .eq('order_id', editOrderId),
           supabase
             .from('purchase_orders')
-            .select('observacoes, modo, unidade_setor')
+            .select('observacoes, modo, unidade_setor, titulo')
             .eq('id', editOrderId)
             .single(),
           supabase
