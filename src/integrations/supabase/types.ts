@@ -286,6 +286,7 @@ export type Database = {
           previsao_registrada_por: string | null
           rejected_reason: string | null
           status: string
+          titulo: string | null
           total: number
           unidade_setor: string | null
           updated_at: string
@@ -305,6 +306,7 @@ export type Database = {
           previsao_registrada_por?: string | null
           rejected_reason?: string | null
           status?: string
+          titulo?: string | null
           total?: number
           unidade_setor?: string | null
           updated_at?: string
@@ -324,6 +326,7 @@ export type Database = {
           previsao_registrada_por?: string | null
           rejected_reason?: string | null
           status?: string
+          titulo?: string | null
           total?: number
           unidade_setor?: string | null
           updated_at?: string
