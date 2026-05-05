@@ -522,6 +522,20 @@ export default function MyRequisitionsPage() {
           </CardContent>
         </Card>
       )}
+      <InventoryImportDialog
+        open={invImportOpen}
+        onOpenChange={setInvImportOpen}
+        hasItems={items.length > 0}
+        onImport={(imported, mode) => {
+          if (mode === 'replace') {
+            setItems(imported);
+          } else {
+            // append (skip duplicates)
+            setItems(prev => [...prev, ...imported.filter(i => !prev.some(p => p.product_id === i.product_id))]);
+          }
+          if (!showForm) setShowForm(true);
+        }}
+      />
     </div>
   );
 }
