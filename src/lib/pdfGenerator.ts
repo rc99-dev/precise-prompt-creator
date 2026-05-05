@@ -125,10 +125,11 @@ interface OrderPDFData {
   showSaldo?: boolean;
   solicitante?: string;
   setor?: string;
+  titulo?: string;
+  timeline?: TimelineEntry[];
 }
 
-export function generateOrderPDF(data: OrderPDFData) {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+function renderOrderPDFInto(doc: jsPDF, data: OrderPDFData) {
   const w = doc.internal.pageSize.getWidth();
 
   let y = drawHeader(doc, "ORDEM DE COMPRA", data.numero, formatDate(data.created_at), data.unidadeSolicitante,
