@@ -208,7 +208,7 @@ export default function NewOrderPage() {
         // Get the requisition header for unidade info
         const { data: req } = await supabase
           .from('requisitions')
-          .select('id, unidade, unidade_setor, observacoes')
+          .select('id, unidade, unidade_setor, observacoes, titulo')
           .eq('id', requisitionId)
           .single();
         // Get all requisition_items for this requisition
