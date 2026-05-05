@@ -145,8 +145,14 @@ export default function OrderHistoryPage() {
     });
   };
   const selectedOrders = filtered.filter(o => selectedIds.has(o.id));
-  const canExportMulti = selectedOrders.length > 1 &&
-    selectedOrders.every(o => o.status === selectedOrders[0].status);
+  const isMaster = role === 'master';
+  const canExportMulti = isMaster
+    ? selectedOrders.length >= 1
+    : selectedOrders.length > 1 && selectedOrders.every(o => o.status === selectedOrders[0].status);
+  const canBatchReceive = isMaster && selectedOrders.length >= 1 &&
+    selectedOrders.every(o => o.status === 'aprovado' || o.status === 'emitido');
+  const canBatchForecast = isMaster && selectedOrders.length >= 1 &&
+    selectedOrders.every(o => o.status === 'emitido');
 
   const viewOrder = async (order: Order) => {
     setSelectedOrder(order);
