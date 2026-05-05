@@ -51,6 +51,7 @@ function ProtectedRoutes() {
         <Routes>
           <Route path="/" element={<Navigate to="/minhas-solicitacoes" replace />} />
           <Route path="/minhas-solicitacoes" element={<MyRequisitionsPage />} />
+          <Route path="/inventarios" element={<InventoriesPage />} />
           <Route path="*" element={<Navigate to="/minhas-solicitacoes" replace />} />
         </Routes>
       </AppLayout>
