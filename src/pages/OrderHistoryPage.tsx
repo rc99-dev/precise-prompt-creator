@@ -492,7 +492,83 @@ export default function OrderHistoryPage() {
     invalidateOrderQueries(queryClient);
   };
 
-  const statusLabel = (s: string) => {
+  const handleBatchReceive = async () => {
+    if (!batchReceiveDate) { toast.error("Informe a data de recebimento."); return; }
+    if (!selectedOrders.length) return;
+    setBatchReceiving(true);
+    try {
+      const ids = selectedOrders.map(o => o.id);
+      const receivedAt = new Date(`${batchReceiveDate}T12:00:00`).toISOString();
+      const { error } = await supabase.from('purchase_orders').update({ status: 'recebido' } as any).in('id', ids);
+      if (error) { toast.error(error.message); return; }
+      // approval_log entries
+      await supabase.from('approval_log').insert(selectedOrders.map(o => ({
+        order_id: o.id, user_id: user!.id, action: 'recebido',
+        motivo: `Recebimento em lote (${selectedOrders.length} pedidos) — data: ${new Date(batchReceiveDate).toLocaleDateString('pt-BR')}`,
+      })));
+      // receipts
+      const numbers = await Promise.all(selectedOrders.map(async () => {
+        const { data } = await supabase.rpc('generate_receipt_number');
+        return data as unknown as string;
+      }));
+      await supabase.from('receipts').insert(selectedOrders.map((o, i) => ({
+        order_id: o.id, user_id: user!.id, numero: numbers[i] || `REC-${Date.now()}-${i}`,
+        status: 'recebido', received_at: receivedAt,
+        observacoes: 'Recebimento em lote',
+      })));
+      // notify buyers
+      await supabase.from('notifications').insert(selectedOrders.map(o => ({
+        user_id: o.user_id,
+        titulo: 'Pedido marcado como recebido',
+        mensagem: `Pedido ${o.numero} foi marcado como recebido em ${new Date(batchReceiveDate).toLocaleDateString('pt-BR')}.`,
+        tipo: 'info', lida: false,
+      })));
+      toast.success(`${selectedOrders.length} pedido(s) marcado(s) como recebido(s)!`);
+      setBatchReceiveOpen(false);
+      setBatchReceiveDate("");
+      setSelectedIds(new Set());
+      invalidateOrderQueries(queryClient);
+    } finally {
+      setBatchReceiving(false);
+    }
+  };
+
+  const handleBatchForecast = async () => {
+    if (!batchForecastDate) { toast.error("Informe a data prevista."); return; }
+    if (!selectedOrders.length) return;
+    setBatchForecasting(true);
+    try {
+      const ids = selectedOrders.map(o => o.id);
+      const { error } = await supabase.from('purchase_orders').update({
+        previsao_entrega: batchForecastDate,
+        obs_estoquista: batchForecastObs || null,
+        previsao_registrada_por: user?.id || null,
+      } as any).in('id', ids);
+      if (error) { toast.error(error.message); return; }
+      const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
+      if (estoquistas?.length) {
+        const notifs: any[] = [];
+        selectedOrders.forEach(o => {
+          estoquistas.forEach(e => notifs.push({
+            user_id: e.user_id,
+            titulo: 'Previsão de entrega registrada',
+            mensagem: `Pedido ${o.numero} — Entrega prevista para ${new Date(batchForecastDate).toLocaleDateString('pt-BR')}. ${batchForecastObs || ''}`,
+            tipo: 'info', lida: false,
+          }));
+        });
+        await supabase.from('notifications').insert(notifs);
+      }
+      toast.success(`Previsão registrada em ${selectedOrders.length} pedido(s)!`);
+      setBatchForecastOpen(false);
+      setBatchForecastDate("");
+      setBatchForecastObs("");
+      setSelectedIds(new Set());
+      invalidateOrderQueries(queryClient);
+    } finally {
+      setBatchForecasting(false);
+    }
+  };
+
     const map: Record<string, string> = {
       rascunho: 'Rascunho', aguardando_aprovacao: 'Aguardando Aprovação',
       aprovado: 'Aprovado', rejeitado: 'Rejeitado', emitido: 'Emitido',
