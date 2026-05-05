@@ -379,7 +379,7 @@ export default function MyRequisitionsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {items.map((item, idx) => (
+                      {[...items].map((it, i) => ({ it, i })).sort((a, b) => a.it.nome.localeCompare(b.it.nome, 'pt-BR')).map(({ it: item, i: idx }) => (
                         <tr key={item.product_id} className="border-b last:border-0">
                           <td className="py-2 px-3 font-medium">{item.nome}</td>
                           <td className="py-2 px-3 text-muted-foreground">{item.unidade_medida}</td>
