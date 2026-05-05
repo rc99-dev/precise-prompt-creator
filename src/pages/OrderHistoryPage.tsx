@@ -569,6 +569,7 @@ export default function OrderHistoryPage() {
     }
   };
 
+  const statusLabel = (s: string) => {
     const map: Record<string, string> = {
       rascunho: 'Rascunho', aguardando_aprovacao: 'Aguardando Aprovação',
       aprovado: 'Aprovado', rejeitado: 'Rejeitado', emitido: 'Emitido',
