@@ -792,6 +792,13 @@ export type Database = {
       generate_order_number: { Args: never; Returns: string }
       generate_quotation_number: { Args: never; Returns: string }
       generate_receipt_number: { Args: never; Returns: string }
+      get_profile_names: {
+        Args: { _user_ids: string[] }
+        Returns: {
+          full_name: string
+          user_id: string
+        }[]
+      }
       get_profile_sensitive: {
         Args: { _user_id: string }
         Returns: {
