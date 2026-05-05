@@ -358,6 +358,7 @@ export default function NewOrderPage() {
   }, [items, pricesByProduct, total]);
 
   const handleSave = async (status: 'rascunho' | 'aguardando_aprovacao') => {
+    if (!titulo) { toast.error("Selecione o título da compra."); return; }
     if (!unidadeSolicitante) { toast.error("Selecione a unidade solicitante."); return; }
     if (items.length === 0) { toast.error("Adicione pelo menos um item."); return; }
     setSaving(true);
@@ -365,8 +366,8 @@ export default function NewOrderPage() {
     if (editOrderId) {
       const modo = activeStrategy || 'manual';
       const { error: updateErr } = await supabase.from('purchase_orders').update({
-        modo, status, observacoes, total, unidade_setor: unidadeSolicitante || null,
-      }).eq('id', editOrderId);
+        modo, status, observacoes, total, unidade_setor: unidadeSolicitante || null, titulo,
+      } as any).eq('id', editOrderId);
       if (updateErr) { toast.error(updateErr.message); setSaving(false); return; }
 
       await supabase.from('purchase_order_items').delete().eq('order_id', editOrderId);
@@ -384,8 +385,8 @@ export default function NewOrderPage() {
       const modo = activeStrategy || 'manual';
       const { data: order, error: orderError } = await supabase.from('purchase_orders').insert({
         numero, user_id: user!.id, modo, status, observacoes, total,
-        unidade_setor: unidadeSolicitante || null,
-      }).select().single();
+        unidade_setor: unidadeSolicitante || null, titulo,
+      } as any).select().single();
       if (orderError) { toast.error(orderError.message); setSaving(false); return; }
       const orderItems = items.map(i => ({
         order_id: order.id, product_id: i.product_id, supplier_id: i.supplier_id || null,
