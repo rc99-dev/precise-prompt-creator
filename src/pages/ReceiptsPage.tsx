@@ -125,7 +125,7 @@ export default function ReceiptsPage() {
 
   const openReceipt = async (order: ReceiptOrder) => {
     setSelectedOrder(order);
-    setNumeroNF("");
+    setNfBySupplier({});
     setObsGeral("");
     const { data } = await supabase.from('purchase_order_items')
       .select('*, products(nome, unidade_medida), suppliers(razao_social)')
@@ -142,34 +142,61 @@ export default function ReceiptsPage() {
     setReceiptItems(prev => prev.map((item, i) => i === idx ? { ...item, ...updates } : item));
   };
 
+  // Group order items by supplier (key = supplier_id || '__no_supplier__')
+  const itemsGroupedBySupplier = (() => {
+    const groups: Record<string, { supplierId: string | null; supplierName: string; items: { item: OrderItemForReceipt; idx: number }[] }> = {};
+    orderItems.forEach((item, idx) => {
+      const key = item.supplier_id || '__no_supplier__';
+      if (!groups[key]) {
+        groups[key] = {
+          supplierId: item.supplier_id,
+          supplierName: item.suppliers?.razao_social || 'Sem fornecedor',
+          items: [],
+        };
+      }
+      groups[key].items.push({ item, idx });
+    });
+    return Object.entries(groups).map(([key, g]) => ({ key, ...g }));
+  })();
+
+  const hasMultipleSuppliers = itemsGroupedBySupplier.length > 1;
+
   const handleSave = async () => {
     if (!selectedOrder || !user) return;
     setSaving(true);
-    const { data: numData } = await supabase.rpc('generate_receipt_number' as any);
-    const numero = (numData as string) || `REC-${Date.now()}`;
     const hasOccurrence = receiptItems.some(i => i.status !== 'recebido');
     const orderStatus = hasOccurrence ? 'recebido_com_ocorrencia' : 'recebido';
 
-    const { data: receipt, error: recError } = await supabase.from('receipts').insert({
-      numero, order_id: selectedOrder.id, user_id: user.id,
-      numero_nf: numeroNF || null, status: orderStatus, observacoes: obsGeral || null,
-    } as any).select().single();
-    if (recError) { toast.error(recError.message); setSaving(false); return; }
+    // Create one receipt per supplier group, each with its own NF
+    for (const group of itemsGroupedBySupplier) {
+      const groupItems = group.items;
+      const groupReceiptItems = groupItems.map(({ idx }) => receiptItems[idx]);
+      const { data: numData } = await supabase.rpc('generate_receipt_number' as any);
+      const numero = (numData as string) || `REC-${Date.now()}-${group.key.slice(-4)}`;
+      const groupNF = nfBySupplier[group.key] || '';
 
-    const items = receiptItems.map(i => ({
-      receipt_id: (receipt as any).id, order_item_id: i.order_item_id, status: i.status,
-      quantidade_recebida: parseFloat(i.quantidade_recebida) || 0,
-      tipo_ocorrencia: i.tipo_ocorrencia || null, observacoes: i.observacoes || null,
-    }));
-    await supabase.from('receipt_items').insert(items as any);
+      const { data: receipt, error: recError } = await supabase.from('receipts').insert({
+        numero, order_id: selectedOrder.id, user_id: user.id,
+        numero_nf: groupNF || null, status: orderStatus,
+        observacoes: hasMultipleSuppliers ? `[${group.supplierName}] ${obsGeral || ''}`.trim() : (obsGeral || null),
+      } as any).select().single();
+      if (recError) { toast.error(recError.message); setSaving(false); return; }
+
+      const itemsPayload = groupReceiptItems.map(i => ({
+        receipt_id: (receipt as any).id, order_item_id: i.order_item_id, status: i.status,
+        quantidade_recebida: parseFloat(i.quantidade_recebida) || 0,
+        tipo_ocorrencia: i.tipo_ocorrencia || null, observacoes: i.observacoes || null,
+      }));
+      await supabase.from('receipt_items').insert(itemsPayload as any);
+    }
+
     await supabase.from('purchase_orders').update({ status: orderStatus } as any).eq('id', selectedOrder.id);
 
-    // MELHORIA 12 — Notificações de recebimento
+    // Notificações de recebimento
     const { data: myProfile } = await supabase.from('profiles').select('full_name').eq('user_id', user.id).single();
     const estoquistaNome = myProfile?.full_name || 'Assistente de Suprimentos';
     const dataRecebimento = formatDate(new Date().toISOString());
 
-    // Notify order creator
     const notifCreator: any = {
       user_id: selectedOrder.user_id,
       titulo: hasOccurrence ? '⚠️ Recebido com ocorrências' : 'Pedido recebido',
@@ -181,7 +208,6 @@ export default function ReceiptsPage() {
     };
     await supabase.from('notifications').insert(notifCreator);
 
-    // If occurrence, also notify all aprovadores
     if (hasOccurrence) {
       const { data: aprovadores } = await supabase.from('user_roles').select('user_id').eq('role', 'aprovador');
       if (aprovadores?.length) {
