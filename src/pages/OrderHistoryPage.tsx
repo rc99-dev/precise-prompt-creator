@@ -354,6 +354,43 @@ export default function OrderHistoryPage() {
     toast.success("PDFs por fornecedor gerados!");
   };
 
+  const exportSelectedPDF = async () => {
+    if (selectedOrders.length < 2) return;
+    if (!canExportMulti) {
+      toast.error("Selecione pedidos com o mesmo status.");
+      return;
+    }
+    setExportingMulti(true);
+    try {
+      const datas = await Promise.all(selectedOrders.map(async (o) => {
+        const r = await fetchPDFData(o);
+        if (!r) return null;
+        const { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF, timeline } = r;
+        const mainSupplier = items[0]?.suppliers as any;
+        return {
+          numero: o.numero, created_at: o.created_at, observacoes: o.observacoes,
+          total: o.total, unidadeSolicitante: (o as any).unidade_setor || undefined,
+          supplier: mainSupplier ? { razao_social: mainSupplier.razao_social, cnpj: mainSupplier.cnpj, telefone: mainSupplier.telefone, cidade: mainSupplier.cidade } : null,
+          items: items.map((i: any) => ({
+            codigo: i.products?.codigo_interno, descricao: i.products?.nome || "",
+            unidade: i.products?.unidade_medida || "", quantidade: i.quantidade,
+            preco_unitario: i.preco_unitario, subtotal: i.subtotal, saldo: saldoMap[i.product_id],
+          })),
+          comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (o as any).approved_at,
+          showSaldo: isInternalPDF, solicitante: solicitante || undefined, setor: setor || undefined,
+          timeline,
+        };
+      }));
+      const valid = datas.filter(Boolean) as any[];
+      if (!valid.length) { toast.error("Nenhum pedido válido."); return; }
+      generateMultipleOrdersPDF(valid);
+      toast.success(`${valid.length} pedidos exportados em PDF único!`);
+      setSelectedIds(new Set());
+    } finally {
+      setExportingMulti(false);
+    }
+  };
+
   const handleSalvarPrevisao = async () => {
     if (!previsaoTarget || !previsaoData) { toast.error("Informe a data prevista."); return; }
     setSavingPrevisao(true);
