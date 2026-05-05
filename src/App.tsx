@@ -21,6 +21,7 @@ import UsersPage from "@/pages/UsersPage";
 import ReportsPage from "@/pages/ReportsPage";
 import NotFound from "@/pages/NotFound";
 import PendingApprovalPage from "@/pages/PendingApprovalPage";
+import InventoriesPage from "@/pages/InventoriesPage";
 import { canAccess } from "@/lib/helpers";
 
 const queryClient = new QueryClient();
@@ -74,6 +75,7 @@ function ProtectedRoutes() {
         {canOrLoading('recebimentos') && <Route path="/recebimentos" element={<ReceiptsPage />} />}
         {canOrLoading('usuarios') && <Route path="/usuarios" element={<UsersPage />} />}
         {canOrLoading('relatorios') && <Route path="/relatorios" element={<ReportsPage />} />}
+        {canOrLoading('inventarios') && <Route path="/inventarios" element={<InventoriesPage />} />}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
