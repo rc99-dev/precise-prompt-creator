@@ -49,6 +49,77 @@ export type Database = {
           },
         ]
       }
+      inventories: {
+        Row: {
+          categoria: string | null
+          created_at: string
+          id: string
+          observacoes: string | null
+          setor: string | null
+          titulo: string
+          unidade: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          setor?: string | null
+          titulo: string
+          unidade?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          setor?: string | null
+          titulo?: string
+          unidade?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      inventory_items: {
+        Row: {
+          created_at: string
+          id: string
+          inventory_id: string
+          observacoes: string | null
+          product_id: string
+          saldo: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inventory_id: string
+          observacoes?: string | null
+          product_id: string
+          saldo?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          observacoes?: string | null
+          product_id?: string
+          saldo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -720,6 +791,7 @@ export type Database = {
           created_at: string
           email: string | null
           endereco: string | null
+          estado: string | null
           grupo: string | null
           id: string
           nome_fantasia: string | null
@@ -737,6 +809,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           endereco?: string | null
+          estado?: string | null
           grupo?: string | null
           id?: string
           nome_fantasia?: string | null
@@ -754,6 +827,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           endereco?: string | null
+          estado?: string | null
           grupo?: string | null
           id?: string
           nome_fantasia?: string | null
