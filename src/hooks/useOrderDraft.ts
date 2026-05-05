@@ -19,6 +19,8 @@ interface DraftData {
   observacoes: string;
   activeStrategy: "melhor_preco" | "melhor_fornecedor" | null;
   editingOrderId?: string | null;
+  titulo?: string;
+  unidadeSolicitante?: string;
   savedAt: number;
 }
 

@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { UNIDADES } from "@/lib/constants";
+import { UNIDADES, TITULOS_SOLICITACAO } from "@/lib/constants";
 import OrderProductSearch from "@/components/order/OrderProductSearch";
 import OrderItemRow from "@/components/order/OrderItemRow";
 import OrderStickyFooter from "@/components/order/OrderStickyFooter";
@@ -61,6 +61,7 @@ export default function NewOrderPage() {
   const [activeStrategy, setActiveStrategy] = useState<"melhor_preco" | "melhor_fornecedor" | null>(null);
   const [observacoes, setObservacoes] = useState("");
   const [unidadeSolicitante, setUnidadeSolicitante] = useState("");
+  const [titulo, setTitulo] = useState("");
   const [saving, setSaving] = useState(false);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const [selectedReqImport, setSelectedReqImport] = useState<string | null>(null);
@@ -139,6 +140,7 @@ export default function NewOrderPage() {
         return [...updated, ...newItems.filter(i => !existingIds.has(i.product_id))];
       });
       if (req?.unidade) setUnidadeSolicitante(req.unidade);
+      if (req?.titulo) setTitulo(req.titulo);
       toast.success(`${reqItems.length} itens importados da solicitação.`);
     }
   }, [pendingReqs]);
@@ -156,7 +158,7 @@ export default function NewOrderPage() {
             .eq('order_id', editOrderId),
           supabase
             .from('purchase_orders')
-            .select('observacoes, modo, unidade_setor')
+            .select('observacoes, modo, unidade_setor, titulo')
             .eq('id', editOrderId)
             .single(),
           supabase
@@ -192,6 +194,7 @@ export default function NewOrderPage() {
           })));
           if (order?.observacoes) setObservacoes(order.observacoes);
           if (order?.unidade_setor) setUnidadeSolicitante(order.unidade_setor);
+          if ((order as any)?.titulo) setTitulo((order as any).titulo);
           if (order?.modo === 'melhor_preco' || order?.modo === 'melhor_fornecedor') {
             setActiveStrategy(order.modo as any);
           }
@@ -206,7 +209,7 @@ export default function NewOrderPage() {
         // Get the requisition header for unidade info
         const { data: req } = await supabase
           .from('requisitions')
-          .select('id, unidade, unidade_setor, observacoes')
+          .select('id, unidade, unidade_setor, observacoes, titulo')
           .eq('id', requisitionId)
           .single();
         // Get all requisition_items for this requisition
@@ -238,6 +241,7 @@ export default function NewOrderPage() {
           setItems(newItems);
           if (req.unidade) setUnidadeSolicitante(req.unidade);
           else if (req.unidade_setor) setUnidadeSolicitante(req.unidade_setor);
+          if ((req as any).titulo) setTitulo((req as any).titulo);
         }
       })();
       return;
@@ -258,6 +262,8 @@ export default function NewOrderPage() {
       setItems(draft.items);
       setObservacoes(draft.observacoes);
       setActiveStrategy(draft.activeStrategy);
+      if (draft.titulo) setTitulo(draft.titulo);
+      if (draft.unidadeSolicitante) setUnidadeSolicitante(draft.unidadeSolicitante);
       setShowDraftBanner(false);
       draftDecided.current = true;
       toast.success("Rascunho restaurado!");
@@ -273,8 +279,8 @@ export default function NewOrderPage() {
 
   useEffect(() => {
     if (editOrderId || requisitionId || !draftRestored.current || !draftDecided.current || showDraftBanner) return;
-    saveDraft({ items, observacoes, activeStrategy, editingOrderId: null });
-  }, [items, observacoes, activeStrategy, saveDraft, editOrderId, requisitionId, showDraftBanner]);
+    saveDraft({ items, observacoes, activeStrategy, editingOrderId: null, titulo, unidadeSolicitante });
+  }, [items, observacoes, activeStrategy, titulo, unidadeSolicitante, saveDraft, editOrderId, requisitionId, showDraftBanner]);
 
   const pricesByProduct = useMemo(() => {
     const map: Record<string, { supplier_id: string; preco: number }[]> = {};
@@ -354,6 +360,7 @@ export default function NewOrderPage() {
   }, [items, pricesByProduct, total]);
 
   const handleSave = async (status: 'rascunho' | 'aguardando_aprovacao') => {
+    if (!titulo) { toast.error("Selecione o título da compra."); return; }
     if (!unidadeSolicitante) { toast.error("Selecione a unidade solicitante."); return; }
     if (items.length === 0) { toast.error("Adicione pelo menos um item."); return; }
     setSaving(true);
@@ -361,8 +368,8 @@ export default function NewOrderPage() {
     if (editOrderId) {
       const modo = activeStrategy || 'manual';
       const { error: updateErr } = await supabase.from('purchase_orders').update({
-        modo, status, observacoes, total, unidade_setor: unidadeSolicitante || null,
-      }).eq('id', editOrderId);
+        modo, status, observacoes, total, unidade_setor: unidadeSolicitante || null, titulo,
+      } as any).eq('id', editOrderId);
       if (updateErr) { toast.error(updateErr.message); setSaving(false); return; }
 
       await supabase.from('purchase_order_items').delete().eq('order_id', editOrderId);
@@ -380,8 +387,8 @@ export default function NewOrderPage() {
       const modo = activeStrategy || 'manual';
       const { data: order, error: orderError } = await supabase.from('purchase_orders').insert({
         numero, user_id: user!.id, modo, status, observacoes, total,
-        unidade_setor: unidadeSolicitante || null,
-      }).select().single();
+        unidade_setor: unidadeSolicitante || null, titulo,
+      } as any).select().single();
       if (orderError) { toast.error(orderError.message); setSaving(false); return; }
       const orderItems = items.map(i => ({
         order_id: order.id, product_id: i.product_id, supplier_id: i.supplier_id || null,
@@ -443,10 +450,16 @@ export default function NewOrderPage() {
       {isError && <QueryError onRetry={() => refetch()} />}
 
       <Card>
-        <CardHeader className="py-3 px-4"><CardTitle className="text-sm">Unidade Solicitante <span className="text-destructive">*</span></CardTitle></CardHeader>
-        <CardContent className="px-4 pb-4 pt-0">
+        <CardHeader className="py-3 px-4"><CardTitle className="text-sm">Identificação da compra <span className="text-destructive">*</span></CardTitle></CardHeader>
+        <CardContent className="px-4 pb-4 pt-0 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Select value={titulo} onValueChange={setTitulo}>
+            <SelectTrigger><SelectValue placeholder="Título da compra *" /></SelectTrigger>
+            <SelectContent>
+              {TITULOS_SOLICITACAO.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Select value={unidadeSolicitante} onValueChange={setUnidadeSolicitante}>
-            <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Unidade solicitante *" /></SelectTrigger>
             <SelectContent>
               {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
             </SelectContent>

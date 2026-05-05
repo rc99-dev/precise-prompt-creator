@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,9 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar, XCircle, Ban } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar, XCircle, Ban, Filter, FileDown } from "lucide-react";
 import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
-import { generateOrderPDF, generateOrderPDFBySupplier } from "@/lib/pdfGenerator";
+import { generateOrderPDF, generateOrderPDFBySupplier, generateMultipleOrdersPDF, TimelineEntry } from "@/lib/pdfGenerator";
+import { UNIDADES } from "@/lib/constants";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import OrderDetailDialog from "@/components/order/OrderDetailDialog";
@@ -28,6 +30,7 @@ type Order = {
   comprador_nome?: string;
   unidade_setor?: string | null;
   has_requisition?: boolean;
+  titulo?: string | null;
 };
 
 type OrderItem = {
@@ -61,6 +64,16 @@ export default function OrderHistoryPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("todos");
   const [search, setSearch] = useState("");
+  const [nfSearch, setNfSearch] = useState("");
+  const [tituloFilter, setTituloFilter] = useState("");
+  const [unidadeFilter, setUnidadeFilter] = useState("todos");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [valorMin, setValorMin] = useState("");
+  const [valorMax, setValorMax] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [exportingMulti, setExportingMulti] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -87,11 +100,46 @@ export default function OrderHistoryPage() {
     refetchOnWindowFocus: true,
   });
 
-  const filtered = orders.filter(o => {
-    const matchStatus = statusFilter === 'todos' || o.status === statusFilter;
-    const matchSearch = o.numero.toLowerCase().includes(search.toLowerCase());
-    return matchStatus && matchSearch;
+  const { data: nfMatchOrderIds } = useQuery({
+    queryKey: ['nf-search', nfSearch],
+    queryFn: async () => {
+      if (!nfSearch.trim()) return null;
+      const { data } = await supabase.from('receipts').select('order_id').ilike('numero_nf', `%${nfSearch.trim()}%`);
+      return new Set((data || []).map((r: any) => r.order_id));
+    },
+    enabled: !!nfSearch.trim(),
+    staleTime: 30 * 1000,
   });
+
+  const titulosDisponiveis = useMemo(() => {
+    const set = new Set<string>();
+    orders.forEach(o => { if (o.titulo) set.add(o.titulo); });
+    return Array.from(set).sort();
+  }, [orders]);
+
+  const filtered = orders.filter(o => {
+    if (statusFilter !== 'todos' && o.status !== statusFilter) return false;
+    if (search && !o.numero.toLowerCase().includes(search.toLowerCase())) return false;
+    if (tituloFilter && o.titulo !== tituloFilter) return false;
+    if (unidadeFilter !== 'todos' && o.unidade_setor !== unidadeFilter) return false;
+    if (dateFrom && new Date(o.created_at) < new Date(`${dateFrom}T00:00:00`)) return false;
+    if (dateTo && new Date(o.created_at) > new Date(`${dateTo}T23:59:59`)) return false;
+    if (valorMin && o.total < parseFloat(valorMin)) return false;
+    if (valorMax && o.total > parseFloat(valorMax)) return false;
+    if (nfSearch.trim() && nfMatchOrderIds && !nfMatchOrderIds.has(o.id)) return false;
+    return true;
+  });
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const selectedOrders = filtered.filter(o => selectedIds.has(o.id));
+  const canExportMulti = selectedOrders.length > 1 &&
+    selectedOrders.every(o => o.status === selectedOrders[0].status);
 
   const viewOrder = async (order: Order) => {
     setSelectedOrder(order);
@@ -170,6 +218,36 @@ export default function OrderHistoryPage() {
     toast.success("CSV exportado!");
   };
 
+  const fetchTimeline = async (order: Order): Promise<TimelineEntry[]> => {
+    if (!['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'].includes(order.status)) return [];
+    const [{ data: logs }, { data: receipt }] = await Promise.all([
+      supabase.from('approval_log').select('user_id, action, motivo, created_at').eq('order_id', order.id).order('created_at'),
+      supabase.from('receipts').select('user_id, status, observacoes, received_at, created_at, numero_nf').eq('order_id', order.id).order('created_at').limit(1).maybeSingle(),
+    ]);
+    const userIds = new Set<string>([order.user_id]);
+    (logs || []).forEach((l: any) => userIds.add(l.user_id));
+    if (receipt?.user_id) userIds.add(receipt.user_id);
+    const { data: names } = await supabase.rpc('get_profile_names', { _user_ids: Array.from(userIds) } as any);
+    const nameMap: Record<string, string> = {};
+    (names || []).forEach((n: any) => { nameMap[n.user_id] = n.full_name || '—'; });
+    const events: TimelineEntry[] = [];
+    events.push({ date: order.created_at, user: nameMap[order.user_id] || '—', action: 'Pedido criado' });
+    (logs || []).forEach((l: any) => {
+      const map: Record<string, string> = { aprovado: 'Aprovado', aprovado_com_alteracao: 'Aprovado com alteração', rejeitado: 'Rejeitado', cancelado: 'Cancelado', enviado: 'Enviado para aprovação', aguardando_aprovacao: 'Enviado para aprovação' };
+      events.push({ date: l.created_at, user: nameMap[l.user_id] || '—', action: map[l.action] || l.action, detail: l.motivo || undefined });
+    });
+    if (receipt) {
+      events.push({
+        date: receipt.received_at || receipt.created_at,
+        user: nameMap[receipt.user_id] || '—',
+        action: receipt.status === 'recebido_com_ocorrencia' ? 'Recebido com ocorrência' : 'Recebido',
+        detail: [receipt.numero_nf ? `NF ${receipt.numero_nf}` : undefined, receipt.observacoes].filter(Boolean).join(' · ') || undefined,
+      });
+    }
+    events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return events;
+  };
+
   const fetchPDFData = async (order: Order, forceSaldo = false) => {
     const { data: items } = await supabase
       .from('purchase_order_items')
@@ -179,14 +257,13 @@ export default function OrderHistoryPage() {
     const { data: buyerProfile } = await supabase.from('profiles').select('full_name, unidade, unidade_setor').eq('user_id', order.user_id).single();
     let aprovadorName: string | null = null;
     if (order.status === 'aprovado' || order.status === 'emitido' || order.status === 'recebido') {
-      const { data: log } = await supabase.from('approval_log').select('user_id').eq('order_id', order.id).eq('action', 'aprovado').limit(1).single();
+      const { data: log } = await supabase.from('approval_log').select('user_id').eq('order_id', order.id).eq('action', 'aprovado').limit(1).maybeSingle();
       if (log) {
         const { data: ap } = await supabase.from('profiles').select('full_name').eq('user_id', log.user_id).single();
         aprovadorName = ap?.full_name || null;
       }
     }
 
-    // Fetch saldo from requisitions linked to this order's products
     const saldoMap: Record<string, number> = {};
     let solicitante: string | null = null;
     let setor: string | null = null;
@@ -194,24 +271,19 @@ export default function OrderHistoryPage() {
     const includeSaldoData = isInternalPDF || forceSaldo;
     if (includeSaldoData) {
       const { data: linkedReqs } = await supabase.from('requisitions')
-        .select('id, user_id, setor')
-        .eq('order_id', order.id)
-        .limit(1);
+        .select('id, user_id, setor').eq('order_id', order.id).limit(1);
       if (linkedReqs && linkedReqs.length > 0) {
         const reqId = linkedReqs[0].id;
         setor = linkedReqs[0].setor;
         const { data: reqProfile } = await supabase.from('profiles').select('full_name').eq('user_id', linkedReqs[0].user_id).single();
         solicitante = reqProfile?.full_name || null;
-        const { data: reqItems } = await supabase.from('requisition_items')
-          .select('product_id, saldo')
-          .eq('requisition_id', reqId);
-        (reqItems || []).forEach((ri: any) => {
-          saldoMap[ri.product_id] = ri.saldo;
-        });
+        const { data: reqItems } = await supabase.from('requisition_items').select('product_id, saldo').eq('requisition_id', reqId);
+        (reqItems || []).forEach((ri: any) => { saldoMap[ri.product_id] = ri.saldo; });
       }
     }
 
-    return { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF: includeSaldoData };
+    const timeline = await fetchTimeline(order);
+    return { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF: includeSaldoData, timeline };
   };
 
   const markAsEmitted = async (order: Order) => {
