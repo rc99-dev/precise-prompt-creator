@@ -275,7 +275,11 @@ export default function MyRequisitionsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Título *</Label>
-                  <Select value={titulo} onValueChange={setTitulo}>
+                  <Select value={titulo} onValueChange={(v) => {
+                    setTitulo(v);
+                    const cat = TITULO_TO_CATEGORIA[v];
+                    if (cat && categories.includes(cat)) setCategoria(cat);
+                  }}>
                     <SelectTrigger><SelectValue placeholder="Selecione o título" /></SelectTrigger>
                     <SelectContent>
                       {TITULOS_SOLICITACAO.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
