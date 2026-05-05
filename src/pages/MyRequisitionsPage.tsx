@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { Plus, ClipboardList, X, Search, FileText } from "lucide-react";
 import { formatDate, statusLabels } from "@/lib/helpers";
 import { generateRequisitionPDF } from "@/lib/pdfGenerator";
-import { UNIDADES, SETORES, TITULOS_SOLICITACAO } from "@/lib/constants";
+import { UNIDADES, SETORES, TITULOS_SOLICITACAO, TITULO_TO_CATEGORIA } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import TableSkeleton from "@/components/TableSkeleton";
