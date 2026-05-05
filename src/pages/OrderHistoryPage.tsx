@@ -64,6 +64,16 @@ export default function OrderHistoryPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("todos");
   const [search, setSearch] = useState("");
+  const [nfSearch, setNfSearch] = useState("");
+  const [tituloFilter, setTituloFilter] = useState("");
+  const [unidadeFilter, setUnidadeFilter] = useState("todos");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [valorMin, setValorMin] = useState("");
+  const [valorMax, setValorMax] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [exportingMulti, setExportingMulti] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -90,11 +100,46 @@ export default function OrderHistoryPage() {
     refetchOnWindowFocus: true,
   });
 
-  const filtered = orders.filter(o => {
-    const matchStatus = statusFilter === 'todos' || o.status === statusFilter;
-    const matchSearch = o.numero.toLowerCase().includes(search.toLowerCase());
-    return matchStatus && matchSearch;
+  const { data: nfMatchOrderIds } = useQuery({
+    queryKey: ['nf-search', nfSearch],
+    queryFn: async () => {
+      if (!nfSearch.trim()) return null;
+      const { data } = await supabase.from('receipts').select('order_id').ilike('numero_nf', `%${nfSearch.trim()}%`);
+      return new Set((data || []).map((r: any) => r.order_id));
+    },
+    enabled: !!nfSearch.trim(),
+    staleTime: 30 * 1000,
   });
+
+  const titulosDisponiveis = useMemo(() => {
+    const set = new Set<string>();
+    orders.forEach(o => { if (o.titulo) set.add(o.titulo); });
+    return Array.from(set).sort();
+  }, [orders]);
+
+  const filtered = orders.filter(o => {
+    if (statusFilter !== 'todos' && o.status !== statusFilter) return false;
+    if (search && !o.numero.toLowerCase().includes(search.toLowerCase())) return false;
+    if (tituloFilter && o.titulo !== tituloFilter) return false;
+    if (unidadeFilter !== 'todos' && o.unidade_setor !== unidadeFilter) return false;
+    if (dateFrom && new Date(o.created_at) < new Date(`${dateFrom}T00:00:00`)) return false;
+    if (dateTo && new Date(o.created_at) > new Date(`${dateTo}T23:59:59`)) return false;
+    if (valorMin && o.total < parseFloat(valorMin)) return false;
+    if (valorMax && o.total > parseFloat(valorMax)) return false;
+    if (nfSearch.trim() && nfMatchOrderIds && !nfMatchOrderIds.has(o.id)) return false;
+    return true;
+  });
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const selectedOrders = filtered.filter(o => selectedIds.has(o.id));
+  const canExportMulti = selectedOrders.length > 1 &&
+    selectedOrders.every(o => o.status === selectedOrders[0].status);
 
   const viewOrder = async (order: Order) => {
     setSelectedOrder(order);
