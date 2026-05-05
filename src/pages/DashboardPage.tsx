@@ -85,8 +85,9 @@ export default function DashboardPage() {
     staleTime: 2 * 60 * 1000,
   });
 
-  const stats = data?.stats || { suppliers: 0, products: 0, pendingReqs: 0, pendingApprovals: 0, monthOrders: 0, monthTotal: 0 };
+  const stats = data?.stats || { suppliers: 0, products: 0, pendingReqs: 0, pendingApprovals: 0, monthOrders: 0, monthTotal: 0, ticketMedio: 0, topSupplier: null as null | { name: string; total: number } };
   const recentOrders = data?.recentOrders || [];
+  const categoryRanking = data?.categoryRanking || [];
 
   const statusBadge = (status: string) => (
     <Badge className={statusColors[status] || 'bg-muted text-muted-foreground'}>{statusLabels[status] || status}</Badge>
