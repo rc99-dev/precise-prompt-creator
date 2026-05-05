@@ -448,10 +448,16 @@ export default function NewOrderPage() {
       {isError && <QueryError onRetry={() => refetch()} />}
 
       <Card>
-        <CardHeader className="py-3 px-4"><CardTitle className="text-sm">Unidade Solicitante <span className="text-destructive">*</span></CardTitle></CardHeader>
-        <CardContent className="px-4 pb-4 pt-0">
+        <CardHeader className="py-3 px-4"><CardTitle className="text-sm">Identificação da compra <span className="text-destructive">*</span></CardTitle></CardHeader>
+        <CardContent className="px-4 pb-4 pt-0 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Select value={titulo} onValueChange={setTitulo}>
+            <SelectTrigger><SelectValue placeholder="Título da compra *" /></SelectTrigger>
+            <SelectContent>
+              {TITULOS_SOLICITACAO.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Select value={unidadeSolicitante} onValueChange={setUnidadeSolicitante}>
-            <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Unidade solicitante *" /></SelectTrigger>
             <SelectContent>
               {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
             </SelectContent>
