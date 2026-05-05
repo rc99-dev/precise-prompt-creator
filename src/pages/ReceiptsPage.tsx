@@ -29,6 +29,7 @@ type ReceiptOrder = {
 
 type OrderItemForReceipt = {
   id: string; product_id: string; quantidade: number; preco_unitario: number;
+  supplier_id: string | null;
   products?: { nome: string; unidade_medida: string } | null;
   suppliers?: { razao_social: string } | null;
 };
