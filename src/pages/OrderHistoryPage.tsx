@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar, XCircle, Ban, Filter, FileDown } from "lucide-react";
 import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
 import { generateOrderPDF, generateOrderPDFBySupplier, generateMultipleOrdersPDF, TimelineEntry } from "@/lib/pdfGenerator";
-import { UNIDADES } from "@/lib/constants";
+import { UNIDADES, TITULOS_SOLICITACAO } from "@/lib/constants";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import OrderDetailDialog from "@/components/order/OrderDetailDialog";
@@ -354,6 +354,43 @@ export default function OrderHistoryPage() {
     toast.success("PDFs por fornecedor gerados!");
   };
 
+  const exportSelectedPDF = async () => {
+    if (selectedOrders.length < 2) return;
+    if (!canExportMulti) {
+      toast.error("Selecione pedidos com o mesmo status.");
+      return;
+    }
+    setExportingMulti(true);
+    try {
+      const datas = await Promise.all(selectedOrders.map(async (o) => {
+        const r = await fetchPDFData(o);
+        if (!r) return null;
+        const { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF, timeline } = r;
+        const mainSupplier = items[0]?.suppliers as any;
+        return {
+          numero: o.numero, created_at: o.created_at, observacoes: o.observacoes,
+          total: o.total, unidadeSolicitante: (o as any).unidade_setor || undefined,
+          supplier: mainSupplier ? { razao_social: mainSupplier.razao_social, cnpj: mainSupplier.cnpj, telefone: mainSupplier.telefone, cidade: mainSupplier.cidade } : null,
+          items: items.map((i: any) => ({
+            codigo: i.products?.codigo_interno, descricao: i.products?.nome || "",
+            unidade: i.products?.unidade_medida || "", quantidade: i.quantidade,
+            preco_unitario: i.preco_unitario, subtotal: i.subtotal, saldo: saldoMap[i.product_id],
+          })),
+          comprador: buyerProfile?.full_name, aprovador: aprovadorName, approved_at: (o as any).approved_at,
+          showSaldo: isInternalPDF, solicitante: solicitante || undefined, setor: setor || undefined,
+          timeline,
+        };
+      }));
+      const valid = datas.filter(Boolean) as any[];
+      if (!valid.length) { toast.error("Nenhum pedido válido."); return; }
+      generateMultipleOrdersPDF(valid);
+      toast.success(`${valid.length} pedidos exportados em PDF único!`);
+      setSelectedIds(new Set());
+    } finally {
+      setExportingMulti(false);
+    }
+  };
+
   const handleSalvarPrevisao = async () => {
     if (!previsaoTarget || !previsaoData) { toast.error("Informe a data prevista."); return; }
     setSavingPrevisao(true);
@@ -464,7 +501,7 @@ export default function OrderHistoryPage() {
         <p className="text-muted-foreground text-sm mt-1">Consulte e gerencie suas ordens de compra</p>
       </div>
 
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex gap-3 flex-wrap items-center">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar por número..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
@@ -479,14 +516,77 @@ export default function OrderHistoryPage() {
             <SelectItem value="rejeitado">Rejeitado</SelectItem>
             <SelectItem value="emitido">Emitido</SelectItem>
             <SelectItem value="recebido">Recebido</SelectItem>
+            <SelectItem value="recebido_com_ocorrencia">Recebido c/ Ocorrência</SelectItem>
+            <SelectItem value="cancelado">Cancelado</SelectItem>
           </SelectContent>
         </Select>
+        <Button variant="outline" size="sm" onClick={() => setShowFilters(s => !s)}>
+          <Filter className="h-4 w-4 mr-2" />{showFilters ? 'Ocultar filtros' : 'Mais filtros'}
+        </Button>
+        {selectedOrders.length > 1 && (
+          <Button size="sm" onClick={exportSelectedPDF} disabled={!canExportMulti || exportingMulti}>
+            <FileDown className="h-4 w-4 mr-2" />
+            {exportingMulti ? 'Gerando...' : `Exportar ${selectedOrders.length} em PDF`}
+          </Button>
+        )}
       </div>
+
+      {showFilters && (
+        <Card>
+          <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Título</label>
+              <Select value={tituloFilter || 'todos'} onValueChange={v => setTituloFilter(v === 'todos' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {TITULOS_SOLICITACAO.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Unidade</label>
+              <Select value={unidadeFilter} onValueChange={setUnidadeFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas</SelectItem>
+                  {UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Buscar por NF</label>
+              <Input placeholder="Nº da nota fiscal" value={nfSearch} onChange={e => setNfSearch(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Período</label>
+              <div className="flex gap-2">
+                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Valor mínimo</label>
+              <Input type="number" placeholder="0,00" value={valorMin} onChange={e => setValorMin(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Valor máximo</label>
+              <Input type="number" placeholder="0,00" value={valorMax} onChange={e => setValorMax(e.target.value)} />
+            </div>
+            <div className="flex items-end">
+              <Button variant="ghost" size="sm" onClick={() => {
+                setTituloFilter(''); setUnidadeFilter('todos'); setNfSearch('');
+                setDateFrom(''); setDateTo(''); setValorMin(''); setValorMax('');
+              }}>Limpar filtros</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <TableSkeleton columns={6} rows={6} />
+            <TableSkeleton columns={8} rows={6} />
           ) : isError ? (
             <QueryError onRetry={() => refetch()} />
           ) : (
@@ -494,8 +594,18 @@ export default function OrderHistoryPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
+                    <th className="w-10 py-3 px-2">
+                      <Checkbox
+                        checked={filtered.length > 0 && filtered.every(o => selectedIds.has(o.id))}
+                        onCheckedChange={(checked) => {
+                          if (checked) setSelectedIds(new Set(filtered.map(o => o.id)));
+                          else setSelectedIds(new Set());
+                        }}
+                      />
+                    </th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Número</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Data</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Título</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Unidade</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Modo</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Comprador</th>
@@ -506,11 +616,15 @@ export default function OrderHistoryPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">Nenhuma ordem encontrada.</td></tr>
+                    <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">Nenhuma ordem encontrada.</td></tr>
                   ) : filtered.map(o => (
                     <tr key={o.id} className="border-b last:border-0 hover:bg-muted/50">
+                      <td className="py-3 px-2 text-center">
+                        <Checkbox checked={selectedIds.has(o.id)} onCheckedChange={() => toggleSelect(o.id)} />
+                      </td>
                       <td className="py-3 px-4 font-medium">{o.numero}</td>
                       <td className="py-3 px-4 text-muted-foreground">{formatDate(o.created_at)}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{o.titulo || '—'}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{o.unidade_setor || '—'}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{modoLabel(o.modo)}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{o.comprador_nome || '—'}</td>
