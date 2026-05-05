@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar, XCircle, Ban, Filter, FileDown } from "lucide-react";
+import { Search, Eye, Copy, Download, FileText, Pencil, Trash2, Calendar, XCircle, Ban, Filter, FileDown, CheckCircle2, X } from "lucide-react";
 import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
 import { generateOrderPDF, generateOrderPDFBySupplier, generateMultipleOrdersPDF, TimelineEntry } from "@/lib/pdfGenerator";
 import { UNIDADES, TITULOS_SOLICITACAO } from "@/lib/constants";
@@ -89,6 +89,13 @@ export default function OrderHistoryPage() {
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [batchReceiveOpen, setBatchReceiveOpen] = useState(false);
+  const [batchReceiveDate, setBatchReceiveDate] = useState("");
+  const [batchReceiving, setBatchReceiving] = useState(false);
+  const [batchForecastOpen, setBatchForecastOpen] = useState(false);
+  const [batchForecastDate, setBatchForecastDate] = useState("");
+  const [batchForecastObs, setBatchForecastObs] = useState("");
+  const [batchForecasting, setBatchForecasting] = useState(false);
 
   const { role } = useAuth();
 
@@ -138,8 +145,14 @@ export default function OrderHistoryPage() {
     });
   };
   const selectedOrders = filtered.filter(o => selectedIds.has(o.id));
-  const canExportMulti = selectedOrders.length > 1 &&
-    selectedOrders.every(o => o.status === selectedOrders[0].status);
+  const isMaster = role === 'master';
+  const canExportMulti = isMaster
+    ? selectedOrders.length >= 1
+    : selectedOrders.length > 1 && selectedOrders.every(o => o.status === selectedOrders[0].status);
+  const canBatchReceive = isMaster && selectedOrders.length >= 1 &&
+    selectedOrders.every(o => o.status === 'aprovado' || o.status === 'emitido');
+  const canBatchForecast = isMaster && selectedOrders.length >= 1 &&
+    selectedOrders.every(o => o.status === 'emitido');
 
   const viewOrder = async (order: Order) => {
     setSelectedOrder(order);
@@ -355,7 +368,7 @@ export default function OrderHistoryPage() {
   };
 
   const exportSelectedPDF = async () => {
-    if (selectedOrders.length < 2) return;
+    if (selectedOrders.length < 1) return;
     if (!canExportMulti) {
       toast.error("Selecione pedidos com o mesmo status.");
       return;
@@ -479,6 +492,83 @@ export default function OrderHistoryPage() {
     invalidateOrderQueries(queryClient);
   };
 
+  const handleBatchReceive = async () => {
+    if (!batchReceiveDate) { toast.error("Informe a data de recebimento."); return; }
+    if (!selectedOrders.length) return;
+    setBatchReceiving(true);
+    try {
+      const ids = selectedOrders.map(o => o.id);
+      const receivedAt = new Date(`${batchReceiveDate}T12:00:00`).toISOString();
+      const { error } = await supabase.from('purchase_orders').update({ status: 'recebido' } as any).in('id', ids);
+      if (error) { toast.error(error.message); return; }
+      // approval_log entries
+      await supabase.from('approval_log').insert(selectedOrders.map(o => ({
+        order_id: o.id, user_id: user!.id, action: 'recebido',
+        motivo: `Recebimento em lote (${selectedOrders.length} pedidos) — data: ${new Date(batchReceiveDate).toLocaleDateString('pt-BR')}`,
+      })));
+      // receipts
+      const numbers = await Promise.all(selectedOrders.map(async () => {
+        const { data } = await supabase.rpc('generate_receipt_number');
+        return data as unknown as string;
+      }));
+      await supabase.from('receipts').insert(selectedOrders.map((o, i) => ({
+        order_id: o.id, user_id: user!.id, numero: numbers[i] || `REC-${Date.now()}-${i}`,
+        status: 'recebido', received_at: receivedAt,
+        observacoes: 'Recebimento em lote',
+      })));
+      // notify buyers
+      await supabase.from('notifications').insert(selectedOrders.map(o => ({
+        user_id: o.user_id,
+        titulo: 'Pedido marcado como recebido',
+        mensagem: `Pedido ${o.numero} foi marcado como recebido em ${new Date(batchReceiveDate).toLocaleDateString('pt-BR')}.`,
+        tipo: 'info', lida: false,
+      })));
+      toast.success(`${selectedOrders.length} pedido(s) marcado(s) como recebido(s)!`);
+      setBatchReceiveOpen(false);
+      setBatchReceiveDate("");
+      setSelectedIds(new Set());
+      invalidateOrderQueries(queryClient);
+    } finally {
+      setBatchReceiving(false);
+    }
+  };
+
+  const handleBatchForecast = async () => {
+    if (!batchForecastDate) { toast.error("Informe a data prevista."); return; }
+    if (!selectedOrders.length) return;
+    setBatchForecasting(true);
+    try {
+      const ids = selectedOrders.map(o => o.id);
+      const { error } = await supabase.from('purchase_orders').update({
+        previsao_entrega: batchForecastDate,
+        obs_estoquista: batchForecastObs || null,
+        previsao_registrada_por: user?.id || null,
+      } as any).in('id', ids);
+      if (error) { toast.error(error.message); return; }
+      const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
+      if (estoquistas?.length) {
+        const notifs: any[] = [];
+        selectedOrders.forEach(o => {
+          estoquistas.forEach(e => notifs.push({
+            user_id: e.user_id,
+            titulo: 'Previsão de entrega registrada',
+            mensagem: `Pedido ${o.numero} — Entrega prevista para ${new Date(batchForecastDate).toLocaleDateString('pt-BR')}. ${batchForecastObs || ''}`,
+            tipo: 'info', lida: false,
+          }));
+        });
+        await supabase.from('notifications').insert(notifs);
+      }
+      toast.success(`Previsão registrada em ${selectedOrders.length} pedido(s)!`);
+      setBatchForecastOpen(false);
+      setBatchForecastDate("");
+      setBatchForecastObs("");
+      setSelectedIds(new Set());
+      invalidateOrderQueries(queryClient);
+    } finally {
+      setBatchForecasting(false);
+    }
+  };
+
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
       rascunho: 'Rascunho', aguardando_aprovacao: 'Aguardando Aprovação',
@@ -523,7 +613,7 @@ export default function OrderHistoryPage() {
         <Button variant="outline" size="sm" onClick={() => setShowFilters(s => !s)}>
           <Filter className="h-4 w-4 mr-2" />{showFilters ? 'Ocultar filtros' : 'Mais filtros'}
         </Button>
-        {selectedOrders.length > 1 && (
+        {!isMaster && selectedOrders.length > 1 && (
           <Button size="sm" onClick={exportSelectedPDF} disabled={!canExportMulti || exportingMulti}>
             <FileDown className="h-4 w-4 mr-2" />
             {exportingMulti ? 'Gerando...' : `Exportar ${selectedOrders.length} em PDF`}
@@ -769,6 +859,70 @@ export default function OrderHistoryPage() {
               <Button variant="outline" onClick={() => setRejectTarget(null)}>Cancelar</Button>
               <Button variant="destructive" onClick={handleMasterReject} disabled={rejecting}>
                 {rejecting ? "Reprovando..." : "Reprovar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {isMaster && selectedOrders.length >= 1 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-card border rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-medium">{selectedOrders.length} pedido(s) selecionado(s)</span>
+          <div className="h-5 w-px bg-border" />
+          <Button size="sm" variant="outline" onClick={exportSelectedPDF} disabled={exportingMulti}>
+            <FileDown className="h-4 w-4 mr-2" />
+            {exportingMulti ? 'Gerando...' : 'Exportar selecionados'}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setBatchReceiveOpen(true)} disabled={!canBatchReceive}
+            title={!canBatchReceive ? 'Disponível apenas quando todos selecionados estão Aprovado ou Emitido' : ''}>
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            Marcar como recebido
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setBatchForecastOpen(true)} disabled={!canBatchForecast}
+            title={!canBatchForecast ? 'Disponível apenas quando todos selecionados estão Emitido' : ''}>
+            <Calendar className="h-4 w-4 mr-2" />
+            Registrar previsão
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={batchReceiveOpen} onOpenChange={(o) => { if (!o) { setBatchReceiveOpen(false); setBatchReceiveDate(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Marcar {selectedOrders.length} pedido(s) como recebido</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data de recebimento *</label>
+              <Input type="date" value={batchReceiveDate} onChange={e => setBatchReceiveDate(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setBatchReceiveOpen(false)}>Cancelar</Button>
+              <Button onClick={handleBatchReceive} disabled={batchReceiving}>
+                {batchReceiving ? "Salvando..." : "Confirmar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={batchForecastOpen} onOpenChange={(o) => { if (!o) { setBatchForecastOpen(false); setBatchForecastDate(""); setBatchForecastObs(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Registrar previsão em {selectedOrders.length} pedido(s)</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data prevista de entrega *</label>
+              <Input type="date" value={batchForecastDate} onChange={e => setBatchForecastDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Observação</label>
+              <Textarea value={batchForecastObs} onChange={e => setBatchForecastObs(e.target.value)} placeholder="Ex: Entregar na portaria das 8h às 10h" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setBatchForecastOpen(false)}>Cancelar</Button>
+              <Button onClick={handleBatchForecast} disabled={batchForecasting}>
+                {batchForecasting ? "Salvando..." : "Confirmar e notificar"}
               </Button>
             </div>
           </div>
