@@ -218,6 +218,36 @@ export default function OrderHistoryPage() {
     toast.success("CSV exportado!");
   };
 
+  const fetchTimeline = async (order: Order): Promise<TimelineEntry[]> => {
+    if (!['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'].includes(order.status)) return [];
+    const [{ data: logs }, { data: receipt }] = await Promise.all([
+      supabase.from('approval_log').select('user_id, action, motivo, created_at').eq('order_id', order.id).order('created_at'),
+      supabase.from('receipts').select('user_id, status, observacoes, received_at, created_at, numero_nf').eq('order_id', order.id).order('created_at').limit(1).maybeSingle(),
+    ]);
+    const userIds = new Set<string>([order.user_id]);
+    (logs || []).forEach((l: any) => userIds.add(l.user_id));
+    if (receipt?.user_id) userIds.add(receipt.user_id);
+    const { data: names } = await supabase.rpc('get_profile_names', { _user_ids: Array.from(userIds) } as any);
+    const nameMap: Record<string, string> = {};
+    (names || []).forEach((n: any) => { nameMap[n.user_id] = n.full_name || '—'; });
+    const events: TimelineEntry[] = [];
+    events.push({ date: order.created_at, user: nameMap[order.user_id] || '—', action: 'Pedido criado' });
+    (logs || []).forEach((l: any) => {
+      const map: Record<string, string> = { aprovado: 'Aprovado', aprovado_com_alteracao: 'Aprovado com alteração', rejeitado: 'Rejeitado', cancelado: 'Cancelado', enviado: 'Enviado para aprovação', aguardando_aprovacao: 'Enviado para aprovação' };
+      events.push({ date: l.created_at, user: nameMap[l.user_id] || '—', action: map[l.action] || l.action, detail: l.motivo || undefined });
+    });
+    if (receipt) {
+      events.push({
+        date: receipt.received_at || receipt.created_at,
+        user: nameMap[receipt.user_id] || '—',
+        action: receipt.status === 'recebido_com_ocorrencia' ? 'Recebido com ocorrência' : 'Recebido',
+        detail: [receipt.numero_nf ? `NF ${receipt.numero_nf}` : undefined, receipt.observacoes].filter(Boolean).join(' · ') || undefined,
+      });
+    }
+    events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return events;
+  };
+
   const fetchPDFData = async (order: Order, forceSaldo = false) => {
     const { data: items } = await supabase
       .from('purchase_order_items')
@@ -227,14 +257,13 @@ export default function OrderHistoryPage() {
     const { data: buyerProfile } = await supabase.from('profiles').select('full_name, unidade, unidade_setor').eq('user_id', order.user_id).single();
     let aprovadorName: string | null = null;
     if (order.status === 'aprovado' || order.status === 'emitido' || order.status === 'recebido') {
-      const { data: log } = await supabase.from('approval_log').select('user_id').eq('order_id', order.id).eq('action', 'aprovado').limit(1).single();
+      const { data: log } = await supabase.from('approval_log').select('user_id').eq('order_id', order.id).eq('action', 'aprovado').limit(1).maybeSingle();
       if (log) {
         const { data: ap } = await supabase.from('profiles').select('full_name').eq('user_id', log.user_id).single();
         aprovadorName = ap?.full_name || null;
       }
     }
 
-    // Fetch saldo from requisitions linked to this order's products
     const saldoMap: Record<string, number> = {};
     let solicitante: string | null = null;
     let setor: string | null = null;
@@ -242,24 +271,19 @@ export default function OrderHistoryPage() {
     const includeSaldoData = isInternalPDF || forceSaldo;
     if (includeSaldoData) {
       const { data: linkedReqs } = await supabase.from('requisitions')
-        .select('id, user_id, setor')
-        .eq('order_id', order.id)
-        .limit(1);
+        .select('id, user_id, setor').eq('order_id', order.id).limit(1);
       if (linkedReqs && linkedReqs.length > 0) {
         const reqId = linkedReqs[0].id;
         setor = linkedReqs[0].setor;
         const { data: reqProfile } = await supabase.from('profiles').select('full_name').eq('user_id', linkedReqs[0].user_id).single();
         solicitante = reqProfile?.full_name || null;
-        const { data: reqItems } = await supabase.from('requisition_items')
-          .select('product_id, saldo')
-          .eq('requisition_id', reqId);
-        (reqItems || []).forEach((ri: any) => {
-          saldoMap[ri.product_id] = ri.saldo;
-        });
+        const { data: reqItems } = await supabase.from('requisition_items').select('product_id, saldo').eq('requisition_id', reqId);
+        (reqItems || []).forEach((ri: any) => { saldoMap[ri.product_id] = ri.saldo; });
       }
     }
 
-    return { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF: includeSaldoData };
+    const timeline = await fetchTimeline(order);
+    return { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF: includeSaldoData, timeline };
   };
 
   const markAsEmitted = async (order: Order) => {
