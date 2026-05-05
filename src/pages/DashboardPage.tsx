@@ -1,16 +1,19 @@
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Package, ShoppingCart, Plus, TrendingDown, Clock, ClipboardList } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Building2, Package, ShoppingCart, Plus, TrendingDown, Clock, ClipboardList, Layers, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatCurrency, formatDate, statusLabels, statusColors } from "@/lib/helpers";
 import { useQuery } from "@tanstack/react-query";
 import QueryError from "@/components/QueryError";
 
-const COUNTABLE_STATUSES = ['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
+const STATUSES_REALIZADAS = ['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
+const STATUSES_RECEBIDAS = ['recebido', 'recebido_com_ocorrencia'];
 
 export default function DashboardPage() {
   const { role } = useAuth();
