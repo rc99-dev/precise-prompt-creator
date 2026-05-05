@@ -480,7 +480,7 @@ export default function MyRequisitionsPage() {
                             setor: r.setor || '—',
                             solicitante: profile?.full_name || '—',
                             created_at: r.created_at,
-                            items: r.requisition_validItems.map(i => ({
+                            items: r.requisition_items.map(i => ({
                               produto: (i.products as any)?.nome || '—',
                               unidade: (i.products as any)?.unidade_medida || '',
                               saldo: i.saldo,
