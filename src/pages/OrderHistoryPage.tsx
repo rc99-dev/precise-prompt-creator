@@ -368,7 +368,7 @@ export default function OrderHistoryPage() {
   };
 
   const exportSelectedPDF = async () => {
-    if (selectedOrders.length < 2) return;
+    if (selectedOrders.length < 1) return;
     if (!canExportMulti) {
       toast.error("Selecione pedidos com o mesmo status.");
       return;
