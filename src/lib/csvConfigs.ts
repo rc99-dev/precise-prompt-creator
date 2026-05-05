@@ -13,16 +13,16 @@ export const suppliersImportConfig: CsvImportConfig = {
   title: "Importar Fornecedores (CSV)",
   templateFilename: "modelo_fornecedores.csv",
   columns: [
-    { csvHeader: "razao_social", dbField: "razao_social", required: true, label: "Razão Social" },
-    { csvHeader: "cnpj", dbField: "cnpj", required: true, label: "CNPJ",
+    { csvHeader: "razao_social", dbField: "razao_social", required: true, label: "Razão Social", example: "Empresa Exemplo LTDA" },
+    { csvHeader: "cnpj", dbField: "cnpj", required: true, label: "CNPJ", example: "12.345.678/0001-90",
       validate: validateCnpj,
       transform: (v) => v.replace(/\D/g, '') || null },
-    { csvHeader: "telefone", dbField: "telefone", required: false, label: "Telefone" },
-    { csvHeader: "email", dbField: "email", required: false, label: "E-mail" },
-    { csvHeader: "cidade", dbField: "cidade", required: false, label: "Cidade" },
-    { csvHeader: "estado", dbField: "estado", required: false, label: "Estado" },
-    { csvHeader: "nome_fantasia", dbField: "nome_fantasia", required: false, label: "Nome Fantasia" },
-    { csvHeader: "contato_principal", dbField: "contato_principal", required: false, label: "Contato" },
+    { csvHeader: "telefone", dbField: "telefone", required: false, label: "Telefone", example: "(11) 99999-9999" },
+    { csvHeader: "email", dbField: "email", required: false, label: "E-mail", example: "contato@empresa.com" },
+    { csvHeader: "cidade", dbField: "cidade", required: false, label: "Cidade", example: "São Paulo" },
+    { csvHeader: "estado", dbField: "estado", required: false, label: "Estado", example: "SP" },
+    { csvHeader: "nome_fantasia", dbField: "nome_fantasia", required: false, label: "Nome Fantasia", example: "Empresa Exemplo" },
+    { csvHeader: "contato_principal", dbField: "contato_principal", required: false, label: "Contato", example: "João Silva" },
   ],
   onImport: async (rows) => {
     let created = 0, updated = 0, ignored = 0;
@@ -47,14 +47,14 @@ export const productsImportConfig: CsvImportConfig = {
   title: "Importar Produtos (CSV)",
   templateFilename: "modelo_produtos.csv",
   columns: [
-    { csvHeader: "nome", dbField: "nome", required: true, label: "Nome" },
-    { csvHeader: "categoria", dbField: "categoria", required: true, label: "Categoria" },
-    { csvHeader: "unidade_medida", dbField: "unidade_medida", required: true, label: "Unidade",
+    { csvHeader: "nome", dbField: "nome", required: true, label: "Nome", example: "Açaí 1kg" },
+    { csvHeader: "categoria", dbField: "categoria", required: true, label: "Categoria", example: "AÇAÍ" },
+    { csvHeader: "unidade_medida", dbField: "unidade_medida", required: true, label: "Unidade", example: "kg",
       validate: (v) => VALID_UNITS.includes(v.toLowerCase()) ? null : `Unidade não reconhecida: "${v}"`,
       transform: (v) => v.toLowerCase() },
-    { csvHeader: "codigo_interno", dbField: "codigo_interno", required: false, label: "Código Interno" },
-    { csvHeader: "marca", dbField: "marca", required: false, label: "Marca" },
-    { csvHeader: "descricao", dbField: "descricao", required: false, label: "Descrição" },
+    { csvHeader: "codigo_interno", dbField: "codigo_interno", required: false, label: "Código Interno", example: "ACA001" },
+    { csvHeader: "marca", dbField: "marca", required: false, label: "Marca", example: "Marca X" },
+    { csvHeader: "descricao", dbField: "descricao", required: false, label: "Descrição", example: "Polpa de açaí grosso" },
   ],
   onImport: async (rows) => {
     let created = 0, updated = 0, ignored = 0;
@@ -91,20 +91,20 @@ export function createPricesImportConfig(
     title: "Importar Preços (CSV)",
     templateFilename: "modelo_precos.csv",
     columns: [
-      { csvHeader: "produto_nome", dbField: "product_id", required: true, label: "Produto",
+      { csvHeader: "produto_nome", dbField: "product_id", required: true, label: "Produto", example: "Açaí 1kg",
         validate: (v) => productsMap.has(v.toLowerCase()) ? null : `Produto não encontrado: "${v}"`,
         transform: (v) => productsMap.get(v.toLowerCase()) || null },
-      { csvHeader: "fornecedor_razao_social", dbField: "supplier_id", required: true, label: "Fornecedor",
+      { csvHeader: "fornecedor_razao_social", dbField: "supplier_id", required: true, label: "Fornecedor", example: "Empresa Exemplo LTDA",
         validate: (v) => suppliersMap.has(v.toLowerCase()) ? null : `Fornecedor não encontrado: "${v}"`,
         transform: (v) => suppliersMap.get(v.toLowerCase()) || null },
-      { csvHeader: "preco_unitario", dbField: "preco_unitario", required: true, label: "Preço Unitário",
+      { csvHeader: "preco_unitario", dbField: "preco_unitario", required: true, label: "Preço Unitário", example: "12,50",
         validate: (v) => {
           const n = parseFloat(v.replace(',', '.'));
           return isNaN(n) || n <= 0 ? `Preço inválido: "${v}"` : null;
         },
         transform: (v) => parseFloat(v.replace(',', '.')) },
-      { csvHeader: "unidade_medida", dbField: "unidade_medida", required: false, label: "Unidade" },
-      { csvHeader: "prazo_entrega", dbField: "prazo_entrega", required: false, label: "Prazo Entrega" },
+      { csvHeader: "unidade_medida", dbField: "unidade_medida", required: false, label: "Unidade", example: "kg" },
+      { csvHeader: "prazo_entrega", dbField: "prazo_entrega", required: false, label: "Prazo Entrega", example: "3 dias úteis" },
     ],
     onImport: async (rows) => {
       let created = 0, updated = 0, ignored = 0;
