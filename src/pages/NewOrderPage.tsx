@@ -240,6 +240,7 @@ export default function NewOrderPage() {
           setItems(newItems);
           if (req.unidade) setUnidadeSolicitante(req.unidade);
           else if (req.unidade_setor) setUnidadeSolicitante(req.unidade_setor);
+          if ((req as any).titulo) setTitulo((req as any).titulo);
         }
       })();
       return;
