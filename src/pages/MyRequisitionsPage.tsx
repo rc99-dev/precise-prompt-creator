@@ -527,11 +527,11 @@ export default function MyRequisitionsPage() {
         onOpenChange={setInvImportOpen}
         hasItems={items.length > 0}
         onImport={(imported, mode) => {
+          const mapped: DraftItem[] = imported.map(i => ({ ...i, pedido: "" }));
           if (mode === 'replace') {
-            setItems(imported);
+            setItems(mapped);
           } else {
-            // append (skip duplicates)
-            setItems(prev => [...prev, ...imported.filter(i => !prev.some(p => p.product_id === i.product_id))]);
+            setItems(prev => [...prev, ...mapped.filter(i => !prev.some(p => p.product_id === i.product_id))]);
           }
           if (!showForm) setShowForm(true);
         }}
