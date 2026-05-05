@@ -613,7 +613,7 @@ export default function OrderHistoryPage() {
         <Button variant="outline" size="sm" onClick={() => setShowFilters(s => !s)}>
           <Filter className="h-4 w-4 mr-2" />{showFilters ? 'Ocultar filtros' : 'Mais filtros'}
         </Button>
-        {selectedOrders.length > 1 && (
+        {!isMaster && selectedOrders.length > 1 && (
           <Button size="sm" onClick={exportSelectedPDF} disabled={!canExportMulti || exportingMulti}>
             <FileDown className="h-4 w-4 mr-2" />
             {exportingMulti ? 'Gerando...' : `Exportar ${selectedOrders.length} em PDF`}
