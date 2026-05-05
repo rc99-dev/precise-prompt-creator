@@ -61,6 +61,7 @@ export default function NewOrderPage() {
   const [activeStrategy, setActiveStrategy] = useState<"melhor_preco" | "melhor_fornecedor" | null>(null);
   const [observacoes, setObservacoes] = useState("");
   const [unidadeSolicitante, setUnidadeSolicitante] = useState("");
+  const [titulo, setTitulo] = useState("");
   const [saving, setSaving] = useState(false);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const [selectedReqImport, setSelectedReqImport] = useState<string | null>(null);
