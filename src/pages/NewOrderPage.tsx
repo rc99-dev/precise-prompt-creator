@@ -140,6 +140,7 @@ export default function NewOrderPage() {
         return [...updated, ...newItems.filter(i => !existingIds.has(i.product_id))];
       });
       if (req?.unidade) setUnidadeSolicitante(req.unidade);
+      if (req?.titulo) setTitulo(req.titulo);
       toast.success(`${reqItems.length} itens importados da solicitação.`);
     }
   }, [pendingReqs]);
