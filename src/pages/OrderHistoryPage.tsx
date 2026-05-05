@@ -864,6 +864,70 @@ export default function OrderHistoryPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {isMaster && selectedOrders.length >= 1 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-card border rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-medium">{selectedOrders.length} pedido(s) selecionado(s)</span>
+          <div className="h-5 w-px bg-border" />
+          <Button size="sm" variant="outline" onClick={exportSelectedPDF} disabled={exportingMulti}>
+            <FileDown className="h-4 w-4 mr-2" />
+            {exportingMulti ? 'Gerando...' : 'Exportar selecionados'}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setBatchReceiveOpen(true)} disabled={!canBatchReceive}
+            title={!canBatchReceive ? 'Disponível apenas quando todos selecionados estão Aprovado ou Emitido' : ''}>
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            Marcar como recebido
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setBatchForecastOpen(true)} disabled={!canBatchForecast}
+            title={!canBatchForecast ? 'Disponível apenas quando todos selecionados estão Emitido' : ''}>
+            <Calendar className="h-4 w-4 mr-2" />
+            Registrar previsão
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={batchReceiveOpen} onOpenChange={(o) => { if (!o) { setBatchReceiveOpen(false); setBatchReceiveDate(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Marcar {selectedOrders.length} pedido(s) como recebido</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data de recebimento *</label>
+              <Input type="date" value={batchReceiveDate} onChange={e => setBatchReceiveDate(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setBatchReceiveOpen(false)}>Cancelar</Button>
+              <Button onClick={handleBatchReceive} disabled={batchReceiving}>
+                {batchReceiving ? "Salvando..." : "Confirmar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={batchForecastOpen} onOpenChange={(o) => { if (!o) { setBatchForecastOpen(false); setBatchForecastDate(""); setBatchForecastObs(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Registrar previsão em {selectedOrders.length} pedido(s)</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data prevista de entrega *</label>
+              <Input type="date" value={batchForecastDate} onChange={e => setBatchForecastDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Observação</label>
+              <Textarea value={batchForecastObs} onChange={e => setBatchForecastObs(e.target.value)} placeholder="Ex: Entregar na portaria das 8h às 10h" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setBatchForecastOpen(false)}>Cancelar</Button>
+              <Button onClick={handleBatchForecast} disabled={batchForecasting}>
+                {batchForecasting ? "Salvando..." : "Confirmar e notificar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
