@@ -403,67 +403,75 @@ export default function ReceiptsPage() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Registrar Recebimento — {selectedOrder?.numero}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Número da NF</Label>
-                <Input value={numeroNF} onChange={e => setNumeroNF(e.target.value)} placeholder="Nº da nota fiscal" />
-              </div>
-              <div className="space-y-2">
-                <Label>Observações gerais</Label>
-                <Input value={obsGeral} onChange={e => setObsGeral(e.target.value)} placeholder="Obs geral do recebimento" />
-              </div>
+            <div className="space-y-2">
+              <Label>Observações gerais</Label>
+              <Input value={obsGeral} onChange={e => setObsGeral(e.target.value)} placeholder="Obs geral do recebimento" />
             </div>
-            <div className="space-y-3">
-              {orderItems.map((item, idx) => (
-                <Card key={item.id}>
+            <div className="space-y-4">
+              {itemsGroupedBySupplier.map(group => (
+                <Card key={group.key} className="border-primary/20">
                   <CardContent className="py-3 space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3 flex-wrap pb-2 border-b">
                       <div>
-                        <p className="font-medium">{item.products?.nome}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Esperado: {item.quantidade} {item.products?.unidade_medida} — {item.suppliers?.razao_social}
-                        </p>
+                        <p className="text-sm font-semibold">{group.supplierName}</p>
+                        <p className="text-xs text-muted-foreground">{group.items.length} {group.items.length === 1 ? 'item' : 'itens'}</p>
+                      </div>
+                      <div className="flex-1 min-w-[200px] max-w-xs">
+                        <Label className="text-xs">Número da NF{hasMultipleSuppliers ? ` (${group.supplierName})` : ''}</Label>
+                        <Input
+                          value={nfBySupplier[group.key] || ''}
+                          onChange={e => setNfBySupplier(prev => ({ ...prev, [group.key]: e.target.value }))}
+                          placeholder="Nº da nota fiscal"
+                        />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Status</Label>
-                        <Select value={receiptItems[idx]?.status} onValueChange={v => updateReceiptItem(idx, { status: v })}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="recebido">Conforme</SelectItem>
-                            <SelectItem value="parcial">Parcial</SelectItem>
-                            <SelectItem value="ocorrencia">Ocorrência</SelectItem>
-                            <SelectItem value="nao_recebido">Não recebido</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {receiptItems[idx]?.status === 'parcial' && (
-                        <div className="space-y-1">
-                          <Label className="text-xs">Qtd recebida</Label>
-                          <Input type="number" step="0.01" value={receiptItems[idx]?.quantidade_recebida}
-                            onChange={e => updateReceiptItem(idx, { quantidade_recebida: e.target.value })} />
+                    {group.items.map(({ item, idx }) => (
+                      <div key={item.id} className="space-y-2 border-b last:border-0 pb-2 last:pb-0">
+                        <div>
+                          <p className="font-medium text-sm">{item.products?.nome}</p>
+                          <p className="text-xs text-muted-foreground">Esperado: {item.quantidade} {item.products?.unidade_medida}</p>
                         </div>
-                      )}
-                      {(receiptItems[idx]?.status === 'ocorrencia' || receiptItems[idx]?.status === 'nao_recebido') && (
-                        <>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                           <div className="space-y-1">
-                            <Label className="text-xs">Tipo ocorrência</Label>
-                            <Select value={receiptItems[idx]?.tipo_ocorrencia} onValueChange={v => updateReceiptItem(idx, { tipo_ocorrencia: v })}>
-                              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                            <Label className="text-xs">Status</Label>
+                            <Select value={receiptItems[idx]?.status} onValueChange={v => updateReceiptItem(idx, { status: v })}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                {OCORRENCIA_TIPOS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                                <SelectItem value="recebido">Conforme</SelectItem>
+                                <SelectItem value="parcial">Parcial</SelectItem>
+                                <SelectItem value="ocorrencia">Ocorrência</SelectItem>
+                                <SelectItem value="nao_recebido">Não recebido</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Observação</Label>
-                            <Input value={receiptItems[idx]?.observacoes}
-                              onChange={e => updateReceiptItem(idx, { observacoes: e.target.value })} />
-                          </div>
-                        </>
-                      )}
-                    </div>
+                          {receiptItems[idx]?.status === 'parcial' && (
+                            <div className="space-y-1">
+                              <Label className="text-xs">Qtd recebida</Label>
+                              <Input type="number" step="0.01" value={receiptItems[idx]?.quantidade_recebida}
+                                onChange={e => updateReceiptItem(idx, { quantidade_recebida: e.target.value })} />
+                            </div>
+                          )}
+                          {(receiptItems[idx]?.status === 'ocorrencia' || receiptItems[idx]?.status === 'nao_recebido') && (
+                            <>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Tipo ocorrência</Label>
+                                <Select value={receiptItems[idx]?.tipo_ocorrencia} onValueChange={v => updateReceiptItem(idx, { tipo_ocorrencia: v })}>
+                                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                  <SelectContent>
+                                    {OCORRENCIA_TIPOS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Observação</Label>
+                                <Input value={receiptItems[idx]?.observacoes}
+                                  onChange={e => updateReceiptItem(idx, { observacoes: e.target.value })} />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </CardContent>
                 </Card>
               ))}
