@@ -281,7 +281,50 @@ function renderOrderPDFInto(doc: jsPDF, data: OrderPDFData) {
   doc.line(sig2X, sigY, sig2X + sigW, sigY);
   doc.text("Aprovador", sig2X + sigW / 2, sigY + 4, { align: "center" });
 
+  // Timeline / history log
+  if (data.timeline && data.timeline.length > 0) {
+    doc.addPage();
+    drawFooterLine(doc);
+    let ty = drawHeader(doc, "HISTÓRICO DO PEDIDO", data.numero, formatDate(data.created_at), data.unidadeSolicitante);
+    autoTable(doc, {
+      startY: ty,
+      head: [["Data / Hora", "Usuário", "Ação", "Detalhes"]],
+      body: data.timeline.map(t => [
+        formatDateTime(t.date),
+        t.user || '—',
+        t.action,
+        t.detail || '—',
+      ]),
+      margin: { left: 14, right: 14, bottom: 30 },
+      styles: { fontSize: 8, cellPadding: 2.5, textColor: DARK as any },
+      headStyles: { fillColor: BRAND as any, textColor: WHITE as any, fontStyle: "bold", fontSize: 8 },
+      alternateRowStyles: { fillColor: [250, 245, 248] },
+      columnStyles: {
+        0: { cellWidth: 38 },
+        1: { cellWidth: 45 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: "auto" },
+      },
+      rowPageBreak: 'auto',
+      didDrawPage: () => { drawFooterLine(doc); },
+    });
+  }
+}
+
+export function generateOrderPDF(data: OrderPDFData) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  renderOrderPDFInto(doc, data);
   const filename = data.filenameSuffix ? `${data.numero}_${data.filenameSuffix}.pdf` : `${data.numero}.pdf`;
+  doc.save(filename);
+}
+
+export function generateMultipleOrdersPDF(orders: OrderPDFData[], filename = `pedidos_${Date.now()}.pdf`) {
+  if (orders.length === 0) return;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  orders.forEach((o, idx) => {
+    if (idx > 0) doc.addPage();
+    renderOrderPDFInto(doc, o);
+  });
   doc.save(filename);
 }
 
