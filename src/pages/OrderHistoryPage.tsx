@@ -30,6 +30,7 @@ type Order = {
   comprador_nome?: string;
   unidade_setor?: string | null;
   has_requisition?: boolean;
+  titulo?: string | null;
 };
 
 type OrderItem = {
