@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Building2, Package, DollarSign,
   ShoppingCart, History, BarChart3, LogOut, Menu,
   ClipboardList, CheckCircle, Truck, Users, FileText,
-  Bell, ChevronLeft,
+  Bell, ChevronLeft, Boxes,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 
@@ -35,6 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const allNavItems: NavItem[] = [
     { to: "/", label: "Dashboard", icon: LayoutDashboard, page: "dashboard" },
     { to: "/minhas-solicitacoes", label: "Minhas Solicitações", icon: ClipboardList, page: "minhas-solicitacoes" },
+    { to: "/inventarios", label: "Inventários", icon: Boxes, page: "inventarios" },
     { to: "/solicitacoes", label: "Solicitações", icon: ClipboardList, page: "solicitacoes", badge: pendingReqs },
     { to: "/nova-ordem", label: "Nova Ordem", icon: ShoppingCart, page: "nova-ordem" },
     { to: "/comparativo", label: "Comparativo", icon: BarChart3, page: "comparativo" },

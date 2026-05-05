@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, ClipboardList, X, Search, FileText } from "lucide-react";
+import { Plus, ClipboardList, X, Search, FileText, Boxes } from "lucide-react";
+import InventoryImportDialog from "@/components/InventoryImportDialog";
 import { formatDate, statusLabels } from "@/lib/helpers";
 import { generateRequisitionPDF } from "@/lib/pdfGenerator";
 import { UNIDADES, SETORES, TITULOS_SOLICITACAO, TITULO_TO_CATEGORIA } from "@/lib/constants";
@@ -43,6 +44,7 @@ export default function MyRequisitionsPage() {
   const [items, setItems] = useState<DraftItem[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [invImportOpen, setInvImportOpen] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-requisitions', user?.id],
@@ -335,6 +337,12 @@ export default function MyRequisitionsPage() {
                 </div>
               </div>
 
+              <div>
+                <Button type="button" variant="outline" onClick={() => setInvImportOpen(true)}>
+                  <Boxes className="h-4 w-4 mr-2" />Importar do inventário
+                </Button>
+              </div>
+
               {/* Product search + add */}
               <div className="space-y-2">
                 <Label>Adicionar Produtos</Label>
@@ -514,6 +522,20 @@ export default function MyRequisitionsPage() {
           </CardContent>
         </Card>
       )}
+      <InventoryImportDialog
+        open={invImportOpen}
+        onOpenChange={setInvImportOpen}
+        hasItems={items.length > 0}
+        onImport={(imported, mode) => {
+          const mapped: DraftItem[] = imported.map(i => ({ ...i, pedido: "" }));
+          if (mode === 'replace') {
+            setItems(mapped);
+          } else {
+            setItems(prev => [...prev, ...mapped.filter(i => !prev.some(p => p.product_id === i.product_id))]);
+          }
+          if (!showForm) setShowForm(true);
+        }}
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ export type CsvColumnDef = {
   dbField: string;
   required: boolean;
   label: string;
+  example?: string;
   validate?: (value: string) => string | null; // returns error message or null
   transform?: (value: string) => unknown;
 };
@@ -64,7 +65,9 @@ function parseCsvText(text: string): { headers: string[]; rows: Record<string, s
 }
 
 function generateTemplateCsv(columns: CsvColumnDef[]): string {
-  return columns.map(c => c.csvHeader).join(";");
+  const headers = columns.map(c => c.csvHeader).join(";");
+  const example = columns.map(c => c.example ?? "").join(";");
+  return headers + "\n" + example;
 }
 
 export default function CsvImportModal({ config, open, onOpenChange, onComplete }: {
