@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { Plus, ClipboardList, X, Search, FileText } from "lucide-react";
 import { formatDate, statusLabels } from "@/lib/helpers";
 import { generateRequisitionPDF } from "@/lib/pdfGenerator";
-import { UNIDADES, SETORES, TITULOS_SOLICITACAO } from "@/lib/constants";
+import { UNIDADES, SETORES, TITULOS_SOLICITACAO, TITULO_TO_CATEGORIA } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import TableSkeleton from "@/components/TableSkeleton";
@@ -174,7 +174,20 @@ export default function MyRequisitionsPage() {
     if (!titulo) { toast.error("Selecione o título."); return; }
     if (!unidade) { toast.error("Selecione a unidade."); return; }
     if (!setor) { toast.error("Selecione o setor."); return; }
-    if (items.length === 0) { toast.error("Adicione pelo menos um produto."); return; }
+
+    // Remove items with both saldo and pedido empty/zero
+    const validItems = items.filter(i => {
+      const s = parseFloat(i.saldo) || 0;
+      const p = parseFloat(i.pedido) || 0;
+      return s > 0 || p > 0;
+    });
+    if (validItems.length === 0) {
+      toast.error("Informe saldo ou pedido em pelo menos um item.");
+      return;
+    }
+    if (validItems.length < items.length) {
+      setItems(validItems);
+    }
 
     setSaving(true);
 
@@ -183,15 +196,15 @@ export default function MyRequisitionsPage() {
       const { error } = await supabase.from('requisitions').update({
         titulo, unidade, setor, unidade_setor: `${unidade} - ${setor}`,
         observacoes: observacoes || null,
-        product_id: items[0].product_id,
-        saldo_atual: parseFloat(items[0].saldo) || 0,
-        unidade_medida: items[0].unidade_medida,
+        product_id: validItems[0].product_id,
+        saldo_atual: parseFloat(validItems[0].saldo) || 0,
+        unidade_medida: validItems[0].unidade_medida,
       } as any).eq('id', editingId);
       if (error) { toast.error(error.message); setSaving(false); return; }
 
       // Delete old items and re-insert
       await supabase.from('requisition_items').delete().eq('requisition_id', editingId);
-      const itemsToInsert = items.map(i => ({
+      const itemsToInsert = validItems.map(i => ({
         requisition_id: editingId,
         product_id: i.product_id,
         saldo: parseFloat(i.saldo) || 0,
@@ -209,15 +222,15 @@ export default function MyRequisitionsPage() {
         user_id: user!.id,
         titulo, unidade, setor,
         unidade_setor: `${unidade} - ${setor}`,
-        product_id: items[0].product_id,
-        saldo_atual: parseFloat(items[0].saldo) || 0,
-        unidade_medida: items[0].unidade_medida,
+        product_id: validItems[0].product_id,
+        saldo_atual: parseFloat(validItems[0].saldo) || 0,
+        unidade_medida: validItems[0].unidade_medida,
         observacoes: observacoes || null,
       } as any).select('id').single();
 
       if (error || !req) { toast.error(error?.message || "Erro ao criar solicitação."); setSaving(false); return; }
 
-      const itemsToInsert = items.map(i => ({
+      const itemsToInsert = validItems.map(i => ({
         requisition_id: req.id,
         product_id: i.product_id,
         saldo: parseFloat(i.saldo) || 0,
@@ -275,7 +288,11 @@ export default function MyRequisitionsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Título *</Label>
-                  <Select value={titulo} onValueChange={setTitulo}>
+                  <Select value={titulo} onValueChange={(v) => {
+                    setTitulo(v);
+                    const cat = TITULO_TO_CATEGORIA[v];
+                    if (cat && categories.includes(cat)) setCategoria(cat);
+                  }}>
                     <SelectTrigger><SelectValue placeholder="Selecione o título" /></SelectTrigger>
                     <SelectContent>
                       {TITULOS_SOLICITACAO.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -362,7 +379,7 @@ export default function MyRequisitionsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {items.map((item, idx) => (
+                      {[...items].map((it, i) => ({ it, i })).sort((a, b) => a.it.nome.localeCompare(b.it.nome, 'pt-BR')).map(({ it: item, i: idx }) => (
                         <tr key={item.product_id} className="border-b last:border-0">
                           <td className="py-2 px-3 font-medium">{item.nome}</td>
                           <td className="py-2 px-3 text-muted-foreground">{item.unidade_medida}</td>

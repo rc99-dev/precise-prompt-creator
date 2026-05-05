@@ -488,7 +488,7 @@ export default function ComparativePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item, idx) => {
+                  {[...items].map((it, i) => ({ it, i })).sort((a, b) => a.it.product_name.localeCompare(b.it.product_name, 'pt-BR')).map(({ it: item, i: idx }) => {
                     const minPrice = getMinPrice(item.product_id);
                     const hasAnyPrice = prices.some(p => p.product_id === item.product_id);
                     return (

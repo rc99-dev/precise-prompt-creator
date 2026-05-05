@@ -13,3 +13,34 @@ export const TITULOS_SOLICITACAO = [
   'Pedido de Polpas', 'Pedido de Processados', 'Pedido de Proteína', 'Pedido de Utensílios',
   'Pedido de Artesanato', 'Pedido de Sobremesa', 'Pedido de Sorvete', 'Pedido de Vinhos',
 ] as const;
+
+// Maps a título de solicitação para a categoria correspondente em products.categoria
+// (categorias armazenadas em maiúsculo). Apenas pré-seleciona a categoria.
+export const TITULO_TO_CATEGORIA: Record<string, string> = {
+  'Pedido de Açaí': 'AÇAÍ',
+  'Pedido de Aves': 'AVES',
+  'Pedido de Bebidas Alcoólicas': 'BEBIDAS ALCOÓLICAS',
+  'Pedido de Bebidas Não Alcoólicas': 'BEBIDAS NÃO ALCOÓLICAS',
+  'Pedido de Cervejas e Chopp': 'CERVEJAS E CHOPP',
+  'Pedido de Congelados': 'CONGELADOS',
+  'Pedido de Descartáveis e Embalagens': 'DESCARTÁVEIS E EMBALAGENS',
+  'Pedido de Equipamentos': 'EQUIPAMENTOS',
+  'Pedido de EPIs': 'EPIs',
+  'Pedido de Estoque Seco': 'ESTOQUE SECO',
+  'Pedido de Farinhas': 'FARINHAS',
+  'Pedido de Frutos do Mar': 'FRUTOS DO MAR',
+  'Pedido de Gás': 'GÁS',
+  'Pedido de Gelo': 'GELO',
+  'Pedido de Hortfruit': 'HORTFRUIT',
+  'Pedido de Mat. Escritório': 'MAT. ESCRITÓRIO',
+  'Pedido de Mat. Higiene e Limpeza': 'MAT. HIGIENE E LIMPEZA',
+  'Pedido de Peixe': 'PEIXE',
+  'Pedido de Polpas': 'POLPAS',
+  'Pedido de Processados': 'PROCESSADOS',
+  'Pedido de Proteína': 'PROTEÍNA',
+  'Pedido de Utensílios': 'UTENSÍLIOS',
+  'Pedido de Artesanato': 'ARTESANATO',
+  'Pedido de Sobremesa': 'SOBREMESA',
+  'Pedido de Sorvete': 'SORVETE',
+  'Pedido de Vinhos': 'VINHOS',
+};

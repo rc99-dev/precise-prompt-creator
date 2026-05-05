@@ -29,6 +29,7 @@ type ReceiptOrder = {
 
 type OrderItemForReceipt = {
   id: string; product_id: string; quantidade: number; preco_unitario: number;
+  supplier_id: string | null;
   products?: { nome: string; unidade_medida: string } | null;
   suppliers?: { razao_social: string } | null;
 };
@@ -100,7 +101,7 @@ export default function ReceiptsPage() {
   const [selectedOrder, setSelectedOrder] = useState<ReceiptOrder | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItemForReceipt[]>([]);
   const [receiptItems, setReceiptItems] = useState<ReceiptItemForm[]>([]);
-  const [numeroNF, setNumeroNF] = useState("");
+  const [nfBySupplier, setNfBySupplier] = useState<Record<string, string>>({});
   const [obsGeral, setObsGeral] = useState("");
   const [saving, setSaving] = useState(false);
   const [filterUnidade, setFilterUnidade] = useState("todas");
@@ -124,7 +125,7 @@ export default function ReceiptsPage() {
 
   const openReceipt = async (order: ReceiptOrder) => {
     setSelectedOrder(order);
-    setNumeroNF("");
+    setNfBySupplier({});
     setObsGeral("");
     const { data } = await supabase.from('purchase_order_items')
       .select('*, products(nome, unidade_medida), suppliers(razao_social)')
@@ -141,34 +142,61 @@ export default function ReceiptsPage() {
     setReceiptItems(prev => prev.map((item, i) => i === idx ? { ...item, ...updates } : item));
   };
 
+  // Group order items by supplier (key = supplier_id || '__no_supplier__')
+  const itemsGroupedBySupplier = (() => {
+    const groups: Record<string, { supplierId: string | null; supplierName: string; items: { item: OrderItemForReceipt; idx: number }[] }> = {};
+    orderItems.forEach((item, idx) => {
+      const key = item.supplier_id || '__no_supplier__';
+      if (!groups[key]) {
+        groups[key] = {
+          supplierId: item.supplier_id,
+          supplierName: item.suppliers?.razao_social || 'Sem fornecedor',
+          items: [],
+        };
+      }
+      groups[key].items.push({ item, idx });
+    });
+    return Object.entries(groups).map(([key, g]) => ({ key, ...g }));
+  })();
+
+  const hasMultipleSuppliers = itemsGroupedBySupplier.length > 1;
+
   const handleSave = async () => {
     if (!selectedOrder || !user) return;
     setSaving(true);
-    const { data: numData } = await supabase.rpc('generate_receipt_number' as any);
-    const numero = (numData as string) || `REC-${Date.now()}`;
     const hasOccurrence = receiptItems.some(i => i.status !== 'recebido');
     const orderStatus = hasOccurrence ? 'recebido_com_ocorrencia' : 'recebido';
 
-    const { data: receipt, error: recError } = await supabase.from('receipts').insert({
-      numero, order_id: selectedOrder.id, user_id: user.id,
-      numero_nf: numeroNF || null, status: orderStatus, observacoes: obsGeral || null,
-    } as any).select().single();
-    if (recError) { toast.error(recError.message); setSaving(false); return; }
+    // Create one receipt per supplier group, each with its own NF
+    for (const group of itemsGroupedBySupplier) {
+      const groupItems = group.items;
+      const groupReceiptItems = groupItems.map(({ idx }) => receiptItems[idx]);
+      const { data: numData } = await supabase.rpc('generate_receipt_number' as any);
+      const numero = (numData as string) || `REC-${Date.now()}-${group.key.slice(-4)}`;
+      const groupNF = nfBySupplier[group.key] || '';
 
-    const items = receiptItems.map(i => ({
-      receipt_id: (receipt as any).id, order_item_id: i.order_item_id, status: i.status,
-      quantidade_recebida: parseFloat(i.quantidade_recebida) || 0,
-      tipo_ocorrencia: i.tipo_ocorrencia || null, observacoes: i.observacoes || null,
-    }));
-    await supabase.from('receipt_items').insert(items as any);
+      const { data: receipt, error: recError } = await supabase.from('receipts').insert({
+        numero, order_id: selectedOrder.id, user_id: user.id,
+        numero_nf: groupNF || null, status: orderStatus,
+        observacoes: hasMultipleSuppliers ? `[${group.supplierName}] ${obsGeral || ''}`.trim() : (obsGeral || null),
+      } as any).select().single();
+      if (recError) { toast.error(recError.message); setSaving(false); return; }
+
+      const itemsPayload = groupReceiptItems.map(i => ({
+        receipt_id: (receipt as any).id, order_item_id: i.order_item_id, status: i.status,
+        quantidade_recebida: parseFloat(i.quantidade_recebida) || 0,
+        tipo_ocorrencia: i.tipo_ocorrencia || null, observacoes: i.observacoes || null,
+      }));
+      await supabase.from('receipt_items').insert(itemsPayload as any);
+    }
+
     await supabase.from('purchase_orders').update({ status: orderStatus } as any).eq('id', selectedOrder.id);
 
-    // MELHORIA 12 — Notificações de recebimento
+    // Notificações de recebimento
     const { data: myProfile } = await supabase.from('profiles').select('full_name').eq('user_id', user.id).single();
     const estoquistaNome = myProfile?.full_name || 'Assistente de Suprimentos';
     const dataRecebimento = formatDate(new Date().toISOString());
 
-    // Notify order creator
     const notifCreator: any = {
       user_id: selectedOrder.user_id,
       titulo: hasOccurrence ? '⚠️ Recebido com ocorrências' : 'Pedido recebido',
@@ -180,7 +208,6 @@ export default function ReceiptsPage() {
     };
     await supabase.from('notifications').insert(notifCreator);
 
-    // If occurrence, also notify all aprovadores
     if (hasOccurrence) {
       const { data: aprovadores } = await supabase.from('user_roles').select('user_id').eq('role', 'aprovador');
       if (aprovadores?.length) {
@@ -376,67 +403,75 @@ export default function ReceiptsPage() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Registrar Recebimento — {selectedOrder?.numero}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Número da NF</Label>
-                <Input value={numeroNF} onChange={e => setNumeroNF(e.target.value)} placeholder="Nº da nota fiscal" />
-              </div>
-              <div className="space-y-2">
-                <Label>Observações gerais</Label>
-                <Input value={obsGeral} onChange={e => setObsGeral(e.target.value)} placeholder="Obs geral do recebimento" />
-              </div>
+            <div className="space-y-2">
+              <Label>Observações gerais</Label>
+              <Input value={obsGeral} onChange={e => setObsGeral(e.target.value)} placeholder="Obs geral do recebimento" />
             </div>
-            <div className="space-y-3">
-              {orderItems.map((item, idx) => (
-                <Card key={item.id}>
+            <div className="space-y-4">
+              {itemsGroupedBySupplier.map(group => (
+                <Card key={group.key} className="border-primary/20">
                   <CardContent className="py-3 space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3 flex-wrap pb-2 border-b">
                       <div>
-                        <p className="font-medium">{item.products?.nome}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Esperado: {item.quantidade} {item.products?.unidade_medida} — {item.suppliers?.razao_social}
-                        </p>
+                        <p className="text-sm font-semibold">{group.supplierName}</p>
+                        <p className="text-xs text-muted-foreground">{group.items.length} {group.items.length === 1 ? 'item' : 'itens'}</p>
+                      </div>
+                      <div className="flex-1 min-w-[200px] max-w-xs">
+                        <Label className="text-xs">Número da NF{hasMultipleSuppliers ? ` (${group.supplierName})` : ''}</Label>
+                        <Input
+                          value={nfBySupplier[group.key] || ''}
+                          onChange={e => setNfBySupplier(prev => ({ ...prev, [group.key]: e.target.value }))}
+                          placeholder="Nº da nota fiscal"
+                        />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Status</Label>
-                        <Select value={receiptItems[idx]?.status} onValueChange={v => updateReceiptItem(idx, { status: v })}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="recebido">Conforme</SelectItem>
-                            <SelectItem value="parcial">Parcial</SelectItem>
-                            <SelectItem value="ocorrencia">Ocorrência</SelectItem>
-                            <SelectItem value="nao_recebido">Não recebido</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {receiptItems[idx]?.status === 'parcial' && (
-                        <div className="space-y-1">
-                          <Label className="text-xs">Qtd recebida</Label>
-                          <Input type="number" step="0.01" value={receiptItems[idx]?.quantidade_recebida}
-                            onChange={e => updateReceiptItem(idx, { quantidade_recebida: e.target.value })} />
+                    {group.items.map(({ item, idx }) => (
+                      <div key={item.id} className="space-y-2 border-b last:border-0 pb-2 last:pb-0">
+                        <div>
+                          <p className="font-medium text-sm">{item.products?.nome}</p>
+                          <p className="text-xs text-muted-foreground">Esperado: {item.quantidade} {item.products?.unidade_medida}</p>
                         </div>
-                      )}
-                      {(receiptItems[idx]?.status === 'ocorrencia' || receiptItems[idx]?.status === 'nao_recebido') && (
-                        <>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                           <div className="space-y-1">
-                            <Label className="text-xs">Tipo ocorrência</Label>
-                            <Select value={receiptItems[idx]?.tipo_ocorrencia} onValueChange={v => updateReceiptItem(idx, { tipo_ocorrencia: v })}>
-                              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                            <Label className="text-xs">Status</Label>
+                            <Select value={receiptItems[idx]?.status} onValueChange={v => updateReceiptItem(idx, { status: v })}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                {OCORRENCIA_TIPOS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                                <SelectItem value="recebido">Conforme</SelectItem>
+                                <SelectItem value="parcial">Parcial</SelectItem>
+                                <SelectItem value="ocorrencia">Ocorrência</SelectItem>
+                                <SelectItem value="nao_recebido">Não recebido</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Observação</Label>
-                            <Input value={receiptItems[idx]?.observacoes}
-                              onChange={e => updateReceiptItem(idx, { observacoes: e.target.value })} />
-                          </div>
-                        </>
-                      )}
-                    </div>
+                          {receiptItems[idx]?.status === 'parcial' && (
+                            <div className="space-y-1">
+                              <Label className="text-xs">Qtd recebida</Label>
+                              <Input type="number" step="0.01" value={receiptItems[idx]?.quantidade_recebida}
+                                onChange={e => updateReceiptItem(idx, { quantidade_recebida: e.target.value })} />
+                            </div>
+                          )}
+                          {(receiptItems[idx]?.status === 'ocorrencia' || receiptItems[idx]?.status === 'nao_recebido') && (
+                            <>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Tipo ocorrência</Label>
+                                <Select value={receiptItems[idx]?.tipo_ocorrencia} onValueChange={v => updateReceiptItem(idx, { tipo_ocorrencia: v })}>
+                                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                  <SelectContent>
+                                    {OCORRENCIA_TIPOS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Observação</Label>
+                                <Input value={receiptItems[idx]?.observacoes}
+                                  onChange={e => updateReceiptItem(idx, { observacoes: e.target.value })} />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </CardContent>
                 </Card>
               ))}

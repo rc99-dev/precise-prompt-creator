@@ -1,33 +1,39 @@
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Package, ShoppingCart, Plus, TrendingDown, Clock, ClipboardList } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Building2, Package, ShoppingCart, Plus, TrendingDown, Clock, ClipboardList, Layers, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatCurrency, formatDate, statusLabels, statusColors } from "@/lib/helpers";
 import { useQuery } from "@tanstack/react-query";
 import QueryError from "@/components/QueryError";
 
-const COUNTABLE_STATUSES = ['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
+const STATUSES_REALIZADAS = ['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
+const STATUSES_RECEBIDAS = ['recebido', 'recebido_com_ocorrencia'];
 
 export default function DashboardPage() {
   const { role } = useAuth();
+  const [view, setView] = useState<'realizadas' | 'recebidas'>('realizadas');
+  const countableStatuses = view === 'recebidas' ? STATUSES_RECEBIDAS : STATUSES_REALIZADAS;
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['dashboard-stats'],
+    queryKey: ['dashboard-stats', view],
     queryFn: async () => {
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
-      const [suppliersRes, productsRes, reqsRes, approvalsRes, ordersRes] = await Promise.all([
+      const [suppliersRes, productsRes, reqsRes, approvalsRes, ordersRes, itemsRes] = await Promise.all([
         supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
         supabase.from('products').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
         supabase.from('requisitions').select('*', { count: 'exact', head: true }).eq('status', 'pendente'),
         supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'aguardando_aprovacao'),
-        supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }).limit(10),
+        supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }).limit(200),
+        supabase.from('purchase_order_items').select('order_id, supplier_id, subtotal, products(categoria), suppliers(razao_social)').limit(2000),
       ]);
 
       if (suppliersRes.error) throw suppliersRes.error;
@@ -36,12 +42,30 @@ export default function DashboardPage() {
       if (approvalsRes.error) throw approvalsRes.error;
       if (ordersRes.error) throw ordersRes.error;
 
-      const orders = ordersRes.data || [];
-      // Only count approved/emitted/received orders for financial metrics
-      const monthOrders = orders.filter((o) =>
-        new Date(o.created_at) >= startOfMonth && COUNTABLE_STATUSES.includes(o.status)
+      const allOrders = ordersRes.data || [];
+      const monthOrders = allOrders.filter((o) =>
+        new Date(o.created_at) >= startOfMonth && countableStatuses.includes(o.status)
       );
       const monthTotal = monthOrders.reduce((s: number, o: any) => s + (o.total || 0), 0);
+      const ticketMedio = monthOrders.length > 0 ? monthTotal / monthOrders.length : 0;
+
+      // Category ranking + top supplier (filtered by countable order ids)
+      const countableIds = new Set(allOrders.filter(o => countableStatuses.includes(o.status)).map(o => o.id));
+      const items = (itemsRes.data || []) as any[];
+      const catMap: Record<string, number> = {};
+      const supMap: Record<string, { name: string; total: number }> = {};
+      items.forEach(it => {
+        if (!countableIds.has(it.order_id)) return;
+        const cat = (it.products?.categoria || 'Sem categoria') as string;
+        catMap[cat] = (catMap[cat] || 0) + (it.subtotal || 0);
+        const sname = it.suppliers?.razao_social || 'Sem fornecedor';
+        const key = it.supplier_id || sname;
+        if (!supMap[key]) supMap[key] = { name: sname, total: 0 };
+        supMap[key].total += it.subtotal || 0;
+      });
+      const categoryRanking = Object.entries(catMap).map(([nome, total]) => ({ nome, total }))
+        .sort((a, b) => b.total - a.total).slice(0, 5);
+      const topSupplier = Object.values(supMap).sort((a, b) => b.total - a.total)[0] || null;
 
       return {
         stats: {
@@ -51,15 +75,19 @@ export default function DashboardPage() {
           pendingApprovals: approvalsRes.count || 0,
           monthOrders: monthOrders.length,
           monthTotal,
+          ticketMedio,
+          topSupplier,
         },
-        recentOrders: orders,
+        categoryRanking,
+        recentOrders: allOrders.slice(0, 10),
       };
     },
     staleTime: 2 * 60 * 1000,
   });
 
-  const stats = data?.stats || { suppliers: 0, products: 0, pendingReqs: 0, pendingApprovals: 0, monthOrders: 0, monthTotal: 0 };
+  const stats = data?.stats || { suppliers: 0, products: 0, pendingReqs: 0, pendingApprovals: 0, monthOrders: 0, monthTotal: 0, ticketMedio: 0, topSupplier: null as null | { name: string; total: number } };
   const recentOrders = data?.recentOrders || [];
+  const categoryRanking = data?.categoryRanking || [];
 
   const statusBadge = (status: string) => (
     <Badge className={statusColors[status] || 'bg-muted text-muted-foreground'}>{statusLabels[status] || status}</Badge>

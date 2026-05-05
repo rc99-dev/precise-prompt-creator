@@ -518,7 +518,7 @@ export default function NewOrderPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item, idx) => {
+                  {[...items].map((it, i) => ({ it, i })).sort((a, b) => a.it.product_name.localeCompare(b.it.product_name, 'pt-BR')).map(({ it: item, i: idx }) => {
                     const min = getMinPrice(item.product_id);
                     // Use only the per-item saldo. Do NOT fall back to the aggregated `saldos` map,
                     // because that map is built from requisitions.saldo_atual (which only stores the
