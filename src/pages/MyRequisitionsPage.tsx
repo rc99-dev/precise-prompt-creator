@@ -174,7 +174,20 @@ export default function MyRequisitionsPage() {
     if (!titulo) { toast.error("Selecione o título."); return; }
     if (!unidade) { toast.error("Selecione a unidade."); return; }
     if (!setor) { toast.error("Selecione o setor."); return; }
-    if (items.length === 0) { toast.error("Adicione pelo menos um produto."); return; }
+
+    // Remove items with both saldo and pedido empty/zero
+    const validItems = items.filter(i => {
+      const s = parseFloat(i.saldo) || 0;
+      const p = parseFloat(i.pedido) || 0;
+      return s > 0 || p > 0;
+    });
+    if (validItems.length === 0) {
+      toast.error("Informe saldo ou pedido em pelo menos um item.");
+      return;
+    }
+    if (validItems.length < items.length) {
+      setItems(validItems);
+    }
 
     setSaving(true);
 
