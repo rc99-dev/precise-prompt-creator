@@ -101,7 +101,7 @@ export default function ReceiptsPage() {
   const [selectedOrder, setSelectedOrder] = useState<ReceiptOrder | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItemForReceipt[]>([]);
   const [receiptItems, setReceiptItems] = useState<ReceiptItemForm[]>([]);
-  const [numeroNF, setNumeroNF] = useState("");
+  const [nfBySupplier, setNfBySupplier] = useState<Record<string, string>>({});
   const [obsGeral, setObsGeral] = useState("");
   const [saving, setSaving] = useState(false);
   const [filterUnidade, setFilterUnidade] = useState("todas");
