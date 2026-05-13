@@ -101,6 +101,7 @@ const defaultPermissions: Record<string, AppRole[]> = {
   usuarios: ['master'],
   relatorios: ['financeiro', 'master'],
   inventarios: ['solicitante', 'comprador', 'estoquista', 'master'],
+  'historico-inventarios': ['solicitante', 'comprador', 'aprovador', 'estoquista', 'financeiro', 'master'],
 };
 
 export function getDefaultPagesForRole(role: AppRole): string[] {
