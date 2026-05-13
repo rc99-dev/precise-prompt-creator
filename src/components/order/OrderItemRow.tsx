@@ -25,8 +25,8 @@ interface Props {
 }
 
 function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, onRemove, saldo }: Props) {
-  const handleQty = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
+  const handleQty = useCallback((value: string) => {
+    const val = parseFloat(value);
     if (!isNaN(val) && val >= 0) onUpdate(index, { quantidade: val });
   }, [index, onUpdate]);
 
