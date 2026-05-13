@@ -61,13 +61,19 @@ export default function ProductsExportDialog({ open, onOpenChange, categories }:
       // ABC ranking
       let abcMap = new Map<string, { total: number; classe: string }>();
       if (abc && productIds.length) {
+        const validStatuses = ['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
+        const { data: validOrders } = await supabase
+          .from('purchase_orders')
+          .select('id')
+          .in('status', validStatuses);
+        const validOrderIds = new Set((validOrders || []).map((o: any) => o.id));
         const { data: items } = await supabase
           .from('purchase_order_items')
-          .select('product_id, subtotal, order_id, purchase_orders!inner(status)')
-          .in('product_id', productIds)
-          .in('purchase_orders.status', ['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia']);
+          .select('product_id, subtotal, order_id')
+          .in('product_id', productIds);
         const totals = new Map<string, number>();
         (items || []).forEach((it: any) => {
+          if (!validOrderIds.has(it.order_id)) return;
           totals.set(it.product_id, (totals.get(it.product_id) || 0) + Number(it.subtotal || 0));
         });
         const sorted = productIds
