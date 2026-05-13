@@ -23,10 +23,11 @@ const purchasesConfig: ChartConfig = {
 const suppliersConfig: ChartConfig = { total: { label: "Total (R$)", color: "hsl(var(--primary))" } };
 const approvalConfig: ChartConfig = { dias: { label: "Dias", color: "hsl(var(--primary))" } };
 
-async function fetchReportData(year: string) {
+async function fetchReportData(year: string, view: 'realizadas' | 'recebidas') {
   const yearNum = parseInt(year);
   const startDate = `${yearNum}-01-01`;
   const endDate = `${yearNum + 1}-01-01`;
+  const countableStatuses = view === 'recebidas' ? STATUSES_RECEBIDAS : STATUSES_REALIZADAS;
 
   const [ordersRes, itemsRes, approvalRes] = await Promise.all([
     supabase.from("purchase_orders").select("id, created_at, total, status, approved_at, modo")
@@ -40,7 +41,7 @@ async function fetchReportData(year: string) {
 
   const allOrders = ordersRes.data || [];
   // Only count orders with countable statuses for financial metrics
-  const orders = allOrders.filter(o => COUNTABLE_STATUSES.includes(o.status));
+  const orders = allOrders.filter(o => countableStatuses.includes(o.status));
   const items = (itemsRes.data || []) as any[];
   const approvals = approvalRes.data || [];
 
