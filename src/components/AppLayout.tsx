@@ -22,14 +22,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [pendingApprovals, setPendingApprovals] = useState(0);
 
   useEffect(() => {
+    const refreshReqs = () => {
+      if (role === 'comprador' || role === 'master') {
+        supabase.from('requisitions').select('id', { count: 'exact', head: true })
+          .eq('status', 'pendente').then(({ count }) => setPendingReqs(count || 0));
+      }
+    };
+    const refreshApprovals = () => {
+      if (role === 'aprovador' || role === 'master') {
+        supabase.from('purchase_orders').select('id', { count: 'exact', head: true })
+          .eq('status', 'aguardando_aprovacao').then(({ count }) => setPendingApprovals(count || 0));
+      }
+    };
+    refreshReqs();
+    refreshApprovals();
+
+    const channels: any[] = [];
     if (role === 'comprador' || role === 'master') {
-      supabase.from('requisitions').select('id', { count: 'exact', head: true })
-        .eq('status', 'pendente').then(({ count }) => setPendingReqs(count || 0));
+      const ch = supabase.channel('sidebar-reqs')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'requisitions' }, refreshReqs)
+        .subscribe();
+      channels.push(ch);
     }
     if (role === 'aprovador' || role === 'master') {
-      supabase.from('purchase_orders').select('id', { count: 'exact', head: true })
-        .eq('status', 'aguardando_aprovacao').then(({ count }) => setPendingApprovals(count || 0));
+      const ch = supabase.channel('sidebar-orders')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, refreshApprovals)
+        .subscribe();
+      channels.push(ch);
     }
+    return () => { channels.forEach(c => supabase.removeChannel(c)); };
   }, [role]);
 
   const allNavItems: NavItem[] = [

@@ -146,12 +146,13 @@ export default function OrderHistoryPage() {
   };
   const selectedOrders = filtered.filter(o => selectedIds.has(o.id));
   const isMaster = role === 'master';
-  const canExportMulti = isMaster
+  const isPrivileged = isMaster || role === 'comprador' || role === 'estoquista';
+  const canExportMulti = isPrivileged
     ? selectedOrders.length >= 1
     : selectedOrders.length > 1 && selectedOrders.every(o => o.status === selectedOrders[0].status);
-  const canBatchReceive = isMaster && selectedOrders.length >= 1 &&
+  const canBatchReceive = (isMaster || role === 'estoquista') && selectedOrders.length >= 1 &&
     selectedOrders.every(o => o.status === 'aprovado' || o.status === 'emitido');
-  const canBatchForecast = isMaster && selectedOrders.length >= 1 &&
+  const canBatchForecast = (isMaster || role === 'estoquista' || role === 'comprador') && selectedOrders.length >= 1 &&
     selectedOrders.every(o => o.status === 'emitido');
 
   const viewOrder = async (order: Order) => {
@@ -638,7 +639,7 @@ export default function OrderHistoryPage() {
         <Button variant="outline" size="sm" onClick={() => setShowFilters(s => !s)}>
           <Filter className="h-4 w-4 mr-2" />{showFilters ? 'Ocultar filtros' : 'Mais filtros'}
         </Button>
-        {!isMaster && selectedOrders.length > 1 && (
+        {!isPrivileged && selectedOrders.length > 1 && (
           <Button size="sm" onClick={exportSelectedPDF} disabled={!canExportMulti || exportingMulti}>
             <FileDown className="h-4 w-4 mr-2" />
             {exportingMulti ? 'Gerando...' : `Exportar ${selectedOrders.length} em PDF`}
@@ -777,12 +778,12 @@ export default function OrderHistoryPage() {
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
-                          {role === 'master' && o.status === 'aprovado' && (
+                          {(role === 'master' || role === 'aprovador') && o.status === 'aprovado' && (
                             <Button variant="ghost" size="icon" onClick={() => { setRejectTarget(o); setRejectReason(""); }} title="Reprovar">
                               <XCircle className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
-                          {role === 'master' && (o.status === 'emitido' || o.status === 'recebido' || o.status === 'recebido_com_ocorrencia') && (
+                          {(role === 'master' || role === 'comprador' || role === 'estoquista') && (o.status === 'emitido' || o.status === 'recebido' || o.status === 'recebido_com_ocorrencia') && (
                             <Button variant="ghost" size="icon" onClick={() => { setCancelTarget(o); setCancelReason(""); }} title="Cancelar pedido">
                               <Ban className="h-4 w-4 text-destructive" />
                             </Button>
@@ -890,7 +891,7 @@ export default function OrderHistoryPage() {
         </DialogContent>
       </Dialog>
 
-      {isMaster && selectedOrders.length >= 1 && (
+      {isPrivileged && selectedOrders.length >= 1 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-card border rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 flex-wrap">
           <span className="text-sm font-medium">{selectedOrders.length} pedido(s) selecionado(s)</span>
           <div className="h-5 w-px bg-border" />
