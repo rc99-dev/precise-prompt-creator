@@ -19,22 +19,26 @@ const STATUSES_RECEBIDAS = ['recebido', 'recebido_com_ocorrencia'];
 export default function DashboardPage() {
   const { role } = useAuth();
   const [view, setView] = useState<'realizadas' | 'recebidas'>('realizadas');
+  const [period, setPeriod] = useState<'mes' | '30d' | '90d' | 'ano'>('mes');
   const countableStatuses = view === 'recebidas' ? STATUSES_RECEBIDAS : STATUSES_REALIZADAS;
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['dashboard-stats', view],
+    queryKey: ['dashboard-stats', view, period],
     queryFn: async () => {
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
+      const now = new Date();
+      let startDate = new Date();
+      if (period === 'mes') { startDate.setDate(1); startDate.setHours(0,0,0,0); }
+      else if (period === '30d') { startDate.setDate(now.getDate() - 30); }
+      else if (period === '90d') { startDate.setDate(now.getDate() - 90); }
+      else if (period === 'ano') { startDate = new Date(now.getFullYear(), 0, 1); }
 
       const [suppliersRes, productsRes, reqsRes, approvalsRes, ordersRes, itemsRes] = await Promise.all([
         supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
         supabase.from('products').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
         supabase.from('requisitions').select('*', { count: 'exact', head: true }).eq('status', 'pendente'),
         supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'aguardando_aprovacao'),
-        supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }).limit(200),
-        supabase.from('purchase_order_items').select('order_id, supplier_id, subtotal, products(categoria), suppliers(razao_social)').limit(2000),
+        supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('purchase_order_items').select('order_id, supplier_id, subtotal, products(categoria), suppliers(razao_social)').limit(5000),
       ]);
 
       if (suppliersRes.error) throw suppliersRes.error;
