@@ -240,6 +240,7 @@ export default function ProductsPage() {
       </Dialog>
 
       <CsvImportModal config={productsImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={invalidate} />
+      <ProductsExportDialog open={exportOpen} onOpenChange={setExportOpen} categories={categories} />
     </div>
   );
 }
