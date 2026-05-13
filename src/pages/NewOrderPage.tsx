@@ -65,6 +65,7 @@ export default function NewOrderPage() {
   const [titulo, setTitulo] = useState("");
   const [saving, setSaving] = useState(false);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [confirmApprovalOpen, setConfirmApprovalOpen] = useState(false);
   const [selectedReqImport, setSelectedReqImport] = useState<string | null>(null);
   const draftRestored = useRef(false);
   const draftDecided = useRef(false);
