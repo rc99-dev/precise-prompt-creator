@@ -206,13 +206,12 @@ export default function MyRequisitionsPage() {
     setShowForm(false); setEditingId(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const prepareSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!titulo) { toast.error("Selecione o título."); return; }
     if (!unidade) { toast.error("Selecione a unidade."); return; }
     if (!setor) { toast.error("Selecione o setor."); return; }
 
-    // Remove items with both saldo and pedido empty/zero
     const validItems = items.filter(i => {
       const s = parseFloat(i.saldo) || 0;
       const p = parseFloat(i.pedido) || 0;
@@ -225,6 +224,19 @@ export default function MyRequisitionsPage() {
     if (validItems.length < items.length) {
       setItems(validItems);
     }
+
+    setConfirmSubmitOpen(true);
+  };
+
+  const executeSubmit = async () => {
+    setConfirmSubmitOpen(false);
+
+    // Recompute validItems
+    const validItems = items.filter(i => {
+      const s = parseFloat(i.saldo) || 0;
+      const p = parseFloat(i.pedido) || 0;
+      return s > 0 || p > 0;
+    });
 
     setSaving(true);
 
