@@ -51,35 +51,53 @@ export type Database = {
       }
       inventories: {
         Row: {
+          autorizado_em: string | null
+          autorizado_por: string | null
           categoria: string | null
           created_at: string
+          created_by: string | null
+          enviado_em: string | null
           id: string
+          numero: string | null
           observacoes: string | null
           setor: string | null
+          status: string
           titulo: string
-          unidade: string | null
+          unidade: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          autorizado_em?: string | null
+          autorizado_por?: string | null
           categoria?: string | null
           created_at?: string
+          created_by?: string | null
+          enviado_em?: string | null
           id?: string
+          numero?: string | null
           observacoes?: string | null
           setor?: string | null
+          status?: string
           titulo: string
-          unidade?: string | null
+          unidade: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          autorizado_em?: string | null
+          autorizado_por?: string | null
           categoria?: string | null
           created_at?: string
+          created_by?: string | null
+          enviado_em?: string | null
           id?: string
+          numero?: string | null
           observacoes?: string | null
           setor?: string | null
+          status?: string
           titulo?: string
-          unidade?: string | null
+          unidade?: string
           updated_at?: string
           user_id?: string
         }
@@ -93,6 +111,7 @@ export type Database = {
           observacoes: string | null
           product_id: string
           saldo: number
+          solicitar_compra: boolean
         }
         Insert: {
           created_at?: string
@@ -101,6 +120,7 @@ export type Database = {
           observacoes?: string | null
           product_id: string
           saldo?: number
+          solicitar_compra?: boolean
         }
         Update: {
           created_at?: string
@@ -109,6 +129,7 @@ export type Database = {
           observacoes?: string | null
           product_id?: string
           saldo?: number
+          solicitar_compra?: boolean
         }
         Relationships: [
           {
@@ -119,6 +140,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inventory_log: {
+        Row: {
+          action: string
+          created_at: string
+          detalhes: string | null
+          id: string
+          inventory_id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          detalhes?: string | null
+          id?: string
+          inventory_id: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          detalhes?: string | null
+          id?: string
+          inventory_id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -866,6 +914,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_inventory_number: { Args: never; Returns: string }
       generate_order_number: { Args: never; Returns: string }
       generate_quotation_number: { Args: never; Returns: string }
       generate_receipt_number: { Args: never; Returns: string }

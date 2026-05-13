@@ -83,6 +83,7 @@ export const ALL_PAGES = [
   { key: 'usuarios', label: 'Usuários' },
   { key: 'relatorios', label: 'Relatórios' },
   { key: 'inventarios', label: 'Inventários' },
+  { key: 'historico-inventarios', label: 'Histórico de Inventários' },
 ] as const;
 
 const defaultPermissions: Record<string, AppRole[]> = {
@@ -100,6 +101,7 @@ const defaultPermissions: Record<string, AppRole[]> = {
   usuarios: ['master'],
   relatorios: ['financeiro', 'master'],
   inventarios: ['solicitante', 'comprador', 'estoquista', 'master'],
+  'historico-inventarios': ['solicitante', 'comprador', 'aprovador', 'estoquista', 'financeiro', 'master'],
 };
 
 export function getDefaultPagesForRole(role: AppRole): string[] {

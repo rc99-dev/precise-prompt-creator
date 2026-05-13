@@ -626,3 +626,121 @@ export function generateRequisitionPDF(data: RequisitionPDFData) {
 
   doc.save(`solicitacao_${data.titulo.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
 }
+// ===== INVENTORY PDF =====
+
+export interface InventoryPDFItem {
+  produto: string;
+  unidade: string;
+  saldo: number;
+  observacoes?: string | null;
+  solicitar_compra?: boolean;
+}
+
+export interface InventoryLogEntry {
+  data: string;
+  usuario: string;
+  acao: string;
+  detalhes?: string | null;
+}
+
+export interface InventoryPDFData {
+  numero: string;
+  titulo: string;
+  unidade: string;
+  setor?: string | null;
+  categoria?: string | null;
+  criado_por: string;
+  status: string;
+  created_at: string;
+  observacoes?: string | null;
+  items: InventoryPDFItem[];
+  log?: InventoryLogEntry[];
+}
+
+export function generateInventoryPDF(data: InventoryPDFData) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const w = doc.internal.pageSize.getWidth();
+
+  let y = drawHeader(doc, "INVENTÁRIO", data.numero, formatDate(data.created_at), data.unidade);
+
+  doc.setFillColor(...GRAY_LIGHT);
+  doc.roundedRect(14, y, w - 28, 28, 2, 2, "F");
+  doc.setFontSize(9);
+  doc.setTextColor(...DARK);
+  doc.setFont("helvetica", "bold"); doc.text("Título:", 18, y + 6);
+  doc.setFont("helvetica", "normal"); doc.text(String(data.titulo), 32, y + 6);
+  doc.setFont("helvetica", "bold"); doc.text("Categoria:", 18, y + 12);
+  doc.setFont("helvetica", "normal"); doc.text(String(data.categoria || "—"), 38, y + 12);
+  doc.setFont("helvetica", "bold"); doc.text("Setor:", 18, y + 18);
+  doc.setFont("helvetica", "normal"); doc.text(String(data.setor || "—"), 30, y + 18);
+  doc.setFont("helvetica", "bold"); doc.text("Criado por:", 18, y + 24);
+  doc.setFont("helvetica", "normal"); doc.text(String(data.criado_por), 40, y + 24);
+  doc.setFont("helvetica", "bold"); doc.text("Status:", w - 60, y + 18);
+  doc.setFont("helvetica", "normal"); doc.text(String(data.status).toUpperCase(), w - 46, y + 18);
+  doc.setFont("helvetica", "bold"); doc.text("Data:", w - 60, y + 24);
+  doc.setFont("helvetica", "normal"); doc.text(formatDate(data.created_at), w - 48, y + 24);
+
+  y += 34;
+
+  autoTable(doc, {
+    startY: y,
+    head: [["#", "Produto", "Unidade", "Saldo", "Solicitar", "Observações"]],
+    body: data.items.map((it, idx) => [
+      String(idx + 1),
+      it.produto,
+      it.unidade,
+      String(it.saldo),
+      it.solicitar_compra ? "Sim" : "—",
+      it.observacoes || "—",
+    ]),
+    margin: { left: 14, right: 14, bottom: 30 },
+    styles: { fontSize: 8, cellPadding: 2.5, textColor: DARK as any },
+    headStyles: { fillColor: BRAND as any, textColor: WHITE as any, fontStyle: "bold", fontSize: 8 },
+    alternateRowStyles: { fillColor: [250, 245, 248] },
+    columnStyles: {
+      0: { cellWidth: 8, halign: "center" },
+      1: { cellWidth: "auto" },
+      2: { cellWidth: 18, halign: "center" },
+      3: { cellWidth: 20, halign: "right" },
+      4: { cellWidth: 20, halign: "center" },
+      5: { cellWidth: 50 },
+    },
+    rowPageBreak: 'auto',
+    didDrawPage: () => { drawFooterLine(doc); },
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 8;
+
+  if (data.observacoes) {
+    doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.setTextColor(...DARK);
+    doc.text("OBSERVAÇÕES", 14, y);
+    doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80);
+    const lines = doc.splitTextToSize(data.observacoes, w - 28);
+    doc.text(lines, 14, y + 5);
+    y += 5 + lines.length * 4 + 4;
+  }
+
+  if (data.log && data.log.length > 0) {
+    if (y > doc.internal.pageSize.getHeight() - 60) { doc.addPage(); y = 20; }
+    doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(...DARK);
+    doc.text("HISTÓRICO DE ALTERAÇÕES", 14, y);
+    autoTable(doc, {
+      startY: y + 3,
+      head: [["Data/Hora", "Usuário", "Ação", "Detalhes"]],
+      body: data.log.map(l => [formatDateTime(l.data), l.usuario, l.acao, l.detalhes || "—"]),
+      margin: { left: 14, right: 14, bottom: 30 },
+      styles: { fontSize: 7.5, cellPadding: 2, textColor: DARK as any },
+      headStyles: { fillColor: BRAND as any, textColor: WHITE as any, fontStyle: "bold", fontSize: 7.5 },
+      alternateRowStyles: { fillColor: [250, 245, 248] },
+      columnStyles: {
+        0: { cellWidth: 36 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: "auto" },
+      },
+      didDrawPage: () => { drawFooterLine(doc); },
+    });
+  }
+
+  doc.save(`inventario_${data.numero}.pdf`);
+}
