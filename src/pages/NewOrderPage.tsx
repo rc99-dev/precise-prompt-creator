@@ -558,6 +558,21 @@ export default function NewOrderPage() {
 
       <OrderStickyFooter total={total} economy={economy} itemCount={items.length} saving={saving}
         onSaveDraft={() => handleSave('rascunho')} onSubmit={() => handleSave('aguardando_aprovacao')} />
+
+      <Dialog open={confirmApprovalOpen} onOpenChange={setConfirmApprovalOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Confirmar envio para aprovação</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Confirma o envio do pedido {editOrderId ? "" : "para aprovação"}? Total: <strong>{formatCurrency(total)}</strong>
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmApprovalOpen(false)}>Cancelar</Button>
+            <Button onClick={() => { setConfirmApprovalOpen(false); doSave('aguardando_aprovacao'); }} disabled={saving}>
+              {saving ? "Enviando..." : "Confirmar envio"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
