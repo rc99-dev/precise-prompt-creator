@@ -1,4 +1,5 @@
 import { memo, useCallback } from "react";
+import { CalcInput } from "@/components/CalcInput";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,8 +25,8 @@ interface Props {
 }
 
 function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, onRemove, saldo }: Props) {
-  const handleQty = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
+  const handleQty = useCallback((value: string) => {
+    const val = parseFloat(value);
     if (!isNaN(val) && val >= 0) onUpdate(index, { quantidade: val });
   }, [index, onUpdate]);
 
@@ -43,8 +44,7 @@ function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, o
         {saldo !== undefined && saldo !== null ? saldo : '—'}
       </td>
       <td className="py-2.5 px-3">
-        <Input
-          type="number"
+        <CalcInput
           min="0.01"
           step="0.01"
           className="w-20 text-center h-8 text-sm"

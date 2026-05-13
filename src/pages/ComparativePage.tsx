@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { CalcInput } from "@/components/CalcInput";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -502,7 +503,7 @@ export default function ComparativePage() {
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          <Input type="number" min="0.01" step="0.01" className="w-16 text-center mx-auto" value={item.quantidade} onChange={e => updateQty(idx, parseFloat(e.target.value) || 0)} />
+                          <CalcInput min="0.01" step="0.01" className="w-16 text-center mx-auto" value={item.quantidade} onChange={v => updateQty(idx, parseFloat(v) || 0)} />
                         </td>
                         {showSaldo && (
                           <td className="py-3 px-4 text-center text-muted-foreground">
