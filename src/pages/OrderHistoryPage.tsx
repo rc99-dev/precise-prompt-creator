@@ -891,7 +891,7 @@ export default function OrderHistoryPage() {
         </DialogContent>
       </Dialog>
 
-      {isMaster && selectedOrders.length >= 1 && (
+      {isPrivileged && selectedOrders.length >= 1 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-card border rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 flex-wrap">
           <span className="text-sm font-medium">{selectedOrders.length} pedido(s) selecionado(s)</span>
           <div className="h-5 w-px bg-border" />
