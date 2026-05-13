@@ -22,6 +22,7 @@ import ReportsPage from "@/pages/ReportsPage";
 import NotFound from "@/pages/NotFound";
 import PendingApprovalPage from "@/pages/PendingApprovalPage";
 import InventoriesPage from "@/pages/InventoriesPage";
+import InventoryHistoryPage from "@/pages/InventoryHistoryPage";
 import { canAccess } from "@/lib/helpers";
 
 const queryClient = new QueryClient();
