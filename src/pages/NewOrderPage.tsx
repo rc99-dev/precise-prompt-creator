@@ -19,6 +19,7 @@ import QueryError from "@/components/QueryError";
 import { useOrderDraft, DraftOrderItem } from "@/hooks/useOrderDraft";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 import { AlertTriangle, Trash2, RotateCcw, ClipboardList } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
