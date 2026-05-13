@@ -35,6 +35,7 @@ export default function MyRequisitionsPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const editId = searchParams.get("edit");
+  const fromInventoryId = searchParams.get("fromInventory");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [titulo, setTitulo] = useState("");
