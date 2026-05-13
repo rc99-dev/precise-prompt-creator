@@ -94,12 +94,19 @@ export default function InventoryHistoryPage() {
   const viewLog = async (inv: any) => {
     const { data: log } = await (supabase as any).from('inventory_log')
       .select('*').eq('inventory_id', inv.id).order('created_at', { ascending: true });
-    const ids = Array.from(new Set((log || []).map((l: any) => l.user_id))) as string[];
-    const { data: names } = ids.length
-      ? await supabase.rpc('get_profile_names', { _user_ids: ids } as any)
-      : { data: [] as any[] };
+    const ids = Array.from(new Set((log || []).map((l: any) => l.user_id).filter(Boolean))) as string[];
     const nm: Record<string, string> = {};
-    (names || []).forEach((n: any) => { nm[n.user_id] = n.full_name; });
+    if (ids.length) {
+      try {
+        const { data: names } = await supabase.rpc('get_profile_names', { _user_ids: ids } as any);
+        (names || []).forEach((n: any) => { if (n.full_name) nm[n.user_id] = n.full_name; });
+      } catch {}
+      const missing = ids.filter(id => !nm[id]);
+      if (missing.length) {
+        const { data: prof } = await supabase.from('profiles').select('user_id, full_name').in('user_id', missing);
+        (prof || []).forEach((p: any) => { if (p.full_name) nm[p.user_id] = p.full_name; });
+      }
+    }
     setLogOpen({ inv, logs: log || [], nameMap: nm });
   };
 
