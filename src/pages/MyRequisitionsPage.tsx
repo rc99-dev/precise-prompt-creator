@@ -499,8 +499,11 @@ export default function MyRequisitionsPage() {
           ) : requisitions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <ClipboardList className="h-12 w-12 mb-3 opacity-50" />
-              <p className="text-sm font-medium">Nenhuma solicitação ainda</p>
-              <p className="text-xs mt-1">Clique em "Nova Solicitação" para informar o saldo dos produtos</p>
+              <p className="text-sm font-medium">Nenhuma solicitação criada por você</p>
+              <p className="text-xs mt-1 text-center max-w-md">
+                Esta tela mostra apenas as solicitações que <strong>você</strong> criou.
+                Para ver/gerenciar todas as solicitações do sistema, acesse <strong>Solicitações</strong> no menu lateral.
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
