@@ -105,10 +105,11 @@ async function fetchReportData(year: string, view: 'realizadas' | 'recebidas') {
 export default function ReportsPage() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(String(currentYear));
+  const [view, setView] = useState<'realizadas' | 'recebidas'>('realizadas');
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['reports', year],
-    queryFn: () => fetchReportData(year),
+    queryKey: ['reports', year, view],
+    queryFn: () => fetchReportData(year, view),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -117,17 +118,25 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Relatórios</h1>
           <p className="text-muted-foreground text-sm mt-1">Indicadores e relatórios gerenciais</p>
         </div>
-        <Select value={year} onValueChange={setYear}>
-          <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+            <TabsList>
+              <TabsTrigger value="realizadas">Realizadas</TabsTrigger>
+              <TabsTrigger value="recebidas">Recebidas</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Select value={year} onValueChange={setYear}>
+            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {isError ? (
