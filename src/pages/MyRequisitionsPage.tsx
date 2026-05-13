@@ -113,6 +113,37 @@ export default function MyRequisitionsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, data]);
 
+  // Pre-fill from inventory items flagged as "solicitar_compra"
+  useEffect(() => {
+    if (!fromInventoryId || !data) return;
+    (async () => {
+      const { data: inv } = await (supabase as any).from('inventories')
+        .select('titulo, unidade, setor, observacoes').eq('id', fromInventoryId).single();
+      const { data: invItems } = await (supabase as any).from('inventory_items')
+        .select('product_id, saldo, observacoes, solicitar_compra, products(nome, unidade_medida)')
+        .eq('inventory_id', fromInventoryId).eq('solicitar_compra', true);
+      if (!inv) { toast.error("Inventário não encontrado"); return; }
+      if (!invItems || invItems.length === 0) { toast.info("Nenhum item marcado para compra"); return; }
+      setEditingId(null);
+      setTitulo(inv.titulo || "");
+      setUnidade(inv.unidade || "");
+      setSetor(inv.setor || "");
+      setObservacoes(inv.observacoes ? `Originado do inventário.\n${inv.observacoes}` : "Originado do inventário.");
+      setItems(invItems.map((i: any) => ({
+        product_id: i.product_id,
+        nome: i.products?.nome || '—',
+        unidade_medida: i.products?.unidade_medida || '',
+        saldo: String(i.saldo || ''),
+        pedido: '',
+        observacoes: i.observacoes || '',
+      })));
+      setShowForm(true);
+      toast.success(`${invItems.length} item(ns) carregado(s) do inventário`);
+      setSearchParams({}, { replace: true });
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromInventoryId, data]);
+
   const loadReqIntoForm = (req: any, reqItems: any[]) => {
     setEditingId(req.id);
     setTitulo(req.titulo || "");
