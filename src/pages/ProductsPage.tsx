@@ -10,12 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Upload, Download } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CsvImportModal from "@/components/CsvImportModal";
 import { productsImportConfig } from "@/lib/csvConfigs";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
+import ProductsExportDialog from "@/components/ProductsExportDialog";
 
 type Product = {
   id: string; nome: string; codigo_interno: string | null; categoria: string | null;
