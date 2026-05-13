@@ -475,6 +475,19 @@ export default function InventoriesPage() {
         </CardContent>
       </Card>
 
+      <Dialog open={!!confirmSendOpen} onOpenChange={(v) => !v && setConfirmSendOpen(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Confirmar envio do inventário</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Confirma o envio do inventário <strong>{confirmSendOpen?.titulo}</strong>? Após enviar, edições precisarão de autorização.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSendOpen(null)}>Cancelar</Button>
+            <Button onClick={executeSendInventory}>Confirmar envio</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!confirmReqOpen} onOpenChange={(v) => !v && setConfirmReqOpen(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Criar solicitação de compra?</DialogTitle></DialogHeader>
