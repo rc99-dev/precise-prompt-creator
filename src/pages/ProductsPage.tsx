@@ -10,12 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Upload, Download } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CsvImportModal from "@/components/CsvImportModal";
 import { productsImportConfig } from "@/lib/csvConfigs";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
+import ProductsExportDialog from "@/components/ProductsExportDialog";
 
 type Product = {
   id: string; nome: string; codigo_interno: string | null; categoria: string | null;
@@ -36,6 +37,7 @@ export default function ProductsPage() {
   const [form, setForm] = useState(emptyProduct);
   const [loading, setLoading] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const { data: products = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['products', statusFilter],
@@ -105,7 +107,8 @@ export default function ProductsPage() {
           <p className="text-muted-foreground text-sm mt-1">Cadastro de produtos</p>
         </div>
         {isAdmin && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setExportOpen(true)}><Download className="h-4 w-4 mr-2" />Exportar</Button>
             <Button variant="outline" onClick={() => setCsvOpen(true)}><Upload className="h-4 w-4 mr-2" />Importar CSV</Button>
             <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo Produto</Button>
           </div>
@@ -237,6 +240,7 @@ export default function ProductsPage() {
       </Dialog>
 
       <CsvImportModal config={productsImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={invalidate} />
+      <ProductsExportDialog open={exportOpen} onOpenChange={setExportOpen} categories={categories} />
     </div>
   );
 }
