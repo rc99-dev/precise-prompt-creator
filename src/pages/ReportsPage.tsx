@@ -13,7 +13,8 @@ import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-const COUNTABLE_STATUSES = ['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
+const STATUSES_REALIZADAS = ['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
+const STATUSES_RECEBIDAS = ['recebido', 'recebido_com_ocorrencia'];
 
 const purchasesConfig: ChartConfig = {
   total: { label: "Total (R$)", color: "hsl(var(--primary))" },
