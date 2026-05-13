@@ -173,10 +173,19 @@ export default function DashboardPage() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {(role === 'comprador' || role === 'master') && (
+        {(role === 'comprador' || role === 'master' || role === 'financeiro') && (
           <>
-            <StatCard title="Pedidos do Mês" icon={ShoppingCart} value={stats.monthOrders} />
-            <StatCard title="Total do Mês" icon={TrendingDown} value={formatCurrency(stats.monthTotal)} className="currency" />
+            <StatCard title={view === 'recebidas' ? 'Pedidos recebidos' : 'Pedidos no período'} icon={ShoppingCart} value={stats.monthOrders} />
+            <StatCard title="Total no período" icon={TrendingDown} value={formatCurrency(stats.monthTotal)} className="currency" />
+            <StatCard title="Ticket médio" icon={Receipt} value={formatCurrency(stats.ticketMedio)} className="currency" />
+            <StatCard title="Top fornecedor" icon={Trophy} value={
+              stats.topSupplier ? (
+                <div className="space-y-0.5">
+                  <div className="text-base font-semibold truncate" title={stats.topSupplier.name}>{stats.topSupplier.name}</div>
+                  <div className="text-sm text-muted-foreground currency">{formatCurrency(stats.topSupplier.total)}</div>
+                </div>
+              ) : <span className="text-base text-muted-foreground">—</span>
+            } />
           </>
         )}
         {role === 'master' && (
@@ -189,6 +198,31 @@ export default function DashboardPage() {
           <StatCard title="Aguardando Aprovação" icon={Clock} value={stats.pendingApprovals} className="text-warning" />
         )}
       </div>
+
+      {(role === 'comprador' || role === 'master' || role === 'financeiro') && categoryRanking.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Layers className="h-4 w-4" />Ranking de compras por categoria</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {categoryRanking.map((c: any, idx: number) => {
+                const max = categoryRanking[0].total || 1;
+                const pct = Math.max(4, (c.total / max) * 100);
+                return (
+                  <div key={c.nome} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium">{idx + 1}. {c.nome}</span>
+                      <span className="currency text-muted-foreground">{formatCurrency(c.total)}</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {role !== 'solicitante' && (
         <Card>
