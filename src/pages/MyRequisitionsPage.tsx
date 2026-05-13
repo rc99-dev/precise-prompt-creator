@@ -393,20 +393,20 @@ export default function MyRequisitionsPage() {
                           <td className="py-2 px-3 font-medium">{item.nome}</td>
                           <td className="py-2 px-3 text-muted-foreground">{item.unidade_medida}</td>
                           <td className="py-2 px-3">
-                            <Input
-                              type="number" step="0.01" min="0"
+                            <CalcInput
+                              step="0.01" min="0"
                               className="w-24 ml-auto text-right h-8"
                               value={item.saldo}
-                              onChange={e => updateField(idx, 'saldo', e.target.value)}
+                              onChange={v => updateField(idx, 'saldo', v)}
                               placeholder="0"
                             />
                           </td>
                           <td className="py-2 px-3">
-                            <Input
-                              type="number" step="0.01" min="0"
+                            <CalcInput
+                              step="0.01" min="0"
                               className="w-24 ml-auto text-right h-8"
                               value={item.pedido}
-                              onChange={e => updateField(idx, 'pedido', e.target.value)}
+                              onChange={v => updateField(idx, 'pedido', v)}
                               placeholder="0"
                             />
                           </td>
