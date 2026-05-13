@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Package, ShoppingCart, Plus, TrendingDown, Clock, ClipboardList, Layers, Users } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Building2, Package, ShoppingCart, Plus, TrendingDown, Clock, ClipboardList, Layers, Users, Receipt, Trophy } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatCurrency, formatDate, statusLabels, statusColors } from "@/lib/helpers";
 import { useQuery } from "@tanstack/react-query";
@@ -18,22 +19,26 @@ const STATUSES_RECEBIDAS = ['recebido', 'recebido_com_ocorrencia'];
 export default function DashboardPage() {
   const { role } = useAuth();
   const [view, setView] = useState<'realizadas' | 'recebidas'>('realizadas');
+  const [period, setPeriod] = useState<'mes' | '30d' | '90d' | 'ano'>('mes');
   const countableStatuses = view === 'recebidas' ? STATUSES_RECEBIDAS : STATUSES_REALIZADAS;
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['dashboard-stats', view],
+    queryKey: ['dashboard-stats', view, period],
     queryFn: async () => {
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
+      const now = new Date();
+      let startDate = new Date();
+      if (period === 'mes') { startDate.setDate(1); startDate.setHours(0,0,0,0); }
+      else if (period === '30d') { startDate.setDate(now.getDate() - 30); }
+      else if (period === '90d') { startDate.setDate(now.getDate() - 90); }
+      else if (period === 'ano') { startDate = new Date(now.getFullYear(), 0, 1); }
 
       const [suppliersRes, productsRes, reqsRes, approvalsRes, ordersRes, itemsRes] = await Promise.all([
         supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
         supabase.from('products').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
         supabase.from('requisitions').select('*', { count: 'exact', head: true }).eq('status', 'pendente'),
         supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'aguardando_aprovacao'),
-        supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }).limit(200),
-        supabase.from('purchase_order_items').select('order_id, supplier_id, subtotal, products(categoria), suppliers(razao_social)').limit(2000),
+        supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('purchase_order_items').select('order_id, supplier_id, subtotal, products(categoria), suppliers(razao_social)').limit(5000),
       ]);
 
       if (suppliersRes.error) throw suppliersRes.error;
@@ -44,7 +49,7 @@ export default function DashboardPage() {
 
       const allOrders = ordersRes.data || [];
       const monthOrders = allOrders.filter((o) =>
-        new Date(o.created_at) >= startOfMonth && countableStatuses.includes(o.status)
+        new Date(o.created_at) >= startDate && countableStatuses.includes(o.status)
       );
       const monthTotal = monthOrders.reduce((s: number, o: any) => s + (o.total || 0), 0);
       const ticketMedio = monthOrders.length > 0 ? monthTotal / monthOrders.length : 0;
@@ -107,16 +112,37 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-1">
             {role === 'aprovador' ? 'Fila de aprovações' : role === 'estoquista' ? 'Entregas e recebimentos' : 'Visão geral do sistema'}
           </p>
         </div>
-        {(role === 'comprador' || role === 'master') && (
-          <Link to="/nova-ordem"><Button><Plus className="h-4 w-4 mr-2" />Nova Ordem</Button></Link>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {(role === 'comprador' || role === 'master' || role === 'financeiro') && (
+            <>
+              <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+                <TabsList>
+                  <TabsTrigger value="realizadas">Compras realizadas</TabsTrigger>
+                  <TabsTrigger value="recebidas">Compras recebidas</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Select value={period} onValueChange={(v) => setPeriod(v as any)}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mes">Este mês</SelectItem>
+                  <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                  <SelectItem value="90d">Últimos 90 dias</SelectItem>
+                  <SelectItem value="ano">Este ano</SelectItem>
+                </SelectContent>
+              </Select>
+            </>
+          )}
+          {(role === 'comprador' || role === 'master') && (
+            <Link to="/nova-ordem"><Button><Plus className="h-4 w-4 mr-2" />Nova Ordem</Button></Link>
+          )}
+        </div>
       </div>
 
       {isError && <QueryError onRetry={() => refetch()} />}
@@ -147,10 +173,19 @@ export default function DashboardPage() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {(role === 'comprador' || role === 'master') && (
+        {(role === 'comprador' || role === 'master' || role === 'financeiro') && (
           <>
-            <StatCard title="Pedidos do Mês" icon={ShoppingCart} value={stats.monthOrders} />
-            <StatCard title="Total do Mês" icon={TrendingDown} value={formatCurrency(stats.monthTotal)} className="currency" />
+            <StatCard title={view === 'recebidas' ? 'Pedidos recebidos' : 'Pedidos no período'} icon={ShoppingCart} value={stats.monthOrders} />
+            <StatCard title="Total no período" icon={TrendingDown} value={formatCurrency(stats.monthTotal)} className="currency" />
+            <StatCard title="Ticket médio" icon={Receipt} value={formatCurrency(stats.ticketMedio)} className="currency" />
+            <StatCard title="Top fornecedor" icon={Trophy} value={
+              stats.topSupplier ? (
+                <div className="space-y-0.5">
+                  <div className="text-base font-semibold truncate" title={stats.topSupplier.name}>{stats.topSupplier.name}</div>
+                  <div className="text-sm text-muted-foreground currency">{formatCurrency(stats.topSupplier.total)}</div>
+                </div>
+              ) : <span className="text-base text-muted-foreground">—</span>
+            } />
           </>
         )}
         {role === 'master' && (
@@ -163,6 +198,31 @@ export default function DashboardPage() {
           <StatCard title="Aguardando Aprovação" icon={Clock} value={stats.pendingApprovals} className="text-warning" />
         )}
       </div>
+
+      {(role === 'comprador' || role === 'master' || role === 'financeiro') && categoryRanking.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Layers className="h-4 w-4" />Ranking de compras por categoria</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {categoryRanking.map((c: any, idx: number) => {
+                const max = categoryRanking[0].total || 1;
+                const pct = Math.max(4, (c.total / max) * 100);
+                return (
+                  <div key={c.nome} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium">{idx + 1}. {c.nome}</span>
+                      <span className="currency text-muted-foreground">{formatCurrency(c.total)}</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {role !== 'solicitante' && (
         <Card>

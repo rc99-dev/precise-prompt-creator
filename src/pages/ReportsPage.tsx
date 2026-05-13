@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/helpers";
 import { BarChart3, TrendingUp, Clock, DollarSign } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig,
 } from "@/components/ui/chart";
@@ -13,7 +14,8 @@ import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-const COUNTABLE_STATUSES = ['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
+const STATUSES_REALIZADAS = ['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
+const STATUSES_RECEBIDAS = ['recebido', 'recebido_com_ocorrencia'];
 
 const purchasesConfig: ChartConfig = {
   total: { label: "Total (R$)", color: "hsl(var(--primary))" },
@@ -22,10 +24,11 @@ const purchasesConfig: ChartConfig = {
 const suppliersConfig: ChartConfig = { total: { label: "Total (R$)", color: "hsl(var(--primary))" } };
 const approvalConfig: ChartConfig = { dias: { label: "Dias", color: "hsl(var(--primary))" } };
 
-async function fetchReportData(year: string) {
+async function fetchReportData(year: string, view: 'realizadas' | 'recebidas') {
   const yearNum = parseInt(year);
   const startDate = `${yearNum}-01-01`;
   const endDate = `${yearNum + 1}-01-01`;
+  const countableStatuses = view === 'recebidas' ? STATUSES_RECEBIDAS : STATUSES_REALIZADAS;
 
   const [ordersRes, itemsRes, approvalRes] = await Promise.all([
     supabase.from("purchase_orders").select("id, created_at, total, status, approved_at, modo")
@@ -39,7 +42,7 @@ async function fetchReportData(year: string) {
 
   const allOrders = ordersRes.data || [];
   // Only count orders with countable statuses for financial metrics
-  const orders = allOrders.filter(o => COUNTABLE_STATUSES.includes(o.status));
+  const orders = allOrders.filter(o => countableStatuses.includes(o.status));
   const items = (itemsRes.data || []) as any[];
   const approvals = approvalRes.data || [];
 
@@ -103,10 +106,11 @@ async function fetchReportData(year: string) {
 export default function ReportsPage() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(String(currentYear));
+  const [view, setView] = useState<'realizadas' | 'recebidas'>('realizadas');
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['reports', year],
-    queryFn: () => fetchReportData(year),
+    queryKey: ['reports', year, view],
+    queryFn: () => fetchReportData(year, view),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -115,17 +119,25 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Relatórios</h1>
           <p className="text-muted-foreground text-sm mt-1">Indicadores e relatórios gerenciais</p>
         </div>
-        <Select value={year} onValueChange={setYear}>
-          <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+            <TabsList>
+              <TabsTrigger value="realizadas">Realizadas</TabsTrigger>
+              <TabsTrigger value="recebidas">Recebidas</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Select value={year} onValueChange={setYear}>
+            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {isError ? (
