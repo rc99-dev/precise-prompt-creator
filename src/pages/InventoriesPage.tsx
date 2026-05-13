@@ -218,11 +218,15 @@ export default function InventoriesPage() {
     // Notify masters
     const { data: masters } = await supabase.from('user_roles').select('user_id').eq('role', 'master');
     if (masters && masters.length > 0) {
-      await supabase.from('notifications').insert(masters.map((m: any) => ({
+      const { error: notifErr } = await supabase.from('notifications').insert(masters.map((m: any) => ({
         user_id: m.user_id, titulo: 'Autorização de inventário',
         mensagem: `${nameMap[user.id] || 'Usuário'} solicitou autorização para editar o inventário ${inv.numero}.`,
         tipo: 'alerta', link: '/inventarios',
       })));
+      if (notifErr) {
+        toast.error("Não foi possível notificar os gerentes: " + notifErr.message);
+        return;
+      }
     }
     toast.success("Autorização solicitada aos gerentes/master.");
   };
