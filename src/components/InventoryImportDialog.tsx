@@ -233,7 +233,6 @@ export default function InventoryImportDialog({
                 <div className="flex items-center gap-2 py-2 border-b bg-muted/30 px-3">
                   <Checkbox
                     checked={selectedItemIds.size === selectedItems.length && selectedItems.length > 0}
-                    indeterminate={selectedItemIds.size > 0 && selectedItemIds.size < selectedItems.length}
                     onCheckedChange={toggleAll}
                   />
                   <span className="text-xs font-medium">
