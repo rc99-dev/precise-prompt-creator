@@ -174,11 +174,18 @@ export default function OrderHistoryPage() {
     if (error || !newOrder) { toast.error("Erro ao duplicar."); return; }
     const { data: items } = await supabase.from('purchase_order_items').select('*').eq('order_id', order.id);
     if (items) {
-      const newItems = items.map(i => ({
-        order_id: newOrder.id, product_id: i.product_id, supplier_id: i.supplier_id,
-        quantidade: i.quantidade, preco_unitario: i.preco_unitario, subtotal: i.subtotal, observacoes: i.observacoes,
-      }));
-      await supabase.from('purchase_order_items').insert(newItems);
+      // Guard: if items already exist for the new order, do NOT insert again (prevents double inserts on rapid clicks / Strict Mode)
+      const { count: existingCount } = await supabase
+        .from('purchase_order_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('order_id', newOrder.id);
+      if ((existingCount || 0) === 0) {
+        const newItems = items.map(i => ({
+          order_id: newOrder.id, product_id: i.product_id, supplier_id: i.supplier_id,
+          quantidade: i.quantidade, preco_unitario: i.preco_unitario, subtotal: i.subtotal, observacoes: i.observacoes,
+        }));
+        await supabase.from('purchase_order_items').insert(newItems);
+      }
     }
     toast.success("Ordem duplicada como rascunho!");
     invalidateOrderQueries(queryClient);
