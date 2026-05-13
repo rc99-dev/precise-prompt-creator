@@ -37,6 +37,7 @@ export default function ProductsPage() {
   const [form, setForm] = useState(emptyProduct);
   const [loading, setLoading] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const { data: products = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['products', statusFilter],
