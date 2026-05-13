@@ -569,7 +569,21 @@ export default function MyRequisitionsPage() {
           </CardContent>
         </Card>
       )}
-      <InventoryImportDialog
+      <Dialog open={confirmSubmitOpen} onOpenChange={setConfirmSubmitOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Confirmar envio da solicitação</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Confirma o envio da solicitação <strong>{titulo}</strong> para <strong>{unidade}</strong>?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSubmitOpen(false)}>Cancelar</Button>
+            <Button onClick={executeSubmit} disabled={saving}>
+              {saving ? "Enviando..." : "Confirmar envio"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
         open={invImportOpen}
         onOpenChange={setInvImportOpen}
         hasItems={items.length > 0}
