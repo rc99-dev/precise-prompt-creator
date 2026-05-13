@@ -333,7 +333,7 @@ export default function MyRequisitionsPage() {
         <Card>
           <CardHeader><CardTitle className="text-lg">{editingId ? "Editar Solicitação" : "Nova Solicitação"}</CardTitle></CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={prepareSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Título *</Label>
