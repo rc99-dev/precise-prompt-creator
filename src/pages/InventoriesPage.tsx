@@ -262,12 +262,19 @@ export default function InventoriesPage() {
       (supabase as any).from('inventory_items').select('saldo, observacoes, solicitar_compra, products(nome, unidade_medida)').eq('inventory_id', inv.id),
       (supabase as any).from('inventory_log').select('*').eq('inventory_id', inv.id).order('created_at', { ascending: true }),
     ]);
-    const logUserIds = Array.from(new Set((log || []).map((l: any) => l.user_id))) as string[];
-    const { data: logNames } = logUserIds.length
-      ? await supabase.rpc('get_profile_names', { _user_ids: logUserIds } as any)
-      : { data: [] as any[] };
+    const logUserIds = Array.from(new Set((log || []).map((l: any) => l.user_id).filter(Boolean))) as string[];
     const ln: Record<string, string> = {};
-    (logNames || []).forEach((n: any) => { ln[n.user_id] = n.full_name; });
+    if (logUserIds.length) {
+      try {
+        const { data: logNames } = await supabase.rpc('get_profile_names', { _user_ids: logUserIds } as any);
+        (logNames || []).forEach((n: any) => { if (n.full_name) ln[n.user_id] = n.full_name; });
+      } catch {}
+      const missing = logUserIds.filter(id => !ln[id]);
+      if (missing.length) {
+        const { data: prof } = await supabase.from('profiles').select('user_id, full_name').in('user_id', missing);
+        (prof || []).forEach((p: any) => { if (p.full_name) ln[p.user_id] = p.full_name; });
+      }
+    }
     generateInventoryPDF({
       numero: inv.numero || inv.id.slice(0, 8),
       titulo: inv.titulo, unidade: inv.unidade, setor: inv.setor, categoria: inv.categoria,

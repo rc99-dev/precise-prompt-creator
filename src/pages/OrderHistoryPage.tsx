@@ -246,11 +246,21 @@ export default function OrderHistoryPage() {
       supabase.from('receipts').select('user_id, status, observacoes, received_at, created_at, numero_nf').eq('order_id', order.id).order('created_at').limit(1).maybeSingle(),
     ]);
     const userIds = new Set<string>([order.user_id]);
-    (logs || []).forEach((l: any) => userIds.add(l.user_id));
+    (logs || []).forEach((l: any) => { if (l.user_id) userIds.add(l.user_id); });
     if (receipt?.user_id) userIds.add(receipt.user_id);
-    const { data: names } = await supabase.rpc('get_profile_names', { _user_ids: Array.from(userIds) } as any);
+    const idsArr = Array.from(userIds);
     const nameMap: Record<string, string> = {};
-    (names || []).forEach((n: any) => { nameMap[n.user_id] = n.full_name || '—'; });
+    try {
+      const { data: names, error: nErr } = await supabase.rpc('get_profile_names', { _user_ids: idsArr } as any);
+      if (nErr) console.warn('get_profile_names error', nErr);
+      (names || []).forEach((n: any) => { if (n.full_name) nameMap[n.user_id] = n.full_name; });
+    } catch (e) { console.warn('get_profile_names threw', e); }
+    // Fallback: try direct profiles read for any missing IDs (works for master / own profile)
+    const missing = idsArr.filter(id => !nameMap[id]);
+    if (missing.length) {
+      const { data: prof } = await supabase.from('profiles').select('user_id, full_name').in('user_id', missing);
+      (prof || []).forEach((p: any) => { if (p.full_name) nameMap[p.user_id] = p.full_name; });
+    }
     const events: TimelineEntry[] = [];
     events.push({ date: order.created_at, user: nameMap[order.user_id] || '—', action: 'Pedido criado' });
     (logs || []).forEach((l: any) => {
