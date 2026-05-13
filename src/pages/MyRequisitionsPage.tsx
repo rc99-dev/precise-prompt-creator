@@ -48,6 +48,7 @@ export default function MyRequisitionsPage() {
   const [productSearch, setProductSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [invImportOpen, setInvImportOpen] = useState(false);
+  const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-requisitions', user?.id],
