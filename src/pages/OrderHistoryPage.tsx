@@ -777,12 +777,12 @@ export default function OrderHistoryPage() {
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
-                          {role === 'master' && o.status === 'aprovado' && (
+                          {(role === 'master' || role === 'aprovador') && o.status === 'aprovado' && (
                             <Button variant="ghost" size="icon" onClick={() => { setRejectTarget(o); setRejectReason(""); }} title="Reprovar">
                               <XCircle className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
-                          {role === 'master' && (o.status === 'emitido' || o.status === 'recebido' || o.status === 'recebido_com_ocorrencia') && (
+                          {(role === 'master' || role === 'comprador' || role === 'estoquista') && (o.status === 'emitido' || o.status === 'recebido' || o.status === 'recebido_com_ocorrencia') && (
                             <Button variant="ghost" size="icon" onClick={() => { setCancelTarget(o); setCancelReason(""); }} title="Cancelar pedido">
                               <Ban className="h-4 w-4 text-destructive" />
                             </Button>
