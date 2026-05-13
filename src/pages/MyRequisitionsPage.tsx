@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, ClipboardList, X, Search, FileText, Boxes } from "lucide-react";
 import InventoryImportDialog from "@/components/InventoryImportDialog";
@@ -47,6 +48,7 @@ export default function MyRequisitionsPage() {
   const [productSearch, setProductSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [invImportOpen, setInvImportOpen] = useState(false);
+  const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-requisitions', user?.id],
@@ -204,13 +206,12 @@ export default function MyRequisitionsPage() {
     setShowForm(false); setEditingId(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const prepareSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!titulo) { toast.error("Selecione o título."); return; }
     if (!unidade) { toast.error("Selecione a unidade."); return; }
     if (!setor) { toast.error("Selecione o setor."); return; }
 
-    // Remove items with both saldo and pedido empty/zero
     const validItems = items.filter(i => {
       const s = parseFloat(i.saldo) || 0;
       const p = parseFloat(i.pedido) || 0;
@@ -223,6 +224,19 @@ export default function MyRequisitionsPage() {
     if (validItems.length < items.length) {
       setItems(validItems);
     }
+
+    setConfirmSubmitOpen(true);
+  };
+
+  const executeSubmit = async () => {
+    setConfirmSubmitOpen(false);
+
+    // Recompute validItems
+    const validItems = items.filter(i => {
+      const s = parseFloat(i.saldo) || 0;
+      const p = parseFloat(i.pedido) || 0;
+      return s > 0 || p > 0;
+    });
 
     setSaving(true);
 
@@ -319,7 +333,7 @@ export default function MyRequisitionsPage() {
         <Card>
           <CardHeader><CardTitle className="text-lg">{editingId ? "Editar Solicitação" : "Nova Solicitação"}</CardTitle></CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={prepareSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Título *</Label>
@@ -555,6 +569,34 @@ export default function MyRequisitionsPage() {
           </CardContent>
         </Card>
       )}
+      <Dialog open={confirmSubmitOpen} onOpenChange={setConfirmSubmitOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Confirmar envio da solicitação</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Confirma o envio da solicitação <strong>{titulo}</strong> para <strong>{unidade}</strong>?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSubmitOpen(false)}>Cancelar</Button>
+            <Button onClick={executeSubmit} disabled={saving}>
+              {saving ? "Enviando..." : "Confirmar envio"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={confirmSubmitOpen} onOpenChange={setConfirmSubmitOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Confirmar envio da solicitação</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Confirma o envio da solicitação <strong>{titulo}</strong> para <strong>{unidade}</strong>?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSubmitOpen(false)}>Cancelar</Button>
+            <Button onClick={executeSubmit} disabled={saving}>
+              {saving ? "Enviando..." : "Confirmar envio"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <InventoryImportDialog
         open={invImportOpen}
         onOpenChange={setInvImportOpen}

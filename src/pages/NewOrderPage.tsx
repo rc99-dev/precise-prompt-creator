@@ -19,6 +19,7 @@ import QueryError from "@/components/QueryError";
 import { useOrderDraft, DraftOrderItem } from "@/hooks/useOrderDraft";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 import { AlertTriangle, Trash2, RotateCcw, ClipboardList } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
@@ -64,6 +65,7 @@ export default function NewOrderPage() {
   const [titulo, setTitulo] = useState("");
   const [saving, setSaving] = useState(false);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [confirmApprovalOpen, setConfirmApprovalOpen] = useState(false);
   const [selectedReqImport, setSelectedReqImport] = useState<string | null>(null);
   const draftRestored = useRef(false);
   const draftDecided = useRef(false);
@@ -359,10 +361,18 @@ export default function NewOrderPage() {
     return totalMax - total;
   }, [items, pricesByProduct, total]);
 
-  const handleSave = async (status: 'rascunho' | 'aguardando_aprovacao') => {
+  const handleSave = (status: 'rascunho' | 'aguardando_aprovacao') => {
     if (!titulo) { toast.error("Selecione o título da compra."); return; }
     if (!unidadeSolicitante) { toast.error("Selecione a unidade solicitante."); return; }
     if (items.length === 0) { toast.error("Adicione pelo menos um item."); return; }
+    if (status === 'aguardando_aprovacao') {
+      setConfirmApprovalOpen(true);
+      return;
+    }
+    doSave(status);
+  };
+
+  const doSave = async (status: 'rascunho' | 'aguardando_aprovacao') => {
     setSaving(true);
 
     if (editOrderId) {
@@ -548,6 +558,21 @@ export default function NewOrderPage() {
 
       <OrderStickyFooter total={total} economy={economy} itemCount={items.length} saving={saving}
         onSaveDraft={() => handleSave('rascunho')} onSubmit={() => handleSave('aguardando_aprovacao')} />
+
+      <Dialog open={confirmApprovalOpen} onOpenChange={setConfirmApprovalOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Confirmar envio para aprovação</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Confirma o envio do pedido {editOrderId ? "" : "para aprovação"}? Total: <strong>{formatCurrency(total)}</strong>
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmApprovalOpen(false)}>Cancelar</Button>
+            <Button onClick={() => { setConfirmApprovalOpen(false); doSave('aguardando_aprovacao'); }} disabled={saving}>
+              {saving ? "Enviando..." : "Confirmar envio"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

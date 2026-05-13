@@ -49,6 +49,7 @@ export default function InventoriesPage() {
   const [productSearch, setProductSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmReqOpen, setConfirmReqOpen] = useState<{ inventoryId: string; count: number } | null>(null);
+  const [confirmSendOpen, setConfirmSendOpen] = useState<Inventory | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['inventories-page'],
@@ -188,15 +189,20 @@ export default function InventoriesPage() {
     setSaving(false);
   };
 
-  const sendInventory = async (inv: Inventory) => {
+  const sendInventory = (inv: Inventory) => {
     if (inv.user_id !== user?.id && !isMaster) { toast.error("Sem permissão"); return; }
-    if (!confirm(`Enviar inventário ${inv.numero}? Após envio, edições requerem autorização.`)) return;
+    setConfirmSendOpen(inv);
+  };
+
+  const executeSendInventory = async () => {
+    const inv = confirmSendOpen;
+    if (!inv) return;
+    setConfirmSendOpen(null);
     const { error } = await (supabase as any).from('inventories').update({
       status: 'enviado', enviado_em: new Date().toISOString(),
     }).eq('id', inv.id);
     if (error) { toast.error(error.message); return; }
     await logEvent(inv.id, 'enviado');
-    // Check items flagged for purchase
     const { data: flagged } = await (supabase as any).from('inventory_items')
       .select('id').eq('inventory_id', inv.id).eq('solicitar_compra', true);
     toast.success("Inventário enviado!");
@@ -468,6 +474,19 @@ export default function InventoriesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!confirmSendOpen} onOpenChange={(v) => !v && setConfirmSendOpen(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Confirmar envio do inventário</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Confirma o envio do inventário <strong>{confirmSendOpen?.titulo}</strong>? Após enviar, edições precisarão de autorização.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSendOpen(null)}>Cancelar</Button>
+            <Button onClick={executeSendInventory}>Confirmar envio</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!confirmReqOpen} onOpenChange={(v) => !v && setConfirmReqOpen(null)}>
         <DialogContent>
