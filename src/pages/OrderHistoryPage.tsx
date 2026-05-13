@@ -404,7 +404,25 @@ export default function OrderHistoryPage() {
       const valid = datas.filter(Boolean) as any[];
       if (!valid.length) { toast.error("Nenhum pedido válido."); return; }
       generateMultipleOrdersPDF(valid);
-      toast.success(`${valid.length} pedidos exportados em PDF único!`);
+
+      // Mirror individual export: aprovado -> emitido + notify estoquistas
+      const toEmit = selectedOrders.filter(o => o.status === 'aprovado');
+      if (toEmit.length > 0) {
+        await supabase.from('purchase_orders').update({ status: 'emitido' } as any).in('id', toEmit.map(o => o.id));
+        const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
+        if (estoquistas?.length) {
+          const notifs = estoquistas.flatMap(e => toEmit.map(o => ({
+            user_id: e.user_id,
+            titulo: 'Nova ordem emitida',
+            mensagem: `Pedido ${o.numero} foi emitido — aguardando confirmação do fornecedor.`,
+            tipo: 'info', lida: false,
+          })));
+          await supabase.from('notifications').insert(notifs);
+        }
+        invalidateOrderQueries(queryClient);
+      }
+
+      toast.success(`${valid.length} pedidos exportados em PDF único!${toEmit.length ? ` ${toEmit.length} marcados como emitidos.` : ''}`);
       setSelectedIds(new Set());
     } finally {
       setExportingMulti(false);
