@@ -83,6 +83,7 @@ export const ALL_PAGES = [
   { key: 'usuarios', label: 'Usuários' },
   { key: 'relatorios', label: 'Relatórios' },
   { key: 'inventarios', label: 'Inventários' },
+  { key: 'historico-inventarios', label: 'Histórico de Inventários' },
 ] as const;
 
 const defaultPermissions: Record<string, AppRole[]> = {
