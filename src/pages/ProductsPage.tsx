@@ -106,13 +106,11 @@ export default function ProductsPage() {
           <h1 className="text-2xl font-bold">Produtos</h1>
           <p className="text-muted-foreground text-sm mt-1">Cadastro de produtos</p>
         </div>
-        {isAdmin && (
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => setExportOpen(true)}><Download className="h-4 w-4 mr-2" />Exportar</Button>
-            <Button variant="outline" onClick={() => setCsvOpen(true)}><Upload className="h-4 w-4 mr-2" />Importar CSV</Button>
-            <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo Produto</Button>
-          </div>
-        )}
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setExportOpen(true)}><Download className="h-4 w-4 mr-2" />Exportar</Button>
+          {isAdmin && <Button variant="outline" onClick={() => setCsvOpen(true)}><Upload className="h-4 w-4 mr-2" />Importar CSV</Button>}
+          {isAdmin && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo Produto</Button>}
+        </div>
       </div>
 
       <div className="flex gap-3 flex-wrap">
