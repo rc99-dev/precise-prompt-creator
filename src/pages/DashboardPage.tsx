@@ -112,16 +112,37 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-1">
             {role === 'aprovador' ? 'Fila de aprovações' : role === 'estoquista' ? 'Entregas e recebimentos' : 'Visão geral do sistema'}
           </p>
         </div>
-        {(role === 'comprador' || role === 'master') && (
-          <Link to="/nova-ordem"><Button><Plus className="h-4 w-4 mr-2" />Nova Ordem</Button></Link>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {(role === 'comprador' || role === 'master' || role === 'financeiro') && (
+            <>
+              <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+                <TabsList>
+                  <TabsTrigger value="realizadas">Compras realizadas</TabsTrigger>
+                  <TabsTrigger value="recebidas">Compras recebidas</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Select value={period} onValueChange={(v) => setPeriod(v as any)}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mes">Este mês</SelectItem>
+                  <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                  <SelectItem value="90d">Últimos 90 dias</SelectItem>
+                  <SelectItem value="ano">Este ano</SelectItem>
+                </SelectContent>
+              </Select>
+            </>
+          )}
+          {(role === 'comprador' || role === 'master') && (
+            <Link to="/nova-ordem"><Button><Plus className="h-4 w-4 mr-2" />Nova Ordem</Button></Link>
+          )}
+        </div>
       </div>
 
       {isError && <QueryError onRetry={() => refetch()} />}
