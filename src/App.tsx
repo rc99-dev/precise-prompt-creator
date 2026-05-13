@@ -79,6 +79,7 @@ function ProtectedRoutes() {
         {canOrLoading('usuarios') && <Route path="/usuarios" element={<UsersPage />} />}
         {canOrLoading('relatorios') && <Route path="/relatorios" element={<ReportsPage />} />}
         {canOrLoading('inventarios') && <Route path="/inventarios" element={<InventoriesPage />} />}
+        <Route path="/historico-inventarios" element={<InventoryHistoryPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
