@@ -361,10 +361,18 @@ export default function NewOrderPage() {
     return totalMax - total;
   }, [items, pricesByProduct, total]);
 
-  const handleSave = async (status: 'rascunho' | 'aguardando_aprovacao') => {
+  const handleSave = (status: 'rascunho' | 'aguardando_aprovacao') => {
     if (!titulo) { toast.error("Selecione o título da compra."); return; }
     if (!unidadeSolicitante) { toast.error("Selecione a unidade solicitante."); return; }
     if (items.length === 0) { toast.error("Adicione pelo menos um item."); return; }
+    if (status === 'aguardando_aprovacao') {
+      setConfirmApprovalOpen(true);
+      return;
+    }
+    doSave(status);
+  };
+
+  const doSave = async (status: 'rascunho' | 'aguardando_aprovacao') => {
     setSaving(true);
 
     if (editOrderId) {
