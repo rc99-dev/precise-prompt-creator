@@ -146,12 +146,13 @@ export default function OrderHistoryPage() {
   };
   const selectedOrders = filtered.filter(o => selectedIds.has(o.id));
   const isMaster = role === 'master';
-  const canExportMulti = isMaster
+  const isPrivileged = isMaster || role === 'comprador' || role === 'estoquista';
+  const canExportMulti = isPrivileged
     ? selectedOrders.length >= 1
     : selectedOrders.length > 1 && selectedOrders.every(o => o.status === selectedOrders[0].status);
-  const canBatchReceive = isMaster && selectedOrders.length >= 1 &&
+  const canBatchReceive = (isMaster || role === 'estoquista') && selectedOrders.length >= 1 &&
     selectedOrders.every(o => o.status === 'aprovado' || o.status === 'emitido');
-  const canBatchForecast = isMaster && selectedOrders.length >= 1 &&
+  const canBatchForecast = (isMaster || role === 'estoquista' || role === 'comprador') && selectedOrders.length >= 1 &&
     selectedOrders.every(o => o.status === 'emitido');
 
   const viewOrder = async (order: Order) => {
