@@ -49,6 +49,7 @@ export default function InventoriesPage() {
   const [productSearch, setProductSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmReqOpen, setConfirmReqOpen] = useState<{ inventoryId: string; count: number } | null>(null);
+  const [confirmSendOpen, setConfirmSendOpen] = useState<Inventory | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['inventories-page'],
