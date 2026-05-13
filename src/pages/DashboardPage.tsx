@@ -49,7 +49,7 @@ export default function DashboardPage() {
 
       const allOrders = ordersRes.data || [];
       const monthOrders = allOrders.filter((o) =>
-        new Date(o.created_at) >= startOfMonth && countableStatuses.includes(o.status)
+        new Date(o.created_at) >= startDate && countableStatuses.includes(o.status)
       );
       const monthTotal = monthOrders.reduce((s: number, o: any) => s + (o.total || 0), 0);
       const ticketMedio = monthOrders.length > 0 ? monthTotal / monthOrders.length : 0;
