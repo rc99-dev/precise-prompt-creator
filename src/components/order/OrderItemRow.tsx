@@ -44,8 +44,7 @@ function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, o
         {saldo !== undefined && saldo !== null ? saldo : '—'}
       </td>
       <td className="py-2.5 px-3">
-        <Input
-          type="number"
+        <CalcInput
           min="0.01"
           step="0.01"
           className="w-20 text-center h-8 text-sm"
