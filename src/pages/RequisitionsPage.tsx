@@ -96,10 +96,14 @@ export default function RequisitionsPage() {
   const handleDelete = async (reqId: string) => {
     if (!confirm("Tem certeza que deseja excluir esta solicitação?")) return;
     // Delete items first, then requisition
-    await supabase.from('requisition_items').delete().eq('requisition_id', reqId);
-    const { error } = await supabase.from('requisitions').delete().eq('id', reqId);
-    if (error) toast.error(error.message);
-    else {
+    const { error: itemsErr } = await supabase.from('requisition_items').delete().eq('requisition_id', reqId);
+    if (itemsErr) { toast.error("Não foi possível excluir os itens: " + itemsErr.message); return; }
+    const { error, count } = await supabase.from('requisitions').delete({ count: 'exact' }).eq('id', reqId);
+    if (error) {
+      toast.error(error.message);
+    } else if (!count) {
+      toast.error("Você não tem permissão para excluir esta solicitação. Solicitações já incluídas em pedido só podem ser removidas pelo master.");
+    } else {
       toast.success("Solicitação excluída.");
       queryClient.invalidateQueries({ queryKey: ['requisitions-list'] });
     }
