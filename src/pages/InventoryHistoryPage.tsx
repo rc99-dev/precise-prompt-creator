@@ -83,7 +83,6 @@ export default function InventoryHistoryPage() {
     const ids = Array.from(new Set((log || []).map((l: any) => l.user_id).filter(Boolean))) as string[];
     const nm = ids.length ? await resolveUserNames(ids) : {};
     setLogOpen({ inv, logs: log || [], nameMap: nm });
-    setLogOpen({ inv, logs: log || [], nameMap: nm });
   };
 
   return (
