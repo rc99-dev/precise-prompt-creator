@@ -75,7 +75,7 @@ export default function PricesPage() {
   const suppliers = data?.suppliers || [];
   const products = data?.products || [];
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['prices-page-data'] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['prices-page-data-v2'] });
 
   const minPrices = useMemo(() => {
     const mins: Record<string, number> = {};
