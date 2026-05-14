@@ -69,7 +69,13 @@ function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, o
       </td>
       <td className="py-2.5 px-3 text-right text-sm font-medium whitespace-nowrap">
         {isMinPrice && <TrendingDown className="h-3 w-3 inline mr-1 text-green-400" />}
-        {formatCurrency(item.preco_unitario)}
+        <CalcInput
+          min="0"
+          step="0.01"
+          className="w-24 text-right h-8 text-sm inline-block"
+          value={item.preco_unitario}
+          onChange={handlePrice}
+        />
       </td>
       <td className="py-2.5 px-3 text-right text-sm font-bold whitespace-nowrap">{formatCurrency(item.subtotal)}</td>
       <td className="py-2.5 px-3 text-right">
