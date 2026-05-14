@@ -36,11 +36,7 @@ export default function InventoryHistoryPage() {
       const counts: Record<string, number> = {};
       (itemsAll || []).forEach((r: any) => { counts[r.inventory_id] = (counts[r.inventory_id] || 0) + 1; });
       const userIds = Array.from(new Set((invs || []).map((i: any) => i.user_id))) as string[];
-      const { data: names } = userIds.length
-        ? await supabase.rpc('get_profile_names', { _user_ids: userIds } as any)
-        : { data: [] as any[] };
-      const nameMap: Record<string, string> = {};
-      (names || []).forEach((n: any) => { nameMap[n.user_id] = n.full_name; });
+      const nameMap = userIds.length ? await resolveUserNames(userIds) : {};
       return {
         inventories: ((invs || []) as any[]).map(i => ({ ...i, itemsCount: counts[i.id] || 0 })),
         nameMap,
