@@ -82,12 +82,7 @@ export default function InventoryHistoryPage() {
       .select('*').eq('inventory_id', inv.id).order('created_at', { ascending: true });
     const ids = Array.from(new Set((log || []).map((l: any) => l.user_id).filter(Boolean))) as string[];
     const nm = ids.length ? await resolveUserNames(ids) : {};
-      const missing = ids.filter(id => !nm[id]);
-      if (missing.length) {
-        const { data: prof } = await supabase.from('profiles').select('user_id, full_name').in('user_id', missing);
-        (prof || []).forEach((p: any) => { if (p.full_name) nm[p.user_id] = p.full_name; });
-      }
-    }
+    setLogOpen({ inv, logs: log || [], nameMap: nm });
     setLogOpen({ inv, logs: log || [], nameMap: nm });
   };
 
