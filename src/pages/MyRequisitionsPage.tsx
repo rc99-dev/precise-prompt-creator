@@ -177,7 +177,8 @@ export default function MyRequisitionsPage() {
 
   const loadCategoryProducts = () => {
     if (!categoria) return;
-    const catProducts = products.filter(p => p.categoria === categoria && !items.some(i => i.product_id === p.id));
+    const target = categoria.trim().toLowerCase();
+    const catProducts = products.filter(p => (p.categoria || '').trim().toLowerCase() === target && !items.some(i => i.product_id === p.id));
     if (catProducts.length > 0) {
       setItems(prev => [
         ...prev,
