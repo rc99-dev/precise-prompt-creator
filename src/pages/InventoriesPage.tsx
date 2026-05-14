@@ -373,7 +373,7 @@ export default function InventoriesPage() {
                           <tr key={it.product_id} className="border-b last:border-0">
                             <td className="py-2 px-3 font-medium">{it.nome}</td>
                             <td className="py-2 px-3 text-muted-foreground">{it.unidade_medida}</td>
-                            <td className="py-2 px-3"><Input type="number" step="0.01" min="0" className="w-24 ml-auto text-right h-8" value={it.saldo} onChange={e => updateField(idx, 'saldo', e.target.value)} placeholder="0" /></td>
+                            <td className="py-2 px-3"><CalcInput min="0" step="0.01" className="w-24 ml-auto text-right h-8" value={it.saldo} onChange={(v) => updateField(idx, 'saldo', v)} placeholder="0" /></td>
                             <td className="py-2 px-3 text-center">
                               <Checkbox checked={it.solicitar_compra} onCheckedChange={(v) => updateField(idx, 'solicitar_compra', !!v)} />
                             </td>
