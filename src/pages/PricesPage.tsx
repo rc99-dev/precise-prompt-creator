@@ -241,14 +241,16 @@ const handleLink = async (e: React.FormEvent) => {
                         <th className="text-left py-3 px-4 font-medium text-muted-foreground">Produto</th>
                         <th className="text-left py-3 px-4 font-medium text-muted-foreground">Fornecedor</th>
                         <th className="text-right py-3 px-4 font-medium text-muted-foreground">Preço Unitário</th>
+                        <th className="text-right py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Qtd. Mín.</th>
                         <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Prazo Entrega</th>
+                        <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden xl:table-cell">Observações</th>
                         <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Atualizado em</th>
                         {canEdit && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {filtered.length === 0 ? (
-                        <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum preço cadastrado.</td></tr>
+                        <tr><td colSpan={canEdit ? 8 : 7} className="text-center py-8 text-muted-foreground">Nenhum preço cadastrado.</td></tr>
                       ) : filtered.map(p => {
                         const isMin = minPrices[p.product_id] === p.preco_unitario;
                         return (
