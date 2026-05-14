@@ -273,7 +273,9 @@ const handleLink = async (e: React.FormEvent) => {
                                 </span>
                               )}
                             </td>
+                            <td className="py-3 px-4 text-right text-muted-foreground hidden lg:table-cell">{p.quantidade_minima ?? '—'}</td>
                             <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{p.prazo_entrega || '—'}</td>
+                            <td className="py-3 px-4 text-muted-foreground hidden xl:table-cell max-w-[240px] truncate" title={p.observacoes || ''}>{p.observacoes || '—'}</td>
                             <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{formatDate(p.updated_at)}</td>
                             {canEdit && (
                               <td className="py-3 px-4 text-right space-x-1">
