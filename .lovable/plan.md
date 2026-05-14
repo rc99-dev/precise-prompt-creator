@@ -1,61 +1,92 @@
+## Plano de correção — Solicitações, Pedidos, Preços, PDFs e Inventário
 
-## Diagnóstico
+Agrupei as falhas auditadas em 6 frentes. Cada item tem causa-raiz e correção objetiva.
 
-Investigando os 5 pontos + o sintoma "master não consegue excluir emitido/aprovado":
+---
 
-| # | Estado real no código | Ação necessária |
-|---|---|---|
-| 1 | `ReceiptsPage` já filtra por `unidade_setor` (a coluna correta — não existe `unidade` em `purchase_orders`). O filtro funciona, mas o select do profile usa só `unidade` para o fallback do "comprador". | Manter filtro; garantir refetch e adicionar log se necessário. **Sem mudança funcional.** |
-| 2 | UI de Histórico já esconde o botão Excluir para status ≠ rascunho/rejeitado (linha 421). RLS atual dá `ALL` ao master → master poderia excluir via API. | Adicionar policy restritiva no banco bloqueando DELETE de pedidos não-rascunho/rejeitado **inclusive para master**. |
-| 3 | `defaultPermissions['minhas-solicitacoes']` já inclui `solicitante, comprador, estoquista`. Sidebar já usa `canAccess` → link já aparece. | **Sem mudança.** |
-| 4 | `RequisitionsPage` faz query sem filtro por `user_id`; RLS já libera para comprador/master. | **Sem mudança.** |
-| 5 | `MyRequisitionsPage` filtra por `user_id = user.id`. | **Sem mudança.** |
-| **+** | "Master não consegue excluir emitido/aprovado" | **Esse comportamento É a regra correta solicitada no item 2.** Para excluir, o pedido precisa primeiro ser movido para rascunho ou rejeitado. |
+### 1. Categorias e produtos na Solicitação
 
-## Plano de implementação
+**Problema:** `products.categoria` é texto livre e diverge dos nomes em `product_categories`. Lista de categorias hard-coded em telas. Filtro por categoria não retorna produtos.
 
-### 1. Migração de banco — blindar DELETE em `purchase_orders`
-Adicionar policy restritiva que se aplica a TODOS os perfis (inclusive master):
+**Correção:**
+- Em `MyRequisitionsPage.tsx` (e qualquer tela de solicitação/pedido com seletor de categoria): buscar categorias via `select id, nome from product_categories order by nome` — remover listas fixas.
+- Filtro de produtos: comparar `products.categoria` (texto) com `product_categories.nome` (texto) via `ilike` case-insensitive e `trim()`. Manter compatibilidade com dados legados.
+- Migração leve (opcional, recomendada): script de normalização que faz `UPDATE products SET categoria = pc.nome FROM product_categories pc WHERE lower(trim(products.categoria)) = lower(trim(pc.nome))` para alinhar capitalização.
 
-```sql
-CREATE POLICY "Block delete unless rascunho or rejeitado"
-ON public.purchase_orders
-AS RESTRICTIVE
-FOR DELETE
-TO authenticated
-USING (status IN ('rascunho','rejeitado'));
-```
+---
 
-Mesma proteção para `purchase_order_items` (evitar deletar itens de pedido emitido):
+### 2. Importação de solicitações no Pedido (Comparativo / Novo Pedido)
 
-```sql
-CREATE POLICY "Block delete items unless parent rascunho/rejeitado"
-ON public.purchase_order_items
-AS RESTRICTIVE
-FOR DELETE
-TO authenticated
-USING (EXISTS (
-  SELECT 1 FROM public.purchase_orders po
-  WHERE po.id = order_id AND po.status IN ('rascunho','rejeitado')
-));
-```
+**Problema:** Agrupamento por `titulo + created_at` é frágil; ao gerar pedido só `selectedReqId` recebe `incluida_no_pedido`, deixando irmãs órfãs. PDF puxa apenas 1 requisição (`.limit(1)`), perdendo saldos.
 
-### 2. `ReceiptsPage.tsx` — reforçar o filtro
-- Manter `eq('unidade_setor', filterUnidade)` (já está).
-- Adicionar `refetchOnWindowFocus: false` e `refetchOnMount: 'always'` no `useQuery` para garantir refetch ao trocar filtro (já garantido pela `queryKey`, mas reforçar).
-- Adicionar `console.info('[recebimentos] filtro unidade:', filterUnidade)` para diagnóstico.
+**Correção:**
+- Em `NewOrderPage.tsx` / `ComparativePage.tsx`: ao emitir o pedido, atualizar **todos** os `requisition_items` originais via array de IDs (`in('id', allReqItemIds)`) marcando `incluida_no_pedido = true`, não só o selecionado.
+- Persistir o vínculo correto em `purchase_order_requisitions` para cada requisição que entrou no pedido.
+- Em `pdfGenerator.ts`: trocar `.limit(1)` por busca completa de todas as requisições vinculadas (`select ... from purchase_order_requisitions where order_id = $1`) e agregar `saldo_atual` por produto somando todas as origens.
 
-### 3. `OrderHistoryPage.tsx` — mensagem amigável quando master tentar excluir
-No `handleDelete`, se a RLS bloquear (erro `new row violates...` ou afetadas=0), mostrar toast: "Pedidos emitidos/aprovados/recebidos não podem ser excluídos. Reprove ou cancele primeiro."
+---
 
-## Comunicação ao usuário
+### 3. Edição de preço na tela de Ordem de Compra
 
-Sobre "não consigo excluir emitido/aprovado como master": **isso é o comportamento correto pedido no item 2**. Para apagar um pedido nesses status, o caminho é:
-- Aprovado → usar o botão "Reprovar" (vira rejeitado) → excluir.
-- Emitido/Recebido → não devem ser excluídos (integridade de auditoria). Caso precise, apenas o histórico fica registrado.
+**Problema:** Campo de preço é read-only; só muda ao trocar fornecedor.
 
-## Arquivos afetados
+**Correção:**
+- Em `NewOrderPage.tsx`: tornar o campo `preco_unitario` editável quando o pedido está em `rascunho` ou `rejeitado`.
+- Recalcular `subtotal = quantidade * preco_unitario` em onChange.
+- Ao salvar, se o preço editado divergir de `supplier_prices.preco_unitario`, oferecer toast com ação "Atualizar tabela de preços" que faz `update supplier_prices` (gatilho `track_price_change` registra histórico automaticamente).
 
-- `supabase/migrations/<nova>.sql` — policies restritivas de DELETE.
-- `src/pages/ReceiptsPage.tsx` — log de debug + reforço de refetch.
-- `src/pages/OrderHistoryPage.tsx` — mensagem amigável no `handleDelete`.
+---
+
+### 4. Tela de Preços (PricesPage)
+
+**Problema:** Cache key `prices-page-data-v2` x invalidate `prices-page-data` (dessincronia). Inline edit cobre só `preco_unitario`. Detalhes (prazo, observações, qtd. mínima) não aparecem.
+
+**Correção:**
+- Padronizar queryKey: usar `["prices-page-data-v2"]` em todos os `invalidateQueries`.
+- Expandir o painel de edição inline para incluir `prazo_entrega`, `quantidade_minima`, `observacoes`, `unidade_medida`.
+- Mostrar essas colunas (ou um popover de detalhes) na linha do produto-fornecedor.
+
+---
+
+### 5. Histórico, exportação e nome do usuário
+
+**Problema:** Nome do usuário sai como "—" em PDFs/históricos. Botão de exportação em massa (status → emitido) escondido para perfis privilegiados. Master perde acesso a ações.
+
+**Correção:**
+- Centralizar resolução de nome: helper `resolveUserName(userId)` que tenta `get_profile_names` RPC → fallback `profiles.full_name` → fallback `profiles.email` → "Usuário".
+- Aplicar esse helper em `OrderHistoryPage`, `InventoryHistoryPage`, `InventoriesPage`, `pdfGenerator` e `reportExports`.
+- Em `OrderHistoryPage.tsx`: remover condicional que esconde "Exportar em massa" para master/comprador — exibir para todos os perfis com permissão de update.
+
+---
+
+### 6. Inventário — exclusão, log e calculadora
+
+**Problema:** `deleteInventory` falha porque `inventory_log` não tem policy de DELETE. Campos de quantidade não usam `CalcInput`.
+
+**Correção:**
+- Migração: adicionar policy `DELETE` em `inventory_log` permitindo dono do inventário e master:
+  ```sql
+  CREATE POLICY "Users delete own inventory log"
+  ON inventory_log FOR DELETE TO authenticated
+  USING (auth.uid() = user_id OR has_role(auth.uid(), 'master'));
+  ```
+- Em `deleteInventory`: deletar `inventory_log` antes de `inventories` (cascade manual).
+- Em `InventoriesPage.tsx`: trocar `<Input type="number">` por `<CalcInput>` nos campos de saldo.
+
+---
+
+### Ordem de execução sugerida
+
+1. Migração RLS de `inventory_log` (desbloqueia exclusão).
+2. Helper `resolveUserName` + aplicação nos PDFs/históricos (fix visível imediato).
+3. Categorias dinâmicas + filtro de produtos (desbloqueia solicitações).
+4. Edição de preço no pedido + correção do cache em Preços.
+5. Importação de solicitações + PDF agregando saldos.
+6. Polimentos: CalcInput inventário, botão de exportação em massa universal.
+
+### Detalhes técnicos
+
+- Arquivos editados: `MyRequisitionsPage.tsx`, `NewOrderPage.tsx`, `ComparativePage.tsx`, `OrderHistoryPage.tsx`, `InventoriesPage.tsx`, `InventoryHistoryPage.tsx`, `PricesPage.tsx`, `lib/pdfGenerator.ts`, `lib/reportExports.ts`, novo `lib/userNames.ts`.
+- 1 migração SQL (policy DELETE em `inventory_log`).
+- 1 script opcional de normalização de `products.categoria`.
+- Sem mudanças em auth, edge functions ou schema de tabelas principais.
