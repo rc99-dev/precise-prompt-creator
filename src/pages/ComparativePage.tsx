@@ -296,11 +296,15 @@ export default function ComparativePage() {
         orderItems.map(i => ({ ...i, order_id: order.id, observacoes: null }))
       );
 
-      // Link requisition if exists
+      // Link ALL matching requisitions (same titulo + created_at) — not just the selected one
       if (selectedReqId) {
+        const selectedReq = pendingReqs.find(r => r.id === selectedReqId);
+        const matchingIds = selectedReq
+          ? pendingReqs.filter(r => r.titulo === selectedReq.titulo && r.created_at === selectedReq.created_at).map(r => r.id)
+          : [selectedReqId];
         await supabase.from('requisitions').update({
           status: 'incluida_no_pedido', order_id: order.id,
-        } as any).eq('id', selectedReqId);
+        } as any).in('id', matchingIds);
       }
 
       clearDraft();
