@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Search, FileDown, History, Boxes } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/helpers";
 import { generateInventoryPDF } from "@/lib/pdfGenerator";
+import { resolveUserNames } from "@/lib/userNames";
 import { useQuery } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 
