@@ -302,14 +302,17 @@ export default function OrderHistoryPage() {
     const includeSaldoData = isInternalPDF || forceSaldo;
     if (includeSaldoData) {
       const { data: linkedReqs } = await supabase.from('requisitions')
-        .select('id, user_id, setor').eq('order_id', order.id).limit(1);
+        .select('id, user_id, setor').eq('order_id', order.id);
       if (linkedReqs && linkedReqs.length > 0) {
-        const reqId = linkedReqs[0].id;
+        const reqIds = linkedReqs.map((r: any) => r.id);
         setor = linkedReqs[0].setor;
         const { data: reqProfile } = await supabase.from('profiles').select('full_name').eq('user_id', linkedReqs[0].user_id).single();
         solicitante = reqProfile?.full_name || null;
-        const { data: reqItems } = await supabase.from('requisition_items').select('product_id, saldo').eq('requisition_id', reqId);
-        (reqItems || []).forEach((ri: any) => { saldoMap[ri.product_id] = ri.saldo; });
+        const { data: reqItems } = await supabase.from('requisition_items').select('product_id, saldo').in('requisition_id', reqIds);
+        // Aggregate saldo across all linked requisitions for the same product
+        (reqItems || []).forEach((ri: any) => {
+          saldoMap[ri.product_id] = (saldoMap[ri.product_id] || 0) + Number(ri.saldo || 0);
+        });
       }
     }
 

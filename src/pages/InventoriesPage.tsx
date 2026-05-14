@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CalcInput } from "@/components/CalcInput";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +16,7 @@ import { toast } from "sonner";
 import { Plus, X, Search, Trash2, Boxes, Send, FileDown, Pencil, ShieldCheck, KeyRound } from "lucide-react";
 import { formatDate } from "@/lib/helpers";
 import { generateInventoryPDF } from "@/lib/pdfGenerator";
+import { resolveUserNames } from "@/lib/userNames";
 import { UNIDADES, SETORES, TITULOS_SOLICITACAO, TITULO_TO_CATEGORIA } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
@@ -62,11 +64,7 @@ export default function InventoriesPage() {
       const counts: Record<string, number> = {};
       (itemsAll || []).forEach((r: any) => { counts[r.inventory_id] = (counts[r.inventory_id] || 0) + 1; });
       const userIds = Array.from(new Set((invs || []).map((i: any) => i.user_id))) as string[];
-      const { data: names } = userIds.length
-        ? await supabase.rpc('get_profile_names', { _user_ids: userIds } as any)
-        : { data: [] as any[] };
-      const nameMap: Record<string, string> = {};
-      (names || []).forEach((n: any) => { nameMap[n.user_id] = n.full_name; });
+      const nameMap = userIds.length ? await resolveUserNames(userIds) : {};
       const distinctCats = Array.from(new Set((prods || []).map((p: any) => p.categoria).filter(Boolean))).sort() as string[];
       return {
         inventories: ((invs || []) as any[]).map(i => ({ ...i, itemsCount: counts[i.id] || 0 })) as Inventory[],
@@ -263,18 +261,7 @@ export default function InventoriesPage() {
       (supabase as any).from('inventory_log').select('*').eq('inventory_id', inv.id).order('created_at', { ascending: true }),
     ]);
     const logUserIds = Array.from(new Set((log || []).map((l: any) => l.user_id).filter(Boolean))) as string[];
-    const ln: Record<string, string> = {};
-    if (logUserIds.length) {
-      try {
-        const { data: logNames } = await supabase.rpc('get_profile_names', { _user_ids: logUserIds } as any);
-        (logNames || []).forEach((n: any) => { if (n.full_name) ln[n.user_id] = n.full_name; });
-      } catch {}
-      const missing = logUserIds.filter(id => !ln[id]);
-      if (missing.length) {
-        const { data: prof } = await supabase.from('profiles').select('user_id, full_name').in('user_id', missing);
-        (prof || []).forEach((p: any) => { if (p.full_name) ln[p.user_id] = p.full_name; });
-      }
-    }
+    const ln = logUserIds.length ? await resolveUserNames(logUserIds) : {};
     generateInventoryPDF({
       numero: inv.numero || inv.id.slice(0, 8),
       titulo: inv.titulo, unidade: inv.unidade, setor: inv.setor, categoria: inv.categoria,
@@ -386,7 +373,7 @@ export default function InventoriesPage() {
                           <tr key={it.product_id} className="border-b last:border-0">
                             <td className="py-2 px-3 font-medium">{it.nome}</td>
                             <td className="py-2 px-3 text-muted-foreground">{it.unidade_medida}</td>
-                            <td className="py-2 px-3"><Input type="number" step="0.01" min="0" className="w-24 ml-auto text-right h-8" value={it.saldo} onChange={e => updateField(idx, 'saldo', e.target.value)} placeholder="0" /></td>
+                            <td className="py-2 px-3"><CalcInput min="0" step="0.01" className="w-24 ml-auto text-right h-8" value={it.saldo} onChange={(v) => updateField(idx, 'saldo', v)} placeholder="0" /></td>
                             <td className="py-2 px-3 text-center">
                               <Checkbox checked={it.solicitar_compra} onCheckedChange={(v) => updateField(idx, 'solicitar_compra', !!v)} />
                             </td>

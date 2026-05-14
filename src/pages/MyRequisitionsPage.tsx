@@ -53,14 +53,17 @@ export default function MyRequisitionsPage() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-requisitions', user?.id],
     queryFn: async () => {
-      const [{ data: reqs, error: e1 }, { data: prods, error: e2 }] = await Promise.all([
+      const [{ data: reqs, error: e1 }, { data: prods, error: e2 }, { data: cats }] = await Promise.all([
         supabase.from('requisitions').select('id, user_id, titulo, unidade, setor, status, motivo_recusa, created_at, observacoes')
           .eq('user_id', user!.id).order('created_at', { ascending: false }),
         supabase.from('products').select('id, nome, unidade_medida, categoria').eq('status', 'ativo').order('nome'),
+        supabase.from('product_categories').select('id, nome').order('nome'),
       ]);
       if (e1 || e2) throw new Error("Erro ao carregar dados");
-      // Extract distinct categories from products
-      const distinctCats = Array.from(new Set((prods || []).map((p: any) => p.categoria).filter(Boolean))).sort() as string[];
+      // Categories come from product_categories table; merge with any legacy categories present in products
+      const fromTable = ((cats || []) as any[]).map(c => c.nome).filter(Boolean);
+      const fromProducts = ((prods || []) as any[]).map(p => p.categoria).filter(Boolean);
+      const distinctCats = Array.from(new Set([...fromTable, ...fromProducts])).sort() as string[];
 
       const reqIds = (reqs || []).map(r => r.id);
       let reqItems: any[] = [];
@@ -174,7 +177,8 @@ export default function MyRequisitionsPage() {
 
   const loadCategoryProducts = () => {
     if (!categoria) return;
-    const catProducts = products.filter(p => p.categoria === categoria && !items.some(i => i.product_id === p.id));
+    const target = categoria.trim().toLowerCase();
+    const catProducts = products.filter(p => (p.categoria || '').trim().toLowerCase() === target && !items.some(i => i.product_id === p.id));
     if (catProducts.length > 0) {
       setItems(prev => [
         ...prev,

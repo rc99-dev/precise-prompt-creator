@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Search, FileDown, History, Boxes } from "lucide-react";
 import { formatDate, formatDateTime } from "@/lib/helpers";
 import { generateInventoryPDF } from "@/lib/pdfGenerator";
+import { resolveUserNames } from "@/lib/userNames";
 import { useQuery } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 
@@ -35,11 +36,7 @@ export default function InventoryHistoryPage() {
       const counts: Record<string, number> = {};
       (itemsAll || []).forEach((r: any) => { counts[r.inventory_id] = (counts[r.inventory_id] || 0) + 1; });
       const userIds = Array.from(new Set((invs || []).map((i: any) => i.user_id))) as string[];
-      const { data: names } = userIds.length
-        ? await supabase.rpc('get_profile_names', { _user_ids: userIds } as any)
-        : { data: [] as any[] };
-      const nameMap: Record<string, string> = {};
-      (names || []).forEach((n: any) => { nameMap[n.user_id] = n.full_name; });
+      const nameMap = userIds.length ? await resolveUserNames(userIds) : {};
       return {
         inventories: ((invs || []) as any[]).map(i => ({ ...i, itemsCount: counts[i.id] || 0 })),
         nameMap,
@@ -64,18 +61,7 @@ export default function InventoryHistoryPage() {
       (supabase as any).from('inventory_log').select('*').eq('inventory_id', inv.id).order('created_at', { ascending: true }),
     ]);
     const logUserIds = Array.from(new Set((log || []).map((l: any) => l.user_id).filter(Boolean))) as string[];
-    const ln: Record<string, string> = {};
-    if (logUserIds.length) {
-      try {
-        const { data: logNames } = await supabase.rpc('get_profile_names', { _user_ids: logUserIds } as any);
-        (logNames || []).forEach((n: any) => { if (n.full_name) ln[n.user_id] = n.full_name; });
-      } catch {}
-      const missing = logUserIds.filter(id => !ln[id]);
-      if (missing.length) {
-        const { data: prof } = await supabase.from('profiles').select('user_id, full_name').in('user_id', missing);
-        (prof || []).forEach((p: any) => { if (p.full_name) ln[p.user_id] = p.full_name; });
-      }
-    }
+    const ln = logUserIds.length ? await resolveUserNames(logUserIds) : {};
     generateInventoryPDF({
       numero: inv.numero || inv.id.slice(0, 8),
       titulo: inv.titulo, unidade: inv.unidade, setor: inv.setor, categoria: inv.categoria,
@@ -95,18 +81,7 @@ export default function InventoryHistoryPage() {
     const { data: log } = await (supabase as any).from('inventory_log')
       .select('*').eq('inventory_id', inv.id).order('created_at', { ascending: true });
     const ids = Array.from(new Set((log || []).map((l: any) => l.user_id).filter(Boolean))) as string[];
-    const nm: Record<string, string> = {};
-    if (ids.length) {
-      try {
-        const { data: names } = await supabase.rpc('get_profile_names', { _user_ids: ids } as any);
-        (names || []).forEach((n: any) => { if (n.full_name) nm[n.user_id] = n.full_name; });
-      } catch {}
-      const missing = ids.filter(id => !nm[id]);
-      if (missing.length) {
-        const { data: prof } = await supabase.from('profiles').select('user_id, full_name').in('user_id', missing);
-        (prof || []).forEach((p: any) => { if (p.full_name) nm[p.user_id] = p.full_name; });
-      }
-    }
+    const nm = ids.length ? await resolveUserNames(ids) : {};
     setLogOpen({ inv, logs: log || [], nameMap: nm });
   };
 

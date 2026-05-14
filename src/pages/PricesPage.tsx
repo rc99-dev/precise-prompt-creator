@@ -75,7 +75,7 @@ export default function PricesPage() {
   const suppliers = data?.suppliers || [];
   const products = data?.products || [];
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['prices-page-data'] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['prices-page-data-v2'] });
 
   const minPrices = useMemo(() => {
     const mins: Record<string, number> = {};
@@ -241,14 +241,16 @@ const handleLink = async (e: React.FormEvent) => {
                         <th className="text-left py-3 px-4 font-medium text-muted-foreground">Produto</th>
                         <th className="text-left py-3 px-4 font-medium text-muted-foreground">Fornecedor</th>
                         <th className="text-right py-3 px-4 font-medium text-muted-foreground">Preço Unitário</th>
+                        <th className="text-right py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Qtd. Mín.</th>
                         <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Prazo Entrega</th>
+                        <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden xl:table-cell">Observações</th>
                         <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Atualizado em</th>
                         {canEdit && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {filtered.length === 0 ? (
-                        <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum preço cadastrado.</td></tr>
+                        <tr><td colSpan={canEdit ? 8 : 7} className="text-center py-8 text-muted-foreground">Nenhum preço cadastrado.</td></tr>
                       ) : filtered.map(p => {
                         const isMin = minPrices[p.product_id] === p.preco_unitario;
                         return (
@@ -271,7 +273,9 @@ const handleLink = async (e: React.FormEvent) => {
                                 </span>
                               )}
                             </td>
+                            <td className="py-3 px-4 text-right text-muted-foreground hidden lg:table-cell">{p.quantidade_minima ?? '—'}</td>
                             <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{p.prazo_entrega || '—'}</td>
+                            <td className="py-3 px-4 text-muted-foreground hidden xl:table-cell max-w-[240px] truncate" title={p.observacoes || ''}>{p.observacoes || '—'}</td>
                             <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{formatDate(p.updated_at)}</td>
                             {canEdit && (
                               <td className="py-3 px-4 text-right space-x-1">
