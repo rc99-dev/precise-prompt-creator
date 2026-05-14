@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Plus, X, Search, Trash2, Boxes, Send, FileDown, Pencil, ShieldCheck, KeyRound } from "lucide-react";
 import { formatDate } from "@/lib/helpers";
 import { generateInventoryPDF } from "@/lib/pdfGenerator";
+import { resolveUserNames } from "@/lib/userNames";
 import { UNIDADES, SETORES, TITULOS_SOLICITACAO, TITULO_TO_CATEGORIA } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
