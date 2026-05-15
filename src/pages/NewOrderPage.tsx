@@ -408,11 +408,49 @@ export default function NewOrderPage() {
       const { error: itemsError } = await supabase.from('purchase_order_items').insert(orderItems);
       if (itemsError) { toast.error(itemsError.message); setSaving(false); return; }
 
-      // Update requisition status if came from requisition
+      // Update requisition status — include all sister requisitions sharing same titulo+unidade+created_at
       if (requisitionId) {
+        const { data: thisReq } = await supabase.from('requisitions')
+          .select('titulo, unidade, created_at').eq('id', requisitionId).maybeSingle();
+        let idsToLink: string[] = [requisitionId];
+        if (thisReq) {
+          const { data: sisters } = await supabase.from('requisitions')
+            .select('id').eq('status', 'pendente')
+            .eq('titulo', thisReq.titulo as any)
+            .eq('unidade', thisReq.unidade as any)
+            .eq('created_at', thisReq.created_at as any);
+          if (sisters?.length) idsToLink = Array.from(new Set([...idsToLink, ...sisters.map((s: any) => s.id)]));
+        }
         await supabase.from('requisitions').update({
           status: 'incluida_no_pedido', order_id: order.id,
-        } as any).eq('id', requisitionId);
+        } as any).in('id', idsToLink);
+      }
+
+      // Detect divergent prices vs supplier_prices table and offer to update
+      const divergent = items.filter(i => {
+        if (!i.supplier_id) return false;
+        const original = allPrices.find(p => p.product_id === i.product_id && p.supplier_id === i.supplier_id);
+        return original && Math.abs(Number(original.preco_unitario) - Number(i.preco_unitario)) > 0.001;
+      });
+      if (divergent.length > 0) {
+        toast(`${divergent.length} preço(s) editado(s) diferem da tabela.`, {
+          description: "Deseja atualizar a tabela de preços?",
+          duration: 10000,
+          action: {
+            label: "Atualizar tabela",
+            onClick: async () => {
+              for (const it of divergent) {
+                await supabase.from('supplier_prices')
+                  .update({ preco_unitario: it.preco_unitario })
+                  .eq('product_id', it.product_id)
+                  .eq('supplier_id', it.supplier_id!);
+              }
+              toast.success("Tabela de preços atualizada!");
+              queryClient.invalidateQueries({ queryKey: ['prices-page-data-v2'] });
+              queryClient.invalidateQueries({ queryKey: ['order-base-data-v3'] });
+            },
+          },
+        });
       }
 
       toast.success(status === 'rascunho' ? "Rascunho salvo!" : "Enviado para aprovação!");
