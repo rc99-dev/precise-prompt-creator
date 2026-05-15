@@ -433,23 +433,36 @@ export default function NewOrderPage() {
         return original && Math.abs(Number(original.preco_unitario) - Number(i.preco_unitario)) > 0.001;
       });
       if (divergent.length > 0) {
-        toast(`${divergent.length} preço(s) editado(s) diferem da tabela.`, {
-          description: "Deseja atualizar a tabela de preços?",
-          duration: 10000,
+        toast.warning(`${divergent.length} preço(s) editado(s) diferem da tabela.`, {
+          description: "Deseja atualizar a tabela de preços com os novos valores?",
+          duration: 15000,
           action: {
             label: "Atualizar tabela",
             onClick: async () => {
-              for (const it of divergent) {
-                await supabase.from('supplier_prices')
-                  .update({ preco_unitario: it.preco_unitario })
-                  .eq('product_id', it.product_id)
-                  .eq('supplier_id', it.supplier_id!);
+              const t = toast.loading("Atualizando tabela de preços...");
+              try {
+                const results = await Promise.all(divergent.map(it =>
+                  supabase.from('supplier_prices')
+                    .update({ preco_unitario: it.preco_unitario })
+                    .eq('product_id', it.product_id)
+                    .eq('supplier_id', it.supplier_id!)
+                ));
+                const failed = results.filter(r => r.error).length;
+                toast.dismiss(t);
+                if (failed > 0) {
+                  toast.error(`Falha ao atualizar ${failed} preço(s).`);
+                } else {
+                  toast.success(`${divergent.length} preço(s) atualizado(s) na tabela!`);
+                }
+                queryClient.invalidateQueries({ queryKey: ['prices-page-data-v2'] });
+                queryClient.invalidateQueries({ queryKey: ['order-base-data-v3'] });
+              } catch (e: any) {
+                toast.dismiss(t);
+                toast.error(`Erro: ${e?.message || 'desconhecido'}`);
               }
-              toast.success("Tabela de preços atualizada!");
-              queryClient.invalidateQueries({ queryKey: ['prices-page-data-v2'] });
-              queryClient.invalidateQueries({ queryKey: ['order-base-data-v3'] });
             },
           },
+          cancel: { label: "Manter", onClick: () => {} },
         });
       }
 
