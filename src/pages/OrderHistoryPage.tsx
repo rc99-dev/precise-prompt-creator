@@ -22,6 +22,7 @@ import { useNavigate } from "react-router-dom";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
+import { resolveUserNames, resolveUserName } from "@/lib/userNames";
 
 type Order = {
   id: string; numero: string; user_id: string; modo: string;
@@ -248,19 +249,7 @@ export default function OrderHistoryPage() {
     const userIds = new Set<string>([order.user_id]);
     (logs || []).forEach((l: any) => { if (l.user_id) userIds.add(l.user_id); });
     if (receipt?.user_id) userIds.add(receipt.user_id);
-    const idsArr = Array.from(userIds);
-    const nameMap: Record<string, string> = {};
-    try {
-      const { data: names, error: nErr } = await supabase.rpc('get_profile_names', { _user_ids: idsArr } as any);
-      if (nErr) console.warn('get_profile_names error', nErr);
-      (names || []).forEach((n: any) => { if (n.full_name) nameMap[n.user_id] = n.full_name; });
-    } catch (e) { console.warn('get_profile_names threw', e); }
-    // Fallback: try direct profiles read for any missing IDs (works for master / own profile)
-    const missing = idsArr.filter(id => !nameMap[id]);
-    if (missing.length) {
-      const { data: prof } = await supabase.from('profiles').select('user_id, full_name').in('user_id', missing);
-      (prof || []).forEach((p: any) => { if (p.full_name) nameMap[p.user_id] = p.full_name; });
-    }
+    const nameMap = await resolveUserNames(Array.from(userIds));
     const events: TimelineEntry[] = [];
     events.push({ date: order.created_at, user: nameMap[order.user_id] || '—', action: 'Pedido criado' });
     (logs || []).forEach((l: any) => {
@@ -285,14 +274,13 @@ export default function OrderHistoryPage() {
       .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social, cnpj, telefone, cidade)')
       .eq('order_id', order.id);
     if (!items || items.length === 0) { toast.error("Sem itens para exportar."); return null; }
-    const { data: buyerProfile } = await supabase.from('profiles').select('full_name, unidade, unidade_setor').eq('user_id', order.user_id).single();
+    const { data: buyerProfileRaw } = await supabase.from('profiles').select('full_name, unidade, unidade_setor').eq('user_id', order.user_id).maybeSingle();
+    const buyerName = await resolveUserName(order.user_id);
+    const buyerProfile = { ...(buyerProfileRaw || {}), full_name: buyerName } as any;
     let aprovadorName: string | null = null;
     if (order.status === 'aprovado' || order.status === 'emitido' || order.status === 'recebido') {
       const { data: log } = await supabase.from('approval_log').select('user_id').eq('order_id', order.id).eq('action', 'aprovado').limit(1).maybeSingle();
-      if (log) {
-        const { data: ap } = await supabase.from('profiles').select('full_name').eq('user_id', log.user_id).single();
-        aprovadorName = ap?.full_name || null;
-      }
+      if (log?.user_id) aprovadorName = await resolveUserName(log.user_id);
     }
 
     const saldoMap: Record<string, number> = {};
@@ -306,8 +294,7 @@ export default function OrderHistoryPage() {
       if (linkedReqs && linkedReqs.length > 0) {
         const reqIds = linkedReqs.map((r: any) => r.id);
         setor = linkedReqs[0].setor;
-        const { data: reqProfile } = await supabase.from('profiles').select('full_name').eq('user_id', linkedReqs[0].user_id).single();
-        solicitante = reqProfile?.full_name || null;
+        solicitante = await resolveUserName(linkedReqs[0].user_id);
         const { data: reqItems } = await supabase.from('requisition_items').select('product_id, saldo').in('requisition_id', reqIds);
         // Aggregate saldo across all linked requisitions for the same product
         (reqItems || []).forEach((ri: any) => {

@@ -185,12 +185,20 @@ const handleLink = async (e: React.FormEvent) => {
   invalidate();
 };
 
-  // Inline edit price
-  const [inlineEdit, setInlineEdit] = useState<{ id: string; value: string } | null>(null);
+  // Inline edit (price / qtd minima / prazo)
+  const [inlineEdit, setInlineEdit] = useState<{ id: string; field: 'preco_unitario' | 'quantidade_minima' | 'prazo_entrega'; value: string } | null>(null);
   const saveInline = async (id: string) => {
     if (!inlineEdit) return;
-    const { error } = await supabase.from('supplier_prices').update({ preco_unitario: parseFloat(inlineEdit.value) }).eq('id', id);
-    if (error) toast.error(error.message); else { toast.success("Preço atualizado!"); setInlineEdit(null); invalidate(); }
+    const payload: any = {};
+    if (inlineEdit.field === 'prazo_entrega') {
+      payload.prazo_entrega = inlineEdit.value || null;
+    } else {
+      const num = parseFloat(inlineEdit.value);
+      if (isNaN(num)) { setInlineEdit(null); return; }
+      payload[inlineEdit.field] = num;
+    }
+    const { error } = await supabase.from('supplier_prices').update(payload).eq('id', id);
+    if (error) toast.error(error.message); else { toast.success("Atualizado!"); setInlineEdit(null); invalidate(); }
   };
 
   return (
@@ -258,23 +266,43 @@ const handleLink = async (e: React.FormEvent) => {
                             <td className="py-3 px-4 font-medium">{p.products?.nome}</td>
                             <td className="py-3 px-4 text-muted-foreground">{p.suppliers?.razao_social}</td>
                             <td className="py-3 px-4 text-right">
-                              {canEdit && inlineEdit?.id === p.id ? (
-                                <div className="flex items-center justify-end gap-1">
-                                  <Input className="w-28 text-right" value={inlineEdit.value}
-                                    onChange={e => setInlineEdit({ id: p.id, value: e.target.value })}
-                                    onKeyDown={e => e.key === 'Enter' && saveInline(p.id)}
-                                    onBlur={() => saveInline(p.id)} autoFocus />
-                                </div>
+                              {canEdit && inlineEdit?.id === p.id && inlineEdit.field === 'preco_unitario' ? (
+                                <Input className="w-28 text-right" value={inlineEdit.value}
+                                  onChange={e => setInlineEdit({ id: p.id, field: 'preco_unitario', value: e.target.value })}
+                                  onKeyDown={e => e.key === 'Enter' && saveInline(p.id)}
+                                  onBlur={() => saveInline(p.id)} autoFocus />
                               ) : (
                                 <span className={`currency font-medium cursor-pointer ${isMin ? 'text-success' : ''}`}
-                                  onClick={() => canEdit && setInlineEdit({ id: p.id, value: p.preco_unitario.toString() })}>
+                                  onClick={() => canEdit && setInlineEdit({ id: p.id, field: 'preco_unitario', value: p.preco_unitario.toString() })}>
                                   {isMin && <TrendingDown className="h-3 w-3 inline mr-1" />}
                                   {formatCurrency(p.preco_unitario)}
                                 </span>
                               )}
                             </td>
-                            <td className="py-3 px-4 text-right text-muted-foreground hidden lg:table-cell">{p.quantidade_minima ?? '—'}</td>
-                            <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{p.prazo_entrega || '—'}</td>
+                            <td className="py-3 px-4 text-right text-muted-foreground hidden lg:table-cell">
+                              {canEdit && inlineEdit?.id === p.id && inlineEdit.field === 'quantidade_minima' ? (
+                                <Input className="w-20 text-right" value={inlineEdit.value}
+                                  onChange={e => setInlineEdit({ id: p.id, field: 'quantidade_minima', value: e.target.value })}
+                                  onKeyDown={e => e.key === 'Enter' && saveInline(p.id)}
+                                  onBlur={() => saveInline(p.id)} autoFocus />
+                              ) : (
+                                <span className="cursor-pointer" onClick={() => canEdit && setInlineEdit({ id: p.id, field: 'quantidade_minima', value: (p.quantidade_minima ?? '').toString() })}>
+                                  {p.quantidade_minima ?? '—'}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">
+                              {canEdit && inlineEdit?.id === p.id && inlineEdit.field === 'prazo_entrega' ? (
+                                <Input className="w-32" value={inlineEdit.value}
+                                  onChange={e => setInlineEdit({ id: p.id, field: 'prazo_entrega', value: e.target.value })}
+                                  onKeyDown={e => e.key === 'Enter' && saveInline(p.id)}
+                                  onBlur={() => saveInline(p.id)} autoFocus />
+                              ) : (
+                                <span className="cursor-pointer" onClick={() => canEdit && setInlineEdit({ id: p.id, field: 'prazo_entrega', value: p.prazo_entrega || '' })}>
+                                  {p.prazo_entrega || '—'}
+                                </span>
+                              )}
+                            </td>
                             <td className="py-3 px-4 text-muted-foreground hidden xl:table-cell max-w-[240px] truncate" title={p.observacoes || ''}>{p.observacoes || '—'}</td>
                             <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{formatDate(p.updated_at)}</td>
                             {canEdit && (
