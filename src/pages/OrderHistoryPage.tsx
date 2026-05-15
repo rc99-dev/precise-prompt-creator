@@ -23,6 +23,7 @@ import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 import { resolveUserNames, resolveUserName } from "@/lib/userNames";
+import { exportSectionExcel } from "@/lib/reportExports";
 
 type Order = {
   id: string; numero: string; user_id: string; modo: string;
