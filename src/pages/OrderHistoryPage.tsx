@@ -23,6 +23,7 @@ import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 import { resolveUserNames, resolveUserName } from "@/lib/userNames";
+import { exportSectionExcel } from "@/lib/reportExports";
 
 type Order = {
   id: string; numero: string; user_id: string; modo: string;
@@ -643,6 +644,33 @@ export default function OrderHistoryPage() {
           <Button size="sm" onClick={exportSelectedPDF} disabled={!canExportMulti || exportingMulti}>
             <FileDown className="h-4 w-4 mr-2" />
             {exportingMulti ? 'Gerando...' : `Exportar ${selectedOrders.length} em PDF`}
+          </Button>
+        )}
+        {isPrivileged && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={filtered.length === 0}
+            onClick={() => {
+              const rows = filtered.map(o => [
+                o.numero,
+                formatDate(o.created_at),
+                o.titulo || '',
+                (o as any).unidade_setor || '',
+                o.status,
+                Number(o.total || 0).toFixed(2).replace('.', ','),
+              ]);
+              exportSectionExcel({
+                title: 'Histórico completo de pedidos',
+                periodLabel: `${filtered.length} pedido(s) — filtros aplicados`,
+                columns: ['Número', 'Data', 'Título', 'Unidade/Setor', 'Status', 'Total (R$)'],
+                rows,
+                footer: `Total geral: R$ ${filtered.reduce((s, o) => s + Number(o.total || 0), 0).toFixed(2).replace('.', ',')}`,
+              });
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Exportar histórico completo
           </Button>
         )}
       </div>
