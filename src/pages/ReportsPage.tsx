@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { exportSectionExcel, exportSectionPDF, exportBundleExcel, exportBundlePDF, type ReportSection } from "@/lib/reportExports";
+import { resolveUserNames } from "@/lib/userNames";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -105,18 +106,7 @@ async function fetchReports(view: "realizadas" | "recebidas", startISO: string, 
   // Buyer profile names
   const buyerOrderIds = orders.filter((o) => buyerSet.has(o.user_id)).map((o) => o.user_id);
   const buyerIds = Array.from(new Set(buyerOrderIds.filter(Boolean)));
-  const nameMap: Record<string, string> = {};
-  if (buyerIds.length) {
-    try {
-      const { data: names } = await supabase.rpc("get_profile_names", { _user_ids: buyerIds } as any);
-      (names || []).forEach((n: any) => { if (n.full_name) nameMap[n.user_id] = n.full_name; });
-    } catch { /* ignore */ }
-    const missing = buyerIds.filter((id) => !nameMap[id]);
-    if (missing.length) {
-      const { data: prof } = await supabase.from("profiles").select("user_id, full_name").in("user_id", missing);
-      (prof || []).forEach((p: any) => { if (p.full_name) nameMap[p.user_id] = p.full_name; });
-    }
-  }
+  const nameMap: Record<string, string> = buyerIds.length ? await resolveUserNames(buyerIds) : {};
 
   // Categoria
   const catMap: Record<string, number> = {};

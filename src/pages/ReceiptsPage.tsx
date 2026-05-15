@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveUserNames } from "@/lib/userNames";
 import { UNIDADES } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,19 +48,19 @@ const fetchReceiptOrders = async (filterUnidade: string) => {
   if (filterUnidade && filterUnidade !== 'todas') {
     query = query.eq('unidade_setor', filterUnidade);
   }
-  const [{ data: orders, error }, { data: profiles }] = await Promise.all([
-    query,
-    supabase.from('profiles').select('user_id, full_name, unidade'),
-  ]);
+  const { data: orders, error } = await query;
   if (error) throw error;
-  const profileMap: Record<string, { name: string; unidade: string }> = {};
-  (profiles || []).forEach((p: any) => {
-    profileMap[p.user_id] = { name: p.full_name, unidade: p.unidade || '' };
-  });
+  const userIds = Array.from(new Set((orders || []).map((o: any) => o.user_id).filter(Boolean)));
+  const nameMap = await resolveUserNames(userIds);
+  const { data: profiles } = userIds.length
+    ? await supabase.from('profiles').select('user_id, unidade').in('user_id', userIds)
+    : { data: [] as any[] };
+  const unidadeMap: Record<string, string> = {};
+  (profiles || []).forEach((p: any) => { unidadeMap[p.user_id] = p.unidade || ''; });
   const mapped = (orders || []).map((o: any) => ({
     ...o,
-    comprador_nome: profileMap[o.user_id]?.name || '—',
-    unidade_comprador: o.unidade_setor || profileMap[o.user_id]?.unidade || '',
+    comprador_nome: nameMap[o.user_id] || 'Usuário',
+    unidade_comprador: o.unidade_setor || unidadeMap[o.user_id] || '',
   })) as ReceiptOrder[];
   console.info('[recebimentos] resultados:', mapped.length);
   return sortOrders(mapped);
