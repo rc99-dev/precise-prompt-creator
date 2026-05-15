@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { exportSectionExcel, exportSectionPDF, exportBundleExcel, exportBundlePDF, type ReportSection } from "@/lib/reportExports";
+import { resolveUserNames } from "@/lib/userNames";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
