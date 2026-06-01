@@ -321,9 +321,12 @@ export default function ApprovalsPage() {
                   />
                 </TabsContent>
               </Tabs>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <Button variant="destructive" onClick={() => { setRejectDialog(detailOrder.id); }}>
                   <XCircle className="h-4 w-4 mr-2" />Rejeitar
+                </Button>
+                <Button variant="outline" onClick={() => { setReturnDialog(detailOrder.id); }}>
+                  <Undo2 className="h-4 w-4 mr-2" />Devolver para edição
                 </Button>
                 <Button onClick={() => saveEditsAndApprove(detailOrder.id)} className="bg-success hover:bg-success/90">
                   <CheckCircle className="h-4 w-4 mr-2" />{hasEdits ? "Aprovar com edições" : "Aprovar"}
