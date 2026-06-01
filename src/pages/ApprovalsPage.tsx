@@ -4,12 +4,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Eye, Clock, Pencil } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Clock, Pencil, Trash2, Undo2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
@@ -46,6 +47,9 @@ export default function ApprovalsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [rejectDialog, setRejectDialog] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [returnDialog, setReturnDialog] = useState<string | null>(null);
+  const [returnReason, setReturnReason] = useState("");
+  const [deleteItemTarget, setDeleteItemTarget] = useState<OrderItem | null>(null);
 
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['approval-orders'],
@@ -120,6 +124,45 @@ export default function ApprovalsPage() {
     } as any);
     toast.success("Pedido rejeitado.");
     setRejectDialog(null); setRejectReason(""); setDetailOrder(null);
+    invalidate();
+  };
+
+  const handleReturnForEdit = async () => {
+    if (!returnDialog || !returnReason.trim()) { toast.error("Informe o motivo da devolução."); return; }
+    const motivo = `[Devolvido para edição] ${returnReason}`;
+    const { error } = await supabase.from('purchase_orders').update({
+      status: 'rejeitado', rejected_reason: motivo,
+    } as any).eq('id', returnDialog);
+    if (error) { toast.error(error.message); return; }
+    await supabase.from('approval_log').insert({
+      order_id: returnDialog, user_id: user!.id, action: 'devolvido_para_edicao', motivo,
+    } as any);
+    toast.success("Pedido devolvido ao solicitante para edição.");
+    setReturnDialog(null); setReturnReason(""); setDetailOrder(null);
+    invalidate();
+  };
+
+  const handleDeleteItem = async () => {
+    if (!deleteItemTarget || !detailOrder) return;
+    const { error } = await supabase.from('purchase_order_items')
+      .delete().eq('id', deleteItemTarget.id);
+    if (error) { toast.error(`Erro ao excluir item: ${error.message}`); return; }
+    // Recalcular total no pedido
+    const remaining = orderItems.filter(i => i.id !== deleteItemTarget.id);
+    const newTotal = remaining.reduce((s, i) => s + (editedItems[i.id] ?? i.quantidade) * i.preco_unitario, 0);
+    await supabase.from('purchase_orders').update({ total: newTotal } as any).eq('id', detailOrder.id);
+    await supabase.from('approval_log').insert({
+      order_id: detailOrder.id, user_id: user!.id, action: 'item_excluido',
+      motivo: `Item removido pelo aprovador: ${deleteItemTarget.products?.nome ?? deleteItemTarget.product_id}`,
+    } as any);
+    setOrderItems(remaining);
+    setEditedItems(prev => {
+      const next = { ...prev };
+      delete next[deleteItemTarget.id];
+      return next;
+    });
+    setDeleteItemTarget(null);
+    toast.success("Item excluído.");
     invalidate();
   };
 
@@ -215,6 +258,7 @@ export default function ApprovalsPage() {
                         <th className="text-center py-2 font-medium text-muted-foreground">Qtd</th>
                         <th className="text-right py-2 font-medium text-muted-foreground">Preço Unit.</th>
                         <th className="text-right py-2 font-medium text-muted-foreground">Subtotal</th>
+                        {isEditing && <th className="w-10"></th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -245,6 +289,20 @@ export default function ApprovalsPage() {
                             </td>
                             <td className="py-2 text-right currency">{formatCurrency(i.preco_unitario)}</td>
                             <td className="py-2 text-right currency font-medium">{formatCurrency(qty * i.preco_unitario)}</td>
+                            {isEditing && (
+                              <td className="py-2 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Excluir item"
+                                  onClick={() => setDeleteItemTarget(i)}
+                                  disabled={orderItems.length <= 1}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
@@ -263,9 +321,12 @@ export default function ApprovalsPage() {
                   />
                 </TabsContent>
               </Tabs>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <Button variant="destructive" onClick={() => { setRejectDialog(detailOrder.id); }}>
                   <XCircle className="h-4 w-4 mr-2" />Rejeitar
+                </Button>
+                <Button variant="outline" onClick={() => { setReturnDialog(detailOrder.id); }}>
+                  <Undo2 className="h-4 w-4 mr-2" />Devolver para edição
                 </Button>
                 <Button onClick={() => saveEditsAndApprove(detailOrder.id)} className="bg-success hover:bg-success/90">
                   <CheckCircle className="h-4 w-4 mr-2" />{hasEdits ? "Aprovar com edições" : "Aprovar"}
@@ -291,6 +352,45 @@ export default function ApprovalsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+
+      <Dialog open={!!returnDialog} onOpenChange={() => { setReturnDialog(null); setReturnReason(""); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Devolver para edição</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              O pedido voltará ao solicitante como <span className="font-medium text-foreground">rejeitado</span> com a observação de devolução, permitindo ajustes e reenvio para aprovação — sem duplicar itens.
+            </p>
+            <div className="space-y-2">
+              <Label>O que precisa ser ajustado? *</Label>
+              <Textarea value={returnReason} onChange={e => setReturnReason(e.target.value)} placeholder="Ex.: revise quantidades do item X, troque o fornecedor Y..." />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setReturnDialog(null)}>Cancelar</Button>
+              <Button onClick={handleReturnForEdit}>
+                <Undo2 className="h-4 w-4 mr-2" />Devolver
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteItemTarget} onOpenChange={(o) => { if (!o) setDeleteItemTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir item do pedido?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteItemTarget && (
+                <>O item <span className="font-medium text-foreground">{deleteItemTarget.products?.nome}</span> será removido do pedido e o total será recalculado. Esta ação é registrada no histórico.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteItem} className="bg-destructive hover:bg-destructive/90">Excluir item</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
