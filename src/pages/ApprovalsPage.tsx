@@ -352,8 +352,7 @@ export default function ApprovalsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
-  );
+
 
       <Dialog open={!!returnDialog} onOpenChange={() => { setReturnDialog(null); setReturnReason(""); }}>
         <DialogContent>
