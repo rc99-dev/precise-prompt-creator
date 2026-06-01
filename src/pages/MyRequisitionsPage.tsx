@@ -20,6 +20,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
+import { rowEnterHandler, focusRowField, focusProductSearch } from "@/lib/keyboardFlow";
 
 type Requisition = {
   id: string; user_id: string; titulo: string | null; unidade: string | null;
@@ -196,6 +197,7 @@ export default function MyRequisitionsPage() {
   const addProduct = (p: Product) => {
     setItems([...items, { product_id: p.id, nome: p.nome, unidade_medida: p.unidade_medida, saldo: "", pedido: "", observacoes: "" }]);
     setProductSearch("");
+    focusRowField(p.id, "saldo");
   };
 
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
@@ -404,6 +406,13 @@ export default function MyRequisitionsPage() {
                     className="pl-9"
                     value={productSearch}
                     onChange={e => setProductSearch(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && filteredProducts.length > 0) {
+                        e.preventDefault();
+                        addProduct(filteredProducts[0]);
+                      }
+                    }}
+                    data-product-search="req"
                   />
                 </div>
                 {productSearch.length >= 2 && filteredProducts.length > 0 && (
@@ -439,7 +448,7 @@ export default function MyRequisitionsPage() {
                     </thead>
                     <tbody>
                       {[...items].map((it, i) => ({ it, i })).sort((a, b) => a.it.nome.localeCompare(b.it.nome, 'pt-BR')).map(({ it: item, i: idx }) => (
-                        <tr key={item.product_id} className="border-b last:border-0">
+                        <tr key={item.product_id} className="border-b last:border-0" data-row={item.product_id}>
                           <td className="py-2 px-3 font-medium">{item.nome}</td>
                           <td className="py-2 px-3 text-muted-foreground">{item.unidade_medida}</td>
                           <td className="py-2 px-3">
@@ -449,6 +458,8 @@ export default function MyRequisitionsPage() {
                               value={item.saldo}
                               onChange={v => updateField(idx, 'saldo', v)}
                               placeholder="0"
+                              data-field="saldo"
+                              onKeyDown={rowEnterHandler(item.product_id, "saldo", ["saldo", "pedido", "observacoes"], "req")}
                             />
                           </td>
                           <td className="py-2 px-3">
@@ -458,6 +469,8 @@ export default function MyRequisitionsPage() {
                               value={item.pedido}
                               onChange={v => updateField(idx, 'pedido', v)}
                               placeholder="0"
+                              data-field="pedido"
+                              onKeyDown={rowEnterHandler(item.product_id, "pedido", ["saldo", "pedido", "observacoes"], "req")}
                             />
                           </td>
                           <td className="py-2 px-3">
@@ -466,6 +479,10 @@ export default function MyRequisitionsPage() {
                               value={item.observacoes}
                               onChange={e => updateField(idx, 'observacoes', e.target.value)}
                               placeholder="Obs..."
+                              data-field="observacoes"
+                              onKeyDown={e => {
+                                if (e.key === "Enter") { e.preventDefault(); focusProductSearch("req"); }
+                              }}
                             />
                           </td>
                           <td className="py-2 px-1">
