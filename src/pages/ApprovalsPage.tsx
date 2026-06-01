@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Eye, Clock, Pencil } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Clock, Pencil, Trash2, Undo2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/helpers";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
