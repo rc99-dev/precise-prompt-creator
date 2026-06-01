@@ -18,8 +18,9 @@ import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { useOrderDraft, DraftOrderItem } from "@/hooks/useOrderDraft";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
-import { AlertTriangle, Trash2, RotateCcw, ClipboardList } from "lucide-react";
+import { AlertTriangle, Trash2, RotateCcw, ClipboardList, TrendingDown, Trophy } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { focusRowField } from "@/lib/keyboardFlow";
 
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
@@ -312,7 +313,16 @@ export default function NewOrderPage() {
       quantidade: 1, supplier_id: min?.supplier_id || '', preco_unitario: min?.preco || 0,
       subtotal: min?.preco || 0, observacoes: '',
     }]);
+    focusRowField(product.id, "quantidade");
   }, [getMinPrice]);
+
+  const applySingleSupplier = useCallback((supplierId: string) => {
+    setActiveStrategy("melhor_fornecedor");
+    setItems(prev => prev.map(item => {
+      const price = getSupplierPrice(item.product_id, supplierId);
+      return { ...item, supplier_id: supplierId, preco_unitario: price, subtotal: item.quantidade * price };
+    }));
+  }, [getSupplierPrice]);
 
   const updateItem = useCallback((index: number, updates: Partial<OrderItem>) => {
     setItems(prev => prev.map((item, i) => {
@@ -509,6 +519,40 @@ export default function NewOrderPage() {
         </p>
       </div>
 
+      {/* Live total banner — always up-to-date */}
+      <Card className="border-primary/40 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
+        <CardContent className="py-3 px-4 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-6 flex-wrap">
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Total da ordem</p>
+              <p className="text-2xl font-bold text-primary leading-tight">{formatCurrency(total)}</p>
+            </div>
+            <div className="h-8 w-px bg-border hidden sm:block" />
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Itens</p>
+              <p className="text-lg font-semibold">{items.length}</p>
+            </div>
+            {economy > 0 && (
+              <>
+                <div className="h-8 w-px bg-border hidden sm:block" />
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Economia</p>
+                  <p className="text-lg font-semibold text-green-400 flex items-center gap-1">
+                    <TrendingDown className="h-4 w-4" />{formatCurrency(economy)}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+          {activeStrategy && (
+            <span className="text-xs text-muted-foreground">
+              Estratégia: <strong className="text-foreground">{activeStrategy === 'melhor_preco' ? 'Melhor preço' : 'Fornecedor único'}</strong>
+            </span>
+          )}
+        </CardContent>
+      </Card>
+
+
       {showDraftBanner && !editOrderId && !requisitionId && (
         <Card className="border-warning/50 bg-warning/5">
           <CardContent className="py-3 px-4 flex items-center justify-between">
@@ -581,6 +625,32 @@ export default function NewOrderPage() {
       {items.length > 0 && analysis && (
         <StrategyCards analysis={analysis} selectedStrategy={activeStrategy} onSelect={applyStrategy} showSelectButton />
       )}
+
+      {items.length > 0 && activeStrategy === "melhor_fornecedor" && (
+        <Card className="border-primary/30">
+          <CardContent className="py-3 px-4 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Fornecedor único aplicado a todos os itens</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Trocar para:</span>
+              <Select
+                value={items.find(i => i.supplier_id)?.supplier_id || ""}
+                onValueChange={applySingleSupplier}
+              >
+                <SelectTrigger className="w-[220px] h-8 text-sm"><SelectValue placeholder="Selecione um fornecedor" /></SelectTrigger>
+                <SelectContent>
+                  {suppliers.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.razao_social}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
 
       {items.length > 0 && (
         <Card>
