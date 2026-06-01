@@ -354,4 +354,44 @@ export default function ApprovalsPage() {
       </Dialog>
     </div>
   );
+
+      <Dialog open={!!returnDialog} onOpenChange={() => { setReturnDialog(null); setReturnReason(""); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Devolver para edição</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              O pedido voltará ao solicitante como <span className="font-medium text-foreground">rejeitado</span> com a observação de devolução, permitindo ajustes e reenvio para aprovação — sem duplicar itens.
+            </p>
+            <div className="space-y-2">
+              <Label>O que precisa ser ajustado? *</Label>
+              <Textarea value={returnReason} onChange={e => setReturnReason(e.target.value)} placeholder="Ex.: revise quantidades do item X, troque o fornecedor Y..." />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setReturnDialog(null)}>Cancelar</Button>
+              <Button onClick={handleReturnForEdit}>
+                <Undo2 className="h-4 w-4 mr-2" />Devolver
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteItemTarget} onOpenChange={(o) => { if (!o) setDeleteItemTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir item do pedido?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteItemTarget && (
+                <>O item <span className="font-medium text-foreground">{deleteItemTarget.products?.nome}</span> será removido do pedido e o total será recalculado. Esta ação é registrada no histórico.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteItem} className="bg-destructive hover:bg-destructive/90">Excluir item</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
 }
