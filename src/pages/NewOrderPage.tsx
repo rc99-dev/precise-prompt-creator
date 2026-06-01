@@ -377,12 +377,32 @@ export default function NewOrderPage() {
 
     if (editOrderId) {
       const modo = activeStrategy || 'manual';
+
+      // Delete existing items FIRST while the order is still in rascunho/rejeitado
+      // (a RLS restrictive policy blocks deletes once status changes to aguardando_aprovacao).
+      const { error: deleteErr, count: deletedCount } = await supabase
+        .from('purchase_order_items')
+        .delete({ count: 'exact' })
+        .eq('order_id', editOrderId);
+      if (deleteErr) { toast.error(`Erro ao limpar itens: ${deleteErr.message}`); setSaving(false); return; }
+      if (deletedCount === 0) {
+        // Sanity check: if there should have been items, abort instead of duplicating.
+        const { count: existingCount } = await supabase
+          .from('purchase_order_items')
+          .select('id', { count: 'exact', head: true })
+          .eq('order_id', editOrderId);
+        if ((existingCount || 0) > 0) {
+          toast.error("Não foi possível atualizar os itens (permissão negada). Recarregue a página e tente novamente.");
+          setSaving(false);
+          return;
+        }
+      }
+
       const { error: updateErr } = await supabase.from('purchase_orders').update({
         modo, status, observacoes, total, unidade_setor: unidadeSolicitante || null, titulo,
       } as any).eq('id', editOrderId);
       if (updateErr) { toast.error(updateErr.message); setSaving(false); return; }
 
-      await supabase.from('purchase_order_items').delete().eq('order_id', editOrderId);
       const orderItems = items.map(i => ({
         order_id: editOrderId, product_id: i.product_id, supplier_id: i.supplier_id || null,
         quantidade: i.quantidade, preco_unitario: i.preco_unitario, subtotal: i.subtotal,
