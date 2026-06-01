@@ -99,14 +99,17 @@ export default function ApprovalsPage() {
     // Save quantity edits if any
     if (hasEdits) {
       for (const [itemId, newQty] of Object.entries(editedItems)) {
-        const item = orderItems.find(i => i.id === itemId);
+        const item = visibleItems.find(i => i.id === itemId);
         if (!item) continue;
         const newSubtotal = newQty * item.preco_unitario;
         await supabase.from('purchase_order_items').update({
           quantidade: newQty, subtotal: newSubtotal,
         } as any).eq('id', itemId);
       }
-      const newTotal = computeEditedTotal();
+      const newTotal = visibleItems.reduce((sum, item) => {
+        const qty = editedItems[item.id] ?? item.quantidade;
+        return sum + qty * item.preco_unitario;
+      }, 0);
       await supabase.from('purchase_orders').update({ total: newTotal } as any).eq('id', orderId);
     }
 
