@@ -258,6 +258,7 @@ export default function ApprovalsPage() {
                         <th className="text-center py-2 font-medium text-muted-foreground">Qtd</th>
                         <th className="text-right py-2 font-medium text-muted-foreground">Preço Unit.</th>
                         <th className="text-right py-2 font-medium text-muted-foreground">Subtotal</th>
+                        {isEditing && <th className="w-10"></th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -288,6 +289,20 @@ export default function ApprovalsPage() {
                             </td>
                             <td className="py-2 text-right currency">{formatCurrency(i.preco_unitario)}</td>
                             <td className="py-2 text-right currency font-medium">{formatCurrency(qty * i.preco_unitario)}</td>
+                            {isEditing && (
+                              <td className="py-2 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Excluir item"
+                                  onClick={() => setDeleteItemTarget(i)}
+                                  disabled={orderItems.length <= 1}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
