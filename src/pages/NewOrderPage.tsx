@@ -626,6 +626,32 @@ export default function NewOrderPage() {
         <StrategyCards analysis={analysis} selectedStrategy={activeStrategy} onSelect={applyStrategy} showSelectButton />
       )}
 
+      {items.length > 0 && activeStrategy === "melhor_fornecedor" && (
+        <Card className="border-primary/30">
+          <CardContent className="py-3 px-4 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Fornecedor único aplicado a todos os itens</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Trocar para:</span>
+              <Select
+                value={items.find(i => i.supplier_id)?.supplier_id || ""}
+                onValueChange={applySingleSupplier}
+              >
+                <SelectTrigger className="w-[220px] h-8 text-sm"><SelectValue placeholder="Selecione um fornecedor" /></SelectTrigger>
+                <SelectContent>
+                  {suppliers.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.razao_social}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+
       {items.length > 0 && (
         <Card>
           <CardContent className="p-0">
