@@ -18,8 +18,9 @@ import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { useOrderDraft, DraftOrderItem } from "@/hooks/useOrderDraft";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
-import { AlertTriangle, Trash2, RotateCcw, ClipboardList } from "lucide-react";
+import { AlertTriangle, Trash2, RotateCcw, ClipboardList, TrendingDown, Trophy } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { focusRowField } from "@/lib/keyboardFlow";
 
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
@@ -312,7 +313,16 @@ export default function NewOrderPage() {
       quantidade: 1, supplier_id: min?.supplier_id || '', preco_unitario: min?.preco || 0,
       subtotal: min?.preco || 0, observacoes: '',
     }]);
+    focusRowField(product.id, "quantidade");
   }, [getMinPrice]);
+
+  const applySingleSupplier = useCallback((supplierId: string) => {
+    setActiveStrategy("melhor_fornecedor");
+    setItems(prev => prev.map(item => {
+      const price = getSupplierPrice(item.product_id, supplierId);
+      return { ...item, supplier_id: supplierId, preco_unitario: price, subtotal: item.quantidade * price };
+    }));
+  }, [getSupplierPrice]);
 
   const updateItem = useCallback((index: number, updates: Partial<OrderItem>) => {
     setItems(prev => prev.map((item, i) => {
