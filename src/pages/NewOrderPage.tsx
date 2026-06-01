@@ -21,6 +21,7 @@ import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 import { AlertTriangle, Trash2, RotateCcw, ClipboardList, TrendingDown, Trophy } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { focusRowField } from "@/lib/keyboardFlow";
+import { dedupeOrderItemsByProduct } from "@/lib/orderItems";
 
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
@@ -183,8 +184,13 @@ export default function NewOrderPage() {
           }, {});
         }
 
-        if (orderItems && orderItems.length > 0) {
-          setItems(orderItems.map(i => ({
+        const uniqueOrderItems = dedupeOrderItemsByProduct(orderItems || []);
+        if (uniqueOrderItems.length > 0) {
+          if (uniqueOrderItems.length < (orderItems?.length || 0)) {
+            await supabase.rpc('cleanup_purchase_order_duplicate_items' as any, { _order_id: editOrderId });
+            toast.warning("Itens duplicados foram removidos deste rascunho.");
+          }
+          setItems(uniqueOrderItems.map(i => ({
             product_id: i.product_id,
             product_name: (i.products as any)?.nome || '',
             unidade: (i.products as any)?.unidade_medida || '',
@@ -308,7 +314,7 @@ export default function NewOrderPage() {
 
   const addProduct = useCallback((product: Product) => {
     const min = getMinPrice(product.id);
-    setItems(prev => [...prev, {
+    setItems(prev => prev.some(item => item.product_id === product.id) ? prev : [...prev, {
       product_id: product.id, product_name: product.nome, unidade: product.unidade_medida,
       quantidade: 1, supplier_id: min?.supplier_id || '', preco_unitario: min?.preco || 0,
       subtotal: min?.preco || 0, observacoes: '',
@@ -413,7 +419,7 @@ export default function NewOrderPage() {
       } as any).eq('id', editOrderId);
       if (updateErr) { toast.error(updateErr.message); setSaving(false); return; }
 
-      const orderItems = items.map(i => ({
+      const orderItems = dedupeOrderItemsByProduct(items).map(i => ({
         order_id: editOrderId, product_id: i.product_id, supplier_id: i.supplier_id || null,
         quantidade: i.quantidade, preco_unitario: i.preco_unitario, subtotal: i.subtotal,
         observacoes: i.observacoes || null,
@@ -430,7 +436,7 @@ export default function NewOrderPage() {
         unidade_setor: unidadeSolicitante || null, titulo,
       } as any).select().single();
       if (orderError) { toast.error(orderError.message); setSaving(false); return; }
-      const orderItems = items.map(i => ({
+      const orderItems = dedupeOrderItemsByProduct(items).map(i => ({
         order_id: order.id, product_id: i.product_id, supplier_id: i.supplier_id || null,
         quantidade: i.quantidade, preco_unitario: i.preco_unitario, subtotal: i.subtotal,
         observacoes: i.observacoes || null,
