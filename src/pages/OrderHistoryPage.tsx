@@ -282,6 +282,12 @@ export default function OrderHistoryPage() {
       .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social, cnpj, telefone, cidade)')
       .eq('order_id', order.id);
     if (!items || items.length === 0) { toast.error("Sem itens para exportar."); return null; }
+    const uniqueItems = dedupeOrderItemsByProduct(items as any[]);
+    if (uniqueItems.length < items.length) {
+      await supabase.rpc('cleanup_purchase_order_duplicate_items' as any, { _order_id: order.id });
+      toast.warning("Itens duplicados foram removidos antes de gerar o PDF.");
+      invalidateOrderQueries(queryClient);
+    }
     const { data: buyerProfileRaw } = await supabase.from('profiles').select('full_name, unidade, unidade_setor').eq('user_id', order.user_id).maybeSingle();
     const buyerName = await resolveUserName(order.user_id);
     const buyerProfile = { ...(buyerProfileRaw || {}), full_name: buyerName } as any;
@@ -312,7 +318,7 @@ export default function OrderHistoryPage() {
     }
 
     const timeline = await fetchTimeline(order);
-    return { items, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF: includeSaldoData, timeline };
+    return { items: uniqueItems, buyerProfile, aprovadorName, saldoMap, solicitante, setor, isInternalPDF: includeSaldoData, timeline };
   };
 
   const markAsEmitted = async (order: Order) => {
