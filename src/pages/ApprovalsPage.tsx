@@ -17,6 +17,7 @@ import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import OrderTimeline from "@/components/order/OrderTimeline";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
+import { dedupeOrderItemsByProduct } from "@/lib/orderItems";
 
 type Order = {
   id: string; numero: string; user_id: string; modo: string;
@@ -66,7 +67,13 @@ export default function ApprovalsPage() {
     const { data } = await supabase.from('purchase_order_items')
       .select('*, products(nome, unidade_medida), suppliers(razao_social)')
       .eq('order_id', order.id);
-    setOrderItems((data || []) as unknown as OrderItem[]);
+    const uniqueItems = dedupeOrderItemsByProduct((data || []) as unknown as OrderItem[]);
+    if (uniqueItems.length < (data?.length || 0)) {
+      await supabase.rpc('cleanup_purchase_order_duplicate_items' as any, { _order_id: order.id });
+      toast.warning("Itens duplicados foram removidos desta ordem.");
+      invalidate();
+    }
+    setOrderItems(uniqueItems);
   };
 
   const invalidate = () => invalidateOrderQueries(queryClient);
@@ -83,6 +90,12 @@ export default function ApprovalsPage() {
   const hasEdits = Object.keys(editedItems).length > 0;
 
   const saveEditsAndApprove = async (orderId: string) => {
+    const { data: removedDuplicates } = await supabase.rpc('cleanup_purchase_order_duplicate_items' as any, { _order_id: orderId });
+    const visibleItems = dedupeOrderItemsByProduct(orderItems);
+    if (Number(removedDuplicates || 0) > 0) {
+      setOrderItems(visibleItems);
+      toast.warning(`${removedDuplicates} item(ns) duplicado(s) removido(s) antes da aprovação.`);
+    }
     // Save quantity edits if any
     if (hasEdits) {
       for (const [itemId, newQty] of Object.entries(editedItems)) {
