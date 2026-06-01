@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2, TrendingDown } from "lucide-react";
 import { formatCurrency } from "@/lib/helpers";
+import { rowEnterHandler } from "@/lib/keyboardFlow";
 
 type Supplier = { id: string; razao_social: string };
 
@@ -39,8 +40,10 @@ function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, o
     if (!isNaN(val) && val >= 0) onUpdate(index, { preco_unitario: val });
   }, [index, onUpdate]);
 
+  const qtyEnter = rowEnterHandler(item.product_id, "quantidade", ["quantidade"], "order");
+
   return (
-    <tr className={`border-b last:border-0 ${isMinPrice ? 'bg-green-500/5' : ''}`}>
+    <tr className={`border-b last:border-0 ${isMinPrice ? 'bg-green-500/5' : ''}`} data-row={item.product_id}>
       <td className="py-2.5 px-3">
         <span className="font-medium text-sm">{item.product_name}</span>
         <span className="text-muted-foreground ml-1 text-xs">({item.unidade})</span>
@@ -55,6 +58,8 @@ function OrderItemRow({ item, index, isMinPrice, availableSuppliers, onUpdate, o
           className="w-20 text-center h-8 text-sm"
           value={item.quantidade}
           onChange={handleQty}
+          onKeyDown={qtyEnter}
+          data-field="quantidade"
         />
       </td>
       <td className="py-2.5 px-3">
