@@ -24,6 +24,7 @@ import QueryError from "@/components/QueryError";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 import { resolveUserNames, resolveUserName } from "@/lib/userNames";
 import { exportSectionExcel } from "@/lib/reportExports";
+import { calculateOrderItemsTotal, dedupeOrderItemsByProduct } from "@/lib/orderItems";
 
 type Order = {
   id: string; numero: string; user_id: string; modo: string;
@@ -163,7 +164,7 @@ export default function OrderHistoryPage() {
       .from('purchase_order_items')
       .select('*, products(nome, unidade_medida), suppliers(razao_social)')
       .eq('order_id', order.id);
-    setOrderItems((data || []) as unknown as OrderItem[]);
+    setOrderItems(dedupeOrderItemsByProduct((data || []) as unknown as OrderItem[]));
     setDialogOpen(true);
   };
 
@@ -181,19 +182,17 @@ export default function OrderHistoryPage() {
       }).select().single();
       if (error || !newOrder) { toast.error("Erro ao duplicar."); return; }
       const { data: items } = await supabase.from('purchase_order_items').select('*').eq('order_id', order.id);
-      if (items && items.length > 0) {
-        // Atomic guard: only insert if no items yet
-        const { count: existingCount } = await supabase
-          .from('purchase_order_items')
-          .select('id', { count: 'exact', head: true })
-          .eq('order_id', newOrder.id);
-        if ((existingCount || 0) === 0) {
-          const newItems = items.map(i => ({
-            order_id: newOrder.id, product_id: i.product_id, supplier_id: i.supplier_id,
-            quantidade: i.quantidade, preco_unitario: i.preco_unitario, subtotal: i.subtotal, observacoes: i.observacoes,
-          }));
-          await supabase.from('purchase_order_items').insert(newItems);
-        }
+      const uniqueItems = dedupeOrderItemsByProduct(items || []);
+      if (uniqueItems.length > 0) {
+        const newItems = uniqueItems.map(i => ({
+          order_id: newOrder.id, product_id: i.product_id, supplier_id: i.supplier_id,
+          quantidade: i.quantidade, preco_unitario: i.preco_unitario,
+          subtotal: Number(i.quantidade || 0) * Number(i.preco_unitario || 0), observacoes: i.observacoes,
+        }));
+        const { error: itemsError } = await supabase.from('purchase_order_items').insert(newItems);
+        if (itemsError) { toast.error(`Erro ao copiar itens: ${itemsError.message}`); return; }
+        const cleanTotal = calculateOrderItemsTotal(newItems);
+        await supabase.from('purchase_orders').update({ total: cleanTotal } as any).eq('id', newOrder.id);
       }
       toast.success("Ordem duplicada como rascunho!");
       invalidateOrderQueries(queryClient);
