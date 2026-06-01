@@ -46,6 +46,9 @@ export default function ApprovalsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [rejectDialog, setRejectDialog] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [returnDialog, setReturnDialog] = useState<string | null>(null);
+  const [returnReason, setReturnReason] = useState("");
+  const [deleteItemTarget, setDeleteItemTarget] = useState<OrderItem | null>(null);
 
   const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['approval-orders'],
