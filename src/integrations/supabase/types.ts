@@ -914,6 +914,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_purchase_order_duplicate_items: {
+        Args: { _order_id: string }
+        Returns: number
+      }
       generate_inventory_number: { Args: never; Returns: string }
       generate_order_number: { Args: never; Returns: string }
       generate_quotation_number: { Args: never; Returns: string }

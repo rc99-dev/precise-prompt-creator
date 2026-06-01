@@ -20,6 +20,7 @@ import QueryError from "@/components/QueryError";
 import { useComparativeDraft, DraftCompItem } from "@/hooks/useComparativeDraft";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 import { toast } from "sonner";
+import { dedupeOrderItemsByProduct } from "@/lib/orderItems";
 
 type Product = { id: string; nome: string; unidade_medida: string; codigo_interno: string | null };
 type Supplier = { id: string; razao_social: string };
@@ -209,7 +210,7 @@ export default function ComparativePage() {
   );
 
   const addProduct = (p: Product) => {
-    setItems([...items, { product_id: p.id, product_name: p.nome, unidade: p.unidade_medida, quantidade: 1 }]);
+    setItems(prev => prev.some(item => item.product_id === p.id) ? prev : [...prev, { product_id: p.id, product_name: p.nome, unidade: p.unidade_medida, quantidade: 1 }]);
     setSearchTerm("");
   };
 
@@ -254,7 +255,8 @@ export default function ComparativePage() {
       const strategy = selectedStrategy || analysis.recommendedStrategy;
 
       // Build items with supplier/price based on strategy
-      const orderItems = items.map(item => {
+      const sourceItems = dedupeOrderItemsByProduct(items);
+      const orderItems = sourceItems.map(item => {
         let supplierId = '';
         let precoUnitario = 0;
 
