@@ -167,31 +167,39 @@ export default function OrderHistoryPage() {
     setDialogOpen(true);
   };
 
+  const duplicatingRef = useRef<Set<string>>(new Set());
   const duplicateOrder = async (order: Order) => {
-    const { data: numData } = await supabase.rpc('generate_order_number');
-    const numero = numData || `OC-${Date.now()}`;
-    const { data: newOrder, error } = await supabase.from('purchase_orders').insert({
-      numero, user_id: user!.id, modo: order.modo, status: 'rascunho',
-      observacoes: order.observacoes, total: order.total,
-    }).select().single();
-    if (error || !newOrder) { toast.error("Erro ao duplicar."); return; }
-    const { data: items } = await supabase.from('purchase_order_items').select('*').eq('order_id', order.id);
-    if (items) {
-      // Guard: if items already exist for the new order, do NOT insert again (prevents double inserts on rapid clicks / Strict Mode)
-      const { count: existingCount } = await supabase
-        .from('purchase_order_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('order_id', newOrder.id);
-      if ((existingCount || 0) === 0) {
-        const newItems = items.map(i => ({
-          order_id: newOrder.id, product_id: i.product_id, supplier_id: i.supplier_id,
-          quantidade: i.quantidade, preco_unitario: i.preco_unitario, subtotal: i.subtotal, observacoes: i.observacoes,
-        }));
-        await supabase.from('purchase_order_items').insert(newItems);
+    // Lock per source order to prevent rapid double-clicks / Strict Mode double-fire
+    if (duplicatingRef.current.has(order.id)) return;
+    duplicatingRef.current.add(order.id);
+    try {
+      const { data: numData } = await supabase.rpc('generate_order_number');
+      const numero = numData || `OC-${Date.now()}`;
+      const { data: newOrder, error } = await supabase.from('purchase_orders').insert({
+        numero, user_id: user!.id, modo: order.modo, status: 'rascunho',
+        observacoes: order.observacoes, total: order.total,
+      }).select().single();
+      if (error || !newOrder) { toast.error("Erro ao duplicar."); return; }
+      const { data: items } = await supabase.from('purchase_order_items').select('*').eq('order_id', order.id);
+      if (items && items.length > 0) {
+        // Atomic guard: only insert if no items yet
+        const { count: existingCount } = await supabase
+          .from('purchase_order_items')
+          .select('id', { count: 'exact', head: true })
+          .eq('order_id', newOrder.id);
+        if ((existingCount || 0) === 0) {
+          const newItems = items.map(i => ({
+            order_id: newOrder.id, product_id: i.product_id, supplier_id: i.supplier_id,
+            quantidade: i.quantidade, preco_unitario: i.preco_unitario, subtotal: i.subtotal, observacoes: i.observacoes,
+          }));
+          await supabase.from('purchase_order_items').insert(newItems);
+        }
       }
+      toast.success("Ordem duplicada como rascunho!");
+      invalidateOrderQueries(queryClient);
+    } finally {
+      duplicatingRef.current.delete(order.id);
     }
-    toast.success("Ordem duplicada como rascunho!");
-    invalidateOrderQueries(queryClient);
   };
 
   const handleDelete = async () => {
