@@ -126,6 +126,45 @@ export default function ApprovalsPage() {
     invalidate();
   };
 
+  const handleReturnForEdit = async () => {
+    if (!returnDialog || !returnReason.trim()) { toast.error("Informe o motivo da devolução."); return; }
+    const motivo = `[Devolvido para edição] ${returnReason}`;
+    const { error } = await supabase.from('purchase_orders').update({
+      status: 'rejeitado', rejected_reason: motivo,
+    } as any).eq('id', returnDialog);
+    if (error) { toast.error(error.message); return; }
+    await supabase.from('approval_log').insert({
+      order_id: returnDialog, user_id: user!.id, action: 'devolvido_para_edicao', motivo,
+    } as any);
+    toast.success("Pedido devolvido ao solicitante para edição.");
+    setReturnDialog(null); setReturnReason(""); setDetailOrder(null);
+    invalidate();
+  };
+
+  const handleDeleteItem = async () => {
+    if (!deleteItemTarget || !detailOrder) return;
+    const { error } = await supabase.from('purchase_order_items')
+      .delete().eq('id', deleteItemTarget.id);
+    if (error) { toast.error(`Erro ao excluir item: ${error.message}`); return; }
+    // Recalcular total no pedido
+    const remaining = orderItems.filter(i => i.id !== deleteItemTarget.id);
+    const newTotal = remaining.reduce((s, i) => s + (editedItems[i.id] ?? i.quantidade) * i.preco_unitario, 0);
+    await supabase.from('purchase_orders').update({ total: newTotal } as any).eq('id', detailOrder.id);
+    await supabase.from('approval_log').insert({
+      order_id: detailOrder.id, user_id: user!.id, action: 'item_excluido',
+      motivo: `Item removido pelo aprovador: ${deleteItemTarget.products?.nome ?? deleteItemTarget.product_id}`,
+    } as any);
+    setOrderItems(remaining);
+    setEditedItems(prev => {
+      const next = { ...prev };
+      delete next[deleteItemTarget.id];
+      return next;
+    });
+    setDeleteItemTarget(null);
+    toast.success("Item excluído.");
+    invalidate();
+  };
+
   return (
     <div className="space-y-6">
       <div>
