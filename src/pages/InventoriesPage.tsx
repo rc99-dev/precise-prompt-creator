@@ -20,6 +20,7 @@ import { resolveUserNames } from "@/lib/userNames";
 import { UNIDADES, SETORES, TITULOS_SOLICITACAO, TITULO_TO_CATEGORIA } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
+import { rowEnterHandler, focusRowField, focusProductSearch } from "@/lib/keyboardFlow";
 
 type Product = { id: string; nome: string; unidade_medida: string; categoria: string | null };
 type DraftItem = { id?: string; product_id: string; nome: string; unidade_medida: string; saldo: string; observacoes: string; solicitar_compra: boolean };
@@ -102,6 +103,7 @@ export default function InventoriesPage() {
   const addProduct = (p: Product) => {
     setItems([...items, { product_id: p.id, nome: p.nome, unidade_medida: p.unidade_medida, saldo: "", observacoes: "", solicitar_compra: false }]);
     setProductSearch("");
+    focusRowField(p.id, "saldo");
   };
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
   const updateField = (idx: number, field: keyof DraftItem, val: any) => {
@@ -343,7 +345,19 @@ export default function InventoriesPage() {
                 <Label>Adicionar Produtos</Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Buscar..." className="pl-9" value={productSearch} onChange={e => setProductSearch(e.target.value)} />
+                  <Input
+                    placeholder="Buscar..."
+                    className="pl-9"
+                    value={productSearch}
+                    onChange={e => setProductSearch(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && filteredProducts.length > 0) {
+                        e.preventDefault();
+                        addProduct(filteredProducts[0]);
+                      }
+                    }}
+                    data-product-search="inv"
+                  />
                 </div>
                 {productSearch.length >= 2 && filteredProducts.length > 0 && (
                   <div className="border rounded-md max-h-40 overflow-y-auto">
@@ -370,14 +384,14 @@ export default function InventoriesPage() {
                       {[...items].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((it) => {
                         const idx = items.findIndex(i => i.product_id === it.product_id);
                         return (
-                          <tr key={it.product_id} className="border-b last:border-0">
+                          <tr key={it.product_id} className="border-b last:border-0" data-row={it.product_id}>
                             <td className="py-2 px-3 font-medium">{it.nome}</td>
                             <td className="py-2 px-3 text-muted-foreground">{it.unidade_medida}</td>
-                            <td className="py-2 px-3"><CalcInput min="0" step="0.01" className="w-24 ml-auto text-right h-8" value={it.saldo} onChange={(v) => updateField(idx, 'saldo', v)} placeholder="0" /></td>
+                            <td className="py-2 px-3"><CalcInput min="0" step="0.01" className="w-24 ml-auto text-right h-8" value={it.saldo} onChange={(v) => updateField(idx, 'saldo', v)} placeholder="0" data-field="saldo" onKeyDown={rowEnterHandler(it.product_id, "saldo", ["saldo", "observacoes"], "inv")} /></td>
                             <td className="py-2 px-3 text-center">
                               <Checkbox checked={it.solicitar_compra} onCheckedChange={(v) => updateField(idx, 'solicitar_compra', !!v)} />
                             </td>
-                            <td className="py-2 px-3"><Input className="w-36 h-8 text-xs" value={it.observacoes} onChange={e => updateField(idx, 'observacoes', e.target.value)} placeholder="Obs..." /></td>
+                            <td className="py-2 px-3"><Input className="w-36 h-8 text-xs" value={it.observacoes} onChange={e => updateField(idx, 'observacoes', e.target.value)} placeholder="Obs..." data-field="observacoes" onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); focusProductSearch("inv"); } }} /></td>
                             <td className="py-2 px-1"><Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeItem(idx)}><X className="h-3 w-3" /></Button></td>
                           </tr>
                         );
