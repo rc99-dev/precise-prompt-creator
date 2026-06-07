@@ -70,6 +70,7 @@ function ProtectedRoutes() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/minhas-solicitacoes" element={<MyRequisitionsPage />} />
         {canOrLoading('solicitacoes') && <Route path="/solicitacoes" element={<RequisitionsPage />} />}
+        {canOrLoading('triagem') && <Route path="/triagem" element={<TriagemPage />} />}
         {canOrLoading('fornecedores') && <Route path="/fornecedores" element={<SuppliersPage />} />}
         {canOrLoading('produtos') && <Route path="/produtos" element={<ProductsPage />} />}
         {canOrLoading('precos') && <Route path="/precos" element={<PricesPage />} />}
