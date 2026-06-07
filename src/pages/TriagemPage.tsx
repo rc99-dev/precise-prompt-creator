@@ -111,14 +111,30 @@ export default function TriagemPage() {
       );
   }, [requisitions, search, destinoFilter]);
 
+  // Build lookup of items that can still be triaged (sem destino)
+  const triablesById = useMemo(() => {
+    const map = new Map<string, ReqItem>();
+    requisitions.forEach(r => (r.requisition_items || []).forEach(i => {
+      if (!i.destino) map.set(i.id, i);
+    }));
+    return map;
+  }, [requisitions]);
+
   const toggleItem = (id: string) => {
+    if (!triablesById.has(id)) {
+      toast.error("Este item já foi triado e não pode ser alterado.");
+      return;
+    }
     const next = new Set(selectedItems);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelectedItems(next);
   };
 
   const toggleReq = (req: Requisition) => {
-    const ids = (req.requisition_items || []).map(i => i.id);
+    const ids = (req.requisition_items || [])
+      .filter(i => !i.destino)
+      .map(i => i.id);
+    if (ids.length === 0) return;
     const allSelected = ids.every(id => selectedItems.has(id));
     const next = new Set(selectedItems);
     if (allSelected) ids.forEach(id => next.delete(id));
@@ -128,28 +144,33 @@ export default function TriagemPage() {
 
   const clearSelection = () => setSelectedItems(new Set());
 
-  const assignDestino = async (destino: 'comprador' | 'pcp' | null) => {
+  const assignDestino = async (destino: 'comprador' | 'pcp') => {
     if (selectedItems.size === 0) {
       toast.error("Selecione ao menos um item.");
       return;
     }
-    const ids = Array.from(selectedItems);
+    // Safety: never include already-triaged items
+    const ids = Array.from(selectedItems).filter(id => triablesById.has(id));
+    if (ids.length === 0) {
+      toast.error("Os itens selecionados já foram triados.");
+      return;
+    }
     const { data: { user } } = await supabase.auth.getUser();
     const payload: any = {
       destino,
-      triagem_em: destino ? new Date().toISOString() : null,
-      triagem_por: destino ? user?.id : null,
+      triagem_em: new Date().toISOString(),
+      triagem_por: user?.id,
     };
-    const { error } = await supabase.from('requisition_items').update(payload).in('id', ids);
+    const { error } = await supabase.from('requisition_items')
+      .update(payload)
+      .in('id', ids)
+      .is('destino', null); // extra guard at DB level
     if (error) { toast.error(error.message); return; }
-    toast.success(
-      destino
-        ? `${ids.length} item(ns) enviados para ${destinoLabels[destino]}.`
-        : `${ids.length} item(ns) tiveram a triagem removida.`
-    );
+    toast.success(`${ids.length} item(ns) enviados para ${destinoLabels[destino]}.`);
     clearSelection();
     queryClient.invalidateQueries({ queryKey: ['triagem-list'] });
   };
+
 
   const totalSelected = selectedItems.size;
 
@@ -198,7 +219,8 @@ export default function TriagemPage() {
         <div className="space-y-4">
           {filtered.map(req => {
             const items = req.requisition_items || [];
-            const allSel = items.length > 0 && items.every(i => selectedItems.has(i.id));
+            const triables = items.filter(i => !i.destino);
+            const allSel = triables.length > 0 && triables.every(i => selectedItems.has(i.id));
             const someSel = items.some(i => selectedItems.has(i.id));
             return (
               <Card key={req.id}>
@@ -207,6 +229,7 @@ export default function TriagemPage() {
                     <div className="flex items-center gap-3">
                       <Checkbox
                         checked={allSel}
+                        disabled={triables.length === 0}
                         onCheckedChange={() => toggleReq(req)}
                         aria-label="Selecionar todos"
                       />
@@ -218,7 +241,9 @@ export default function TriagemPage() {
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {items.length} item(ns){someSel && !allSel ? ` · ${items.filter(i => selectedItems.has(i.id)).length} sel.` : ''}
+                      {items.length} item(ns)
+                      {triables.length < items.length ? ` · ${items.length - triables.length} triado(s)` : ''}
+                      {someSel && !allSel ? ` · ${items.filter(i => selectedItems.has(i.id)).length} sel.` : ''}
                     </div>
                   </div>
                   <div className="overflow-x-auto">
@@ -235,29 +260,35 @@ export default function TriagemPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {items.map(i => (
-                          <tr key={i.id} className="border-b last:border-0 hover:bg-muted/30">
-                            <td className="py-2 px-3">
-                              <Checkbox
-                                checked={selectedItems.has(i.id)}
-                                onCheckedChange={() => toggleItem(i.id)}
-                                aria-label="Selecionar item"
-                              />
-                            </td>
-                            <td className="py-2 px-3">{i.products?.nome || '—'}</td>
-                            <td className="py-2 px-3 text-muted-foreground hidden md:table-cell">{i.products?.unidade_medida || '—'}</td>
-                            <td className="py-2 px-3 text-right">{i.saldo}</td>
-                            <td className="py-2 px-3 text-right">{i.pedido || '—'}</td>
-                            <td className="py-2 px-3 text-muted-foreground text-xs hidden md:table-cell">{i.observacoes || '—'}</td>
-                            <td className="py-2 px-3 text-center">
-                              {i.destino ? (
-                                <Badge className={destinoColors[i.destino]}>{destinoLabels[i.destino]}</Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {items.map(i => {
+                          const locked = !!i.destino;
+                          return (
+                            <tr key={i.id} className={`border-b last:border-0 ${locked ? 'opacity-70' : 'hover:bg-muted/30'}`}>
+                              <td className="py-2 px-3">
+                                <Checkbox
+                                  checked={selectedItems.has(i.id)}
+                                  disabled={locked}
+                                  onCheckedChange={() => toggleItem(i.id)}
+                                  aria-label="Selecionar item"
+                                />
+                              </td>
+                              <td className="py-2 px-3">{i.products?.nome || '—'}</td>
+                              <td className="py-2 px-3 text-muted-foreground hidden md:table-cell">{i.products?.unidade_medida || '—'}</td>
+                              <td className="py-2 px-3 text-right">{i.saldo}</td>
+                              <td className="py-2 px-3 text-right">{i.pedido || '—'}</td>
+                              <td className="py-2 px-3 text-muted-foreground text-xs hidden md:table-cell">{i.observacoes || '—'}</td>
+                              <td className="py-2 px-3 text-center">
+                                {i.destino ? (
+                                  <Badge className={destinoColors[i.destino]} title="Triagem definitiva">
+                                    {destinoLabels[i.destino]}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -265,6 +296,7 @@ export default function TriagemPage() {
               </Card>
             );
           })}
+
         </div>
       )}
 
@@ -279,10 +311,8 @@ export default function TriagemPage() {
               <Button variant="ghost" size="sm" onClick={clearSelection}>
                 <Eraser className="h-4 w-4 mr-1" /> Limpar
               </Button>
-              <Button variant="outline" size="sm" onClick={() => assignDestino(null)}>
-                Remover destino
-              </Button>
               <Button size="sm" onClick={() => assignDestino('pcp')} className="bg-success text-success-foreground hover:bg-success/90">
+
                 <Factory className="h-4 w-4 mr-1" /> Enviar para PCP
               </Button>
               <Button size="sm" onClick={() => assignDestino('comprador')}>
