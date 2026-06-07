@@ -391,6 +391,17 @@ export default function NewOrderPage() {
 
   const total = useMemo(() => items.reduce((sum, i) => sum + i.subtotal, 0), [items]);
 
+  const totalsBySupplier = useMemo(() => {
+    const map: Record<string, { total: number; count: number }> = {};
+    items.forEach(i => {
+      const sid = i.supplier_id || "__sem__";
+      if (!map[sid]) map[sid] = { total: 0, count: 0 };
+      map[sid].total += i.subtotal;
+      map[sid].count += 1;
+    });
+    return map;
+  }, [items]);
+
   const economy = useMemo(() => {
     const totalMax = items.reduce((sum, item) => {
       const entries = pricesByProduct[item.product_id] || [];
