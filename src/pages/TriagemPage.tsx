@@ -311,10 +311,8 @@ export default function TriagemPage() {
               <Button variant="ghost" size="sm" onClick={clearSelection}>
                 <Eraser className="h-4 w-4 mr-1" /> Limpar
               </Button>
-              <Button variant="outline" size="sm" onClick={() => assignDestino(null)}>
-                Remover destino
-              </Button>
               <Button size="sm" onClick={() => assignDestino('pcp')} className="bg-success text-success-foreground hover:bg-success/90">
+
                 <Factory className="h-4 w-4 mr-1" /> Enviar para PCP
               </Button>
               <Button size="sm" onClick={() => assignDestino('comprador')}>
