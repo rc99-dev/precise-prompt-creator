@@ -78,6 +78,7 @@ function ProtectedRoutes() {
         {canOrLoading('nova-ordem') && <Route path="/nova-ordem" element={<NewOrderPage />} />}
         {canOrLoading('historico') && <Route path="/historico" element={<OrderHistoryPage />} />}
         {canOrLoading('analise-consumo') && <Route path="/analise-consumo" element={<ConsumptionAnalysisPage />} />}
+        {canOrLoading('comparativo-financeiro') && <Route path="/comparativo-financeiro" element={<FinancialComparisonPage />} />}
         {canOrLoading('comparativo') && <Route path="/comparativo" element={<ComparativePage />} />}
         {canOrLoading('aprovacoes') && <Route path="/aprovacoes" element={<ApprovalsPage />} />}
         {canOrLoading('recebimentos') && <Route path="/recebimentos" element={<ReceiptsPage />} />}
