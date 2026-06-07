@@ -224,12 +224,41 @@ export default function ComparativePage() {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, quantidade: qty } : item));
   };
 
-  const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
+  const removeItem = (idx: number) => {
+    setItems(prev => {
+      const removed = prev[idx];
+      if (removed) {
+        setSelectedSupplierByProduct(curr => {
+          if (!curr[removed.product_id]) return curr;
+          const next = { ...curr };
+          delete next[removed.product_id];
+          return next;
+        });
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
 
-  const relevantSuppliers = useMemo(() => {
+  const toggleItemSupplier = (productId: string, supplierId: string) => {
+    setSelectedSupplierByProduct(prev => {
+      if (prev[productId] === supplierId) {
+        const next = { ...prev };
+        delete next[productId];
+        return next;
+      }
+      return { ...prev, [productId]: supplierId };
+    });
+  };
+
+  const allRelevantSuppliers = useMemo(() => {
     const ids = new Set(prices.filter(p => items.some(i => i.product_id === p.product_id)).map(p => p.supplier_id));
     return suppliers.filter(s => ids.has(s.id));
   }, [suppliers, prices, items]);
+
+  const relevantSuppliers = useMemo(() => {
+    if (supplierFilter.length === 0) return allRelevantSuppliers;
+    return allRelevantSuppliers.filter(s => supplierFilter.includes(s.id));
+  }, [allRelevantSuppliers, supplierFilter]);
 
   const supplierTotals = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -251,29 +280,35 @@ export default function ComparativePage() {
     setSelectedStrategy(s);
   };
 
+  const picksCount = Object.keys(selectedSupplierByProduct).length;
+
   const generateOrder = async () => {
-    if (!analysis || items.length === 0) return;
+    if (items.length === 0) return;
     setGeneratingOrder(true);
 
     try {
       const { data: numData } = await supabase.rpc('generate_order_number');
       const numero = numData || `PED-${Date.now()}`;
-      const strategy = selectedStrategy || analysis.recommendedStrategy;
+      const strategy = selectedStrategy || analysis?.recommendedStrategy || 'melhor_preco';
 
-      // Build items with supplier/price based on strategy
+      // Build items respecting per-item supplier picks first; fallback to strategy
       const sourceItems = dedupeOrderItemsByProduct(items);
       const orderItems = sourceItems.map(item => {
         let supplierId = '';
         let precoUnitario = 0;
 
-        if (strategy === 'melhor_preco') {
+        const picked = selectedSupplierByProduct[item.product_id];
+        if (picked) {
+          supplierId = picked;
+          precoUnitario = prices.find(p => p.product_id === item.product_id && p.supplier_id === picked)?.preco_unitario || 0;
+        } else if (strategy === 'melhor_preco') {
           const productPrices = prices.filter(p => p.product_id === item.product_id);
           if (productPrices.length > 0) {
             const best = productPrices.reduce((m, e) => e.preco_unitario < m.preco_unitario ? e : m);
             supplierId = best.supplier_id;
             precoUnitario = best.preco_unitario;
           }
-        } else if (strategy === 'melhor_fornecedor' && analysis.bestSingle) {
+        } else if (strategy === 'melhor_fornecedor' && analysis?.bestSingle) {
           supplierId = analysis.bestSingle.supplierId;
           precoUnitario = prices.find(p => p.product_id === item.product_id && p.supplier_id === supplierId)?.preco_unitario || 0;
         }
