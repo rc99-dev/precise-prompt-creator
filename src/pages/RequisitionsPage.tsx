@@ -291,6 +291,7 @@ export default function RequisitionsPage() {
                     <th className="text-left py-2 font-medium text-muted-foreground">Unidade</th>
                     <th className="text-right py-2 font-medium text-muted-foreground">Saldo</th>
                     <th className="text-right py-2 font-medium text-muted-foreground">Pedido</th>
+                    <th className="text-center py-2 font-medium text-muted-foreground">Destino</th>
                     <th className="text-left py-2 font-medium text-muted-foreground">Obs</th>
                   </tr>
                 </thead>
@@ -301,6 +302,15 @@ export default function RequisitionsPage() {
                       <td className="py-2 text-muted-foreground">{(i.products as any)?.unidade_medida || '—'}</td>
                       <td className="py-2 text-right">{i.saldo}</td>
                       <td className="py-2 text-right">{i.pedido || '—'}</td>
+                      <td className="py-2 text-center">
+                        {i.destino ? (
+                          <Badge className={i.destino === 'pcp' ? 'bg-success/20 text-success' : 'bg-info/20 text-info'}>
+                            {i.destino === 'pcp' ? 'PCP' : 'Comprador'}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="py-2 text-muted-foreground text-xs">{i.observacoes || '—'}</td>
                     </tr>
                   ))}
