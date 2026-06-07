@@ -71,6 +71,7 @@ export const statusColors: Record<string, string> = {
 export const ALL_PAGES = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'solicitacoes', label: 'Solicitações' },
+  { key: 'triagem', label: 'Triagem' },
   { key: 'minhas-solicitacoes', label: 'Minhas Solicitações' },
   { key: 'nova-ordem', label: 'Nova Ordem' },
   { key: 'historico', label: 'Histórico de Ordens' },
