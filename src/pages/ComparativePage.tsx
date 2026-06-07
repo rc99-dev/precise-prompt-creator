@@ -274,6 +274,36 @@ export default function ComparativePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [relevantSuppliers, items, prices]);
 
+  // Custo por item baseado no fornecedor escolhido (ou menor preço como fallback)
+  const itemCosts = useMemo(() => {
+    const costs: Record<string, { price: number | null; supplierId: string | null; isFallback: boolean }> = {};
+    items.forEach(item => {
+      const picked = selectedSupplierByProduct[item.product_id];
+      if (picked) {
+        const price = getPrice(item.product_id, picked);
+        costs[item.product_id] = { price: price ?? null, supplierId: picked, isFallback: false };
+      } else {
+        const candidates = prices.filter(p => p.product_id === item.product_id && relevantSuppliers.some(s => s.id === p.supplier_id));
+        if (candidates.length > 0) {
+          const best = candidates.reduce((m, e) => e.preco_unitario < m.preco_unitario ? e : m);
+          costs[item.product_id] = { price: best.preco_unitario, supplierId: best.supplier_id, isFallback: true };
+        } else {
+          costs[item.product_id] = { price: null, supplierId: null, isFallback: false };
+        }
+      }
+    });
+    return costs;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, selectedSupplierByProduct, prices, relevantSuppliers]);
+
+  const grandTotal = useMemo(() => {
+    return items.reduce((sum, item) => {
+      const c = itemCosts[item.product_id];
+      if (c?.price) return sum + c.price * item.quantidade;
+      return sum;
+    }, 0);
+  }, [items, itemCosts]);
+
   const analysis = useStrategyAnalysis(items, prices, suppliers);
 
   const handleSelectStrategy = (s: "melhor_preco" | "melhor_fornecedor") => {
