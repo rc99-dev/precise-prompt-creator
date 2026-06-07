@@ -129,6 +129,8 @@ export default function ComparativePage() {
       setUnidadeSolicitante(draft.unidadeSolicitante || "");
       setShowSaldo(draft.showSaldo);
       setSelectedReqId(draft.selectedRequisitionId);
+      setSelectedSupplierByProduct(draft.selectedSupplierByProduct || {});
+      setSupplierFilter(draft.supplierFilter || []);
       setShowDraftBanner(false);
       draftDecided.current = true;
       toast.success("Rascunho restaurado!");
@@ -145,8 +147,8 @@ export default function ComparativePage() {
   // Auto-save draft (only after user decided about existing draft)
   useEffect(() => {
     if (!draftRestored.current || !draftDecided.current || showDraftBanner) return;
-    saveDraft({ items, unidadeSolicitante, showSaldo, selectedRequisitionId: selectedReqId });
-  }, [items, unidadeSolicitante, showSaldo, selectedReqId, saveDraft, showDraftBanner]);
+    saveDraft({ items, unidadeSolicitante, showSaldo, selectedRequisitionId: selectedReqId, selectedSupplierByProduct, supplierFilter });
+  }, [items, unidadeSolicitante, showSaldo, selectedReqId, selectedSupplierByProduct, supplierFilter, saveDraft, showDraftBanner]);
 
   // Load requisition products — import ALL items from requisition_items
   useEffect(() => {
