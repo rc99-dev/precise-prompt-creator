@@ -274,6 +274,36 @@ export default function ComparativePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [relevantSuppliers, items, prices]);
 
+  // Custo por item baseado no fornecedor escolhido (ou menor preço como fallback)
+  const itemCosts = useMemo(() => {
+    const costs: Record<string, { price: number | null; supplierId: string | null; isFallback: boolean }> = {};
+    items.forEach(item => {
+      const picked = selectedSupplierByProduct[item.product_id];
+      if (picked) {
+        const price = getPrice(item.product_id, picked);
+        costs[item.product_id] = { price: price ?? null, supplierId: picked, isFallback: false };
+      } else {
+        const candidates = prices.filter(p => p.product_id === item.product_id && relevantSuppliers.some(s => s.id === p.supplier_id));
+        if (candidates.length > 0) {
+          const best = candidates.reduce((m, e) => e.preco_unitario < m.preco_unitario ? e : m);
+          costs[item.product_id] = { price: best.preco_unitario, supplierId: best.supplier_id, isFallback: true };
+        } else {
+          costs[item.product_id] = { price: null, supplierId: null, isFallback: false };
+        }
+      }
+    });
+    return costs;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, selectedSupplierByProduct, prices, relevantSuppliers]);
+
+  const grandTotal = useMemo(() => {
+    return items.reduce((sum, item) => {
+      const c = itemCosts[item.product_id];
+      if (c?.price) return sum + c.price * item.quantidade;
+      return sum;
+    }, 0);
+  }, [items, itemCosts]);
+
   const analysis = useStrategyAnalysis(items, prices, suppliers);
 
   const handleSelectStrategy = (s: "melhor_preco" | "melhor_fornecedor") => {
@@ -563,6 +593,7 @@ export default function ComparativePage() {
                     {relevantSuppliers.map(s => (
                       <th key={s.id} className="text-right py-3 px-4 font-medium text-muted-foreground min-w-[140px]">{s.razao_social}</th>
                     ))}
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground min-w-[140px] bg-primary/5">Custo do item</th>
                     <th className="text-right py-3 px-4 w-10"></th>
                   </tr>
                 </thead>
@@ -624,6 +655,29 @@ export default function ComparativePage() {
                             </td>
                           );
                         })}
+                        {(() => {
+                          const c = itemCosts[item.product_id];
+                          const total = c?.price ? c.price * item.quantidade : null;
+                          const supplierName = c?.supplierId ? allRelevantSuppliers.find(s => s.id === c.supplierId)?.razao_social : null;
+                          return (
+                            <td className="py-3 px-4 text-right bg-primary/5 font-semibold">
+                              {total !== null ? (
+                                <div className="flex flex-col items-end leading-tight">
+                                  <span className={c?.isFallback ? "text-muted-foreground" : "text-primary"}>
+                                    {formatCurrency(total)}
+                                  </span>
+                                  {supplierName && (
+                                    <span className="text-[10px] font-normal text-muted-foreground">
+                                      {c?.isFallback ? "menor preço" : "escolhido"}: {supplierName}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground/50 text-xs">—</span>
+                              )}
+                            </td>
+                          );
+                        })()}
                         <td className="py-3 px-4 text-right">
                           <Button variant="ghost" size="icon" onClick={() => removeItem(idx)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                         </td>
@@ -645,6 +699,26 @@ export default function ComparativePage() {
                         </td>
                       );
                     })}
+                    <td className="py-3 px-4 text-right bg-primary/10 text-primary text-base">
+                      {formatCurrency(grandTotal)}
+                    </td>
+                    <td></td>
+                  </tr>
+                  <tr className="border-t bg-muted/30 text-xs">
+                    <td className="py-2 px-4 sticky left-0 bg-card text-muted-foreground">Itens cobertos</td>
+                    <td></td>
+                    {showSaldo && <td></td>}
+                    {relevantSuppliers.map(s => {
+                      const covered = items.filter(it => getPrice(it.product_id, s.id) !== undefined).length;
+                      return (
+                        <td key={s.id} className="py-2 px-4 text-right text-muted-foreground">
+                          {covered}/{items.length}
+                        </td>
+                      );
+                    })}
+                    <td className="py-2 px-4 text-right text-muted-foreground">
+                      {items.filter(it => itemCosts[it.product_id]?.price).length}/{items.length}
+                    </td>
                     <td></td>
                   </tr>
                 </tfoot>
