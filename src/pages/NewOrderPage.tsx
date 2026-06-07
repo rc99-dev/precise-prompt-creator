@@ -359,8 +359,9 @@ export default function NewOrderPage() {
   const applyStrategy = useCallback((strategy: "melhor_preco" | "melhor_fornecedor") => {
     setActiveStrategy(strategy);
     if (strategy === "melhor_preco") {
+      const filter = restrictedSuppliers.length > 0 ? restrictedSuppliers : undefined;
       setItems(prev => prev.map(item => {
-        const min = getMinPrice(item.product_id);
+        const min = getMinPrice(item.product_id, filter);
         if (!min) return item;
         return { ...item, supplier_id: min.supplier_id, preco_unitario: min.preco, subtotal: item.quantidade * min.preco };
       }));
@@ -371,7 +372,23 @@ export default function NewOrderPage() {
         return { ...item, supplier_id: bestId, preco_unitario: price, subtotal: item.quantidade * price };
       }));
     }
-  }, [getMinPrice, getSupplierPrice, analysis]);
+  }, [getMinPrice, getSupplierPrice, analysis, restrictedSuppliers]);
+
+  const toggleRestrictedSupplier = useCallback((id: string) => {
+    setRestrictedSuppliers(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
+  }, []);
+
+  // Re-apply melhor_preco when restricted suppliers change
+  useEffect(() => {
+    if (activeStrategy !== "melhor_preco") return;
+    const filter = restrictedSuppliers.length > 0 ? restrictedSuppliers : undefined;
+    setItems(prev => prev.map(item => {
+      const min = getMinPrice(item.product_id, filter);
+      if (!min) return item;
+      return { ...item, supplier_id: min.supplier_id, preco_unitario: min.preco, subtotal: item.quantidade * min.preco };
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restrictedSuppliers]);
 
   const total = useMemo(() => items.reduce((sum, i) => sum + i.subtotal, 0), [items]);
 
