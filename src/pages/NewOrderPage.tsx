@@ -18,8 +18,11 @@ import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { useOrderDraft, DraftOrderItem } from "@/hooks/useOrderDraft";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
-import { AlertTriangle, Trash2, RotateCcw, ClipboardList, TrendingDown, Trophy } from "lucide-react";
+import { AlertTriangle, Trash2, RotateCcw, ClipboardList, TrendingDown, Trophy, Filter, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { focusRowField } from "@/lib/keyboardFlow";
 import { dedupeOrderItemsByProduct } from "@/lib/orderItems";
 
@@ -62,6 +65,7 @@ export default function NewOrderPage() {
   const requisitionId = searchParams.get("requisition");
   const [items, setItems] = useState<OrderItem[]>([]);
   const [activeStrategy, setActiveStrategy] = useState<"melhor_preco" | "melhor_fornecedor" | null>(null);
+  const [restrictedSuppliers, setRestrictedSuppliers] = useState<string[]>([]);
   const [observacoes, setObservacoes] = useState("");
   const [unidadeSolicitante, setUnidadeSolicitante] = useState("");
   const [titulo, setTitulo] = useState("");
@@ -300,8 +304,11 @@ export default function NewOrderPage() {
     return map;
   }, [allPrices]);
 
-  const getMinPrice = useCallback((productId: string) => {
-    const entries = pricesByProduct[productId] || [];
+  const getMinPrice = useCallback((productId: string, allowedSupplierIds?: string[]) => {
+    let entries = pricesByProduct[productId] || [];
+    if (allowedSupplierIds && allowedSupplierIds.length > 0) {
+      entries = entries.filter(e => allowedSupplierIds.includes(e.supplier_id));
+    }
     if (entries.length === 0) return null;
     return entries.reduce((min, e) => e.preco < min.preco ? e : min, entries[0]);
   }, [pricesByProduct]);
@@ -352,8 +359,9 @@ export default function NewOrderPage() {
   const applyStrategy = useCallback((strategy: "melhor_preco" | "melhor_fornecedor") => {
     setActiveStrategy(strategy);
     if (strategy === "melhor_preco") {
+      const filter = restrictedSuppliers.length > 0 ? restrictedSuppliers : undefined;
       setItems(prev => prev.map(item => {
-        const min = getMinPrice(item.product_id);
+        const min = getMinPrice(item.product_id, filter);
         if (!min) return item;
         return { ...item, supplier_id: min.supplier_id, preco_unitario: min.preco, subtotal: item.quantidade * min.preco };
       }));
@@ -364,7 +372,23 @@ export default function NewOrderPage() {
         return { ...item, supplier_id: bestId, preco_unitario: price, subtotal: item.quantidade * price };
       }));
     }
-  }, [getMinPrice, getSupplierPrice, analysis]);
+  }, [getMinPrice, getSupplierPrice, analysis, restrictedSuppliers]);
+
+  const toggleRestrictedSupplier = useCallback((id: string) => {
+    setRestrictedSuppliers(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
+  }, []);
+
+  // Re-apply melhor_preco when restricted suppliers change
+  useEffect(() => {
+    if (activeStrategy !== "melhor_preco") return;
+    const filter = restrictedSuppliers.length > 0 ? restrictedSuppliers : undefined;
+    setItems(prev => prev.map(item => {
+      const min = getMinPrice(item.product_id, filter);
+      if (!min) return item;
+      return { ...item, supplier_id: min.supplier_id, preco_unitario: min.preco, subtotal: item.quantidade * min.preco };
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restrictedSuppliers]);
 
   const total = useMemo(() => items.reduce((sum, i) => sum + i.subtotal, 0), [items]);
 
@@ -630,6 +654,82 @@ export default function NewOrderPage() {
 
       {items.length > 0 && analysis && (
         <StrategyCards analysis={analysis} selectedStrategy={activeStrategy} onSelect={applyStrategy} showSelectButton />
+      )}
+
+      {items.length > 0 && activeStrategy === "melhor_preco" && (
+        <Card className="border-primary/30">
+          <CardContent className="py-3 px-4 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <TrendingDown className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Melhor preço por item</span>
+              <span className="text-xs text-muted-foreground">
+                {restrictedSuppliers.length === 0
+                  ? "considerando todos os fornecedores"
+                  : `restrito a ${restrictedSuppliers.length} fornecedor(es)`}
+              </span>
+              {restrictedSuppliers.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {restrictedSuppliers.map(id => {
+                    const s = suppliers.find(x => x.id === id);
+                    if (!s) return null;
+                    return (
+                      <Badge key={id} variant="secondary" className="text-[10px] gap-1 pr-1">
+                        {s.razao_social}
+                        <button
+                          onClick={() => toggleRestrictedSupplier(id)}
+                          className="hover:text-destructive ml-0.5"
+                          aria-label={`Remover ${s.razao_social}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-8">
+                    <Filter className="h-3.5 w-3.5 mr-1.5" />
+                    Filtrar fornecedores
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-0" align="end">
+                  <div className="p-3 border-b flex items-center justify-between">
+                    <span className="text-sm font-semibold">Considerar apenas:</span>
+                    {restrictedSuppliers.length > 0 && (
+                      <button
+                        onClick={() => setRestrictedSuppliers([])}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+                    {suppliers.map(s => (
+                      <label
+                        key={s.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm"
+                      >
+                        <Checkbox
+                          checked={restrictedSuppliers.includes(s.id)}
+                          onCheckedChange={() => toggleRestrictedSupplier(s.id)}
+                        />
+                        <span className="flex-1">{s.razao_social}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="p-2 border-t text-[11px] text-muted-foreground">
+                    Vazio = todos os fornecedores.
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {items.length > 0 && activeStrategy === "melhor_fornecedor" && (
