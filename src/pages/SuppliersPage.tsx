@@ -16,6 +16,7 @@ import CsvImportModal from "@/components/CsvImportModal";
 import { suppliersImportConfig } from "@/lib/csvConfigs";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
+import SupplierDetailsDialog from "@/components/SupplierDetailsDialog";
 
 type Supplier = {
   id: string; razao_social: string; nome_fantasia: string | null; cnpj: string | null;
