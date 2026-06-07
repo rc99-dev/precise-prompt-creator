@@ -304,8 +304,11 @@ export default function NewOrderPage() {
     return map;
   }, [allPrices]);
 
-  const getMinPrice = useCallback((productId: string) => {
-    const entries = pricesByProduct[productId] || [];
+  const getMinPrice = useCallback((productId: string, allowedSupplierIds?: string[]) => {
+    let entries = pricesByProduct[productId] || [];
+    if (allowedSupplierIds && allowedSupplierIds.length > 0) {
+      entries = entries.filter(e => allowedSupplierIds.includes(e.supplier_id));
+    }
     if (entries.length === 0) return null;
     return entries.reduce((min, e) => e.preco < min.preco ? e : min, entries[0]);
   }, [pricesByProduct]);
