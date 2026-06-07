@@ -593,6 +593,7 @@ export default function ComparativePage() {
                     {relevantSuppliers.map(s => (
                       <th key={s.id} className="text-right py-3 px-4 font-medium text-muted-foreground min-w-[140px]">{s.razao_social}</th>
                     ))}
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground min-w-[140px] bg-primary/5">Custo do item</th>
                     <th className="text-right py-3 px-4 w-10"></th>
                   </tr>
                 </thead>
