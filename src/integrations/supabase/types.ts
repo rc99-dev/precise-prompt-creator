@@ -666,30 +666,39 @@ export type Database = {
       requisition_items: {
         Row: {
           created_at: string
+          destino: string | null
           id: string
           observacoes: string | null
           pedido: number
           product_id: string
           requisition_id: string
           saldo: number
+          triagem_em: string | null
+          triagem_por: string | null
         }
         Insert: {
           created_at?: string
+          destino?: string | null
           id?: string
           observacoes?: string | null
           pedido?: number
           product_id: string
           requisition_id: string
           saldo?: number
+          triagem_em?: string | null
+          triagem_por?: string | null
         }
         Update: {
           created_at?: string
+          destino?: string | null
           id?: string
           observacoes?: string | null
           pedido?: number
           product_id?: string
           requisition_id?: string
           saldo?: number
+          triagem_em?: string | null
+          triagem_por?: string | null
         }
         Relationships: [
           {
