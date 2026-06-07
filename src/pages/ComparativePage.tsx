@@ -655,6 +655,29 @@ export default function ComparativePage() {
                             </td>
                           );
                         })}
+                        {(() => {
+                          const c = itemCosts[item.product_id];
+                          const total = c?.price ? c.price * item.quantidade : null;
+                          const supplierName = c?.supplierId ? allRelevantSuppliers.find(s => s.id === c.supplierId)?.razao_social : null;
+                          return (
+                            <td className="py-3 px-4 text-right bg-primary/5 font-semibold">
+                              {total !== null ? (
+                                <div className="flex flex-col items-end leading-tight">
+                                  <span className={c?.isFallback ? "text-muted-foreground" : "text-primary"}>
+                                    {formatCurrency(total)}
+                                  </span>
+                                  {supplierName && (
+                                    <span className="text-[10px] font-normal text-muted-foreground">
+                                      {c?.isFallback ? "menor preço" : "escolhido"}: {supplierName}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground/50 text-xs">—</span>
+                              )}
+                            </td>
+                          );
+                        })()}
                         <td className="py-3 px-4 text-right">
                           <Button variant="ghost" size="icon" onClick={() => removeItem(idx)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                         </td>
@@ -676,6 +699,26 @@ export default function ComparativePage() {
                         </td>
                       );
                     })}
+                    <td className="py-3 px-4 text-right bg-primary/10 text-primary text-base">
+                      {formatCurrency(grandTotal)}
+                    </td>
+                    <td></td>
+                  </tr>
+                  <tr className="border-t bg-muted/30 text-xs">
+                    <td className="py-2 px-4 sticky left-0 bg-card text-muted-foreground">Itens cobertos</td>
+                    <td></td>
+                    {showSaldo && <td></td>}
+                    {relevantSuppliers.map(s => {
+                      const covered = items.filter(it => getPrice(it.product_id, s.id) !== undefined).length;
+                      return (
+                        <td key={s.id} className="py-2 px-4 text-right text-muted-foreground">
+                          {covered}/{items.length}
+                        </td>
+                      );
+                    })}
+                    <td className="py-2 px-4 text-right text-muted-foreground">
+                      {items.filter(it => itemCosts[it.product_id]?.price).length}/{items.length}
+                    </td>
                     <td></td>
                   </tr>
                 </tfoot>
