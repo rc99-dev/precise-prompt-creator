@@ -76,6 +76,7 @@ export const ALL_PAGES = [
   { key: 'nova-ordem', label: 'Nova Ordem' },
   { key: 'historico', label: 'Histórico de Ordens' },
   { key: 'analise-consumo', label: 'Análise de Consumo' },
+  { key: 'comparativo-financeiro', label: 'Comparativo Financeiro' },
   { key: 'comparativo', label: 'Comparativo' },
   { key: 'aprovacoes', label: 'Aprovações' },
   { key: 'recebimentos', label: 'Recebimentos' },
