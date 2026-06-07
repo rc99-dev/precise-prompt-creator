@@ -656,6 +656,82 @@ export default function NewOrderPage() {
         <StrategyCards analysis={analysis} selectedStrategy={activeStrategy} onSelect={applyStrategy} showSelectButton />
       )}
 
+      {items.length > 0 && activeStrategy === "melhor_preco" && (
+        <Card className="border-primary/30">
+          <CardContent className="py-3 px-4 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <TrendingDown className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Melhor preço por item</span>
+              <span className="text-xs text-muted-foreground">
+                {restrictedSuppliers.length === 0
+                  ? "considerando todos os fornecedores"
+                  : `restrito a ${restrictedSuppliers.length} fornecedor(es)`}
+              </span>
+              {restrictedSuppliers.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {restrictedSuppliers.map(id => {
+                    const s = suppliers.find(x => x.id === id);
+                    if (!s) return null;
+                    return (
+                      <Badge key={id} variant="secondary" className="text-[10px] gap-1 pr-1">
+                        {s.razao_social}
+                        <button
+                          onClick={() => toggleRestrictedSupplier(id)}
+                          className="hover:text-destructive ml-0.5"
+                          aria-label={`Remover ${s.razao_social}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-8">
+                    <Filter className="h-3.5 w-3.5 mr-1.5" />
+                    Filtrar fornecedores
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-0" align="end">
+                  <div className="p-3 border-b flex items-center justify-between">
+                    <span className="text-sm font-semibold">Considerar apenas:</span>
+                    {restrictedSuppliers.length > 0 && (
+                      <button
+                        onClick={() => setRestrictedSuppliers([])}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+                    {suppliers.map(s => (
+                      <label
+                        key={s.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm"
+                      >
+                        <Checkbox
+                          checked={restrictedSuppliers.includes(s.id)}
+                          onCheckedChange={() => toggleRestrictedSupplier(s.id)}
+                        />
+                        <span className="flex-1">{s.razao_social}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="p-2 border-t text-[11px] text-muted-foreground">
+                    Vazio = todos os fornecedores.
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {items.length > 0 && activeStrategy === "melhor_fornecedor" && (
         <Card className="border-primary/30">
           <CardContent className="py-3 px-4 flex items-center justify-between flex-wrap gap-3">
