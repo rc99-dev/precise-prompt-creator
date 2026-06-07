@@ -16,6 +16,7 @@ import ConsumptionAnalysisPage from "@/pages/ConsumptionAnalysisPage";
 import ComparativePage from "@/pages/ComparativePage";
 import MyRequisitionsPage from "@/pages/MyRequisitionsPage";
 import RequisitionsPage from "@/pages/RequisitionsPage";
+import TriagemPage from "@/pages/TriagemPage";
 import ApprovalsPage from "@/pages/ApprovalsPage";
 import ReceiptsPage from "@/pages/ReceiptsPage";
 import UsersPage from "@/pages/UsersPage";
