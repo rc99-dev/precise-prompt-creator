@@ -18,13 +18,12 @@ import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { useOrderDraft, DraftOrderItem } from "@/hooks/useOrderDraft";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
-import { AlertTriangle, Trash2, RotateCcw, ClipboardList, TrendingDown, Trophy, Filter, X } from "lucide-react";
+import { AlertTriangle, Trash2, RotateCcw, ClipboardList, TrendingDown, Trophy, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { focusRowField } from "@/lib/keyboardFlow";
 import { dedupeOrderItemsByProduct } from "@/lib/orderItems";
+import SupplierFilterPopover from "@/components/SupplierFilterPopover";
+import SupplierSearchableSelect from "@/components/SupplierSearchableSelect";
 
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
@@ -392,6 +391,17 @@ export default function NewOrderPage() {
 
   const total = useMemo(() => items.reduce((sum, i) => sum + i.subtotal, 0), [items]);
 
+  const totalsBySupplier = useMemo(() => {
+    const map: Record<string, { total: number; count: number }> = {};
+    items.forEach(i => {
+      const sid = i.supplier_id || "__sem__";
+      if (!map[sid]) map[sid] = { total: 0, count: 0 };
+      map[sid].total += i.subtotal;
+      map[sid].count += 1;
+    });
+    return map;
+  }, [items]);
+
   const economy = useMemo(() => {
     const totalMax = items.reduce((sum, item) => {
       const entries = pricesByProduct[item.product_id] || [];
@@ -667,67 +677,12 @@ export default function NewOrderPage() {
                   ? "considerando todos os fornecedores"
                   : `restrito a ${restrictedSuppliers.length} fornecedor(es)`}
               </span>
-              {restrictedSuppliers.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {restrictedSuppliers.map(id => {
-                    const s = suppliers.find(x => x.id === id);
-                    if (!s) return null;
-                    return (
-                      <Badge key={id} variant="secondary" className="text-[10px] gap-1 pr-1">
-                        {s.razao_social}
-                        <button
-                          onClick={() => toggleRestrictedSupplier(id)}
-                          className="hover:text-destructive ml-0.5"
-                          aria-label={`Remover ${s.razao_social}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    );
-                  })}
-                </div>
-              )}
             </div>
-            <div className="flex items-center gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button size="sm" variant="outline" className="h-8">
-                    <Filter className="h-3.5 w-3.5 mr-1.5" />
-                    Filtrar fornecedores
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-72 p-0" align="end">
-                  <div className="p-3 border-b flex items-center justify-between">
-                    <span className="text-sm font-semibold">Considerar apenas:</span>
-                    {restrictedSuppliers.length > 0 && (
-                      <button
-                        onClick={() => setRestrictedSuppliers([])}
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                      >
-                        Limpar
-                      </button>
-                    )}
-                  </div>
-                  <div className="max-h-64 overflow-y-auto p-2 space-y-1">
-                    {suppliers.map(s => (
-                      <label
-                        key={s.id}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm"
-                      >
-                        <Checkbox
-                          checked={restrictedSuppliers.includes(s.id)}
-                          onCheckedChange={() => toggleRestrictedSupplier(s.id)}
-                        />
-                        <span className="flex-1">{s.razao_social}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="p-2 border-t text-[11px] text-muted-foreground">
-                    Vazio = todos os fornecedores.
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+            <SupplierFilterPopover
+              suppliers={suppliers}
+              selected={restrictedSuppliers}
+              onChange={setRestrictedSuppliers}
+            />
           </CardContent>
         </Card>
       )}
@@ -741,21 +696,48 @@ export default function NewOrderPage() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Trocar para:</span>
-              <Select
+              <SupplierSearchableSelect
+                suppliers={suppliers}
                 value={items.find(i => i.supplier_id)?.supplier_id || ""}
-                onValueChange={applySingleSupplier}
-              >
-                <SelectTrigger className="w-[220px] h-8 text-sm"><SelectValue placeholder="Selecione um fornecedor" /></SelectTrigger>
-                <SelectContent>
-                  {suppliers.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.razao_social}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={applySingleSupplier}
+                className="w-[240px]"
+              />
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Totais por fornecedor — aparece quando há 2+ fornecedores em uso */}
+      {items.length > 0 && Object.keys(totalsBySupplier).filter(k => k !== "__sem__").length >= 2 && (
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              Totais por fornecedor
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 pt-0">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {Object.entries(totalsBySupplier)
+                .sort((a, b) => b[1].total - a[1].total)
+                .map(([sid, info]) => {
+                  const name = sid === "__sem__"
+                    ? "Sem fornecedor"
+                    : suppliers.find(s => s.id === sid)?.razao_social || "—";
+                  return (
+                    <div key={sid} className="border rounded-md px-3 py-2 bg-muted/30">
+                      <p className="text-[11px] text-muted-foreground truncate" title={name}>{name}</p>
+                      <p className="text-sm font-bold">{formatCurrency(info.total)}</p>
+                      <p className="text-[10px] text-muted-foreground">{info.count} item(ns)</p>
+                    </div>
+                  );
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+
 
 
       {items.length > 0 && (

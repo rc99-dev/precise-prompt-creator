@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Trash2, TrendingDown, AlertTriangle, FileText, RotateCcw, ShoppingCart } from "lucide-react";
+import { Search, Plus, Trash2, TrendingDown, AlertTriangle, FileText, RotateCcw, ShoppingCart, Check } from "lucide-react";
 import { formatCurrency } from "@/lib/helpers";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,6 +21,8 @@ import { useComparativeDraft, DraftCompItem } from "@/hooks/useComparativeDraft"
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 import { toast } from "sonner";
 import { dedupeOrderItemsByProduct } from "@/lib/orderItems";
+import SupplierFilterPopover from "@/components/SupplierFilterPopover";
+import { cn } from "@/lib/utils";
 
 type Product = { id: string; nome: string; unidade_medida: string; codigo_interno: string | null };
 type Supplier = { id: string; razao_social: string };
@@ -65,6 +67,8 @@ export default function ComparativePage() {
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState<"melhor_preco" | "melhor_fornecedor" | null>(null);
   const [generatingOrder, setGeneratingOrder] = useState(false);
+  const [supplierFilter, setSupplierFilter] = useState<string[]>([]);
+  const [selectedSupplierByProduct, setSelectedSupplierByProduct] = useState<Record<string, string>>({});
   const draftRestored = useRef(false);
   const { hasDraft, saveDraft, loadDraft, clearDraft } = useComparativeDraft();
 
@@ -125,6 +129,8 @@ export default function ComparativePage() {
       setUnidadeSolicitante(draft.unidadeSolicitante || "");
       setShowSaldo(draft.showSaldo);
       setSelectedReqId(draft.selectedRequisitionId);
+      setSelectedSupplierByProduct(draft.selectedSupplierByProduct || {});
+      setSupplierFilter(draft.supplierFilter || []);
       setShowDraftBanner(false);
       draftDecided.current = true;
       toast.success("Rascunho restaurado!");
@@ -141,8 +147,8 @@ export default function ComparativePage() {
   // Auto-save draft (only after user decided about existing draft)
   useEffect(() => {
     if (!draftRestored.current || !draftDecided.current || showDraftBanner) return;
-    saveDraft({ items, unidadeSolicitante, showSaldo, selectedRequisitionId: selectedReqId });
-  }, [items, unidadeSolicitante, showSaldo, selectedReqId, saveDraft, showDraftBanner]);
+    saveDraft({ items, unidadeSolicitante, showSaldo, selectedRequisitionId: selectedReqId, selectedSupplierByProduct, supplierFilter });
+  }, [items, unidadeSolicitante, showSaldo, selectedReqId, selectedSupplierByProduct, supplierFilter, saveDraft, showDraftBanner]);
 
   // Load requisition products — import ALL items from requisition_items
   useEffect(() => {
@@ -218,12 +224,41 @@ export default function ComparativePage() {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, quantidade: qty } : item));
   };
 
-  const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
+  const removeItem = (idx: number) => {
+    setItems(prev => {
+      const removed = prev[idx];
+      if (removed) {
+        setSelectedSupplierByProduct(curr => {
+          if (!curr[removed.product_id]) return curr;
+          const next = { ...curr };
+          delete next[removed.product_id];
+          return next;
+        });
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
 
-  const relevantSuppliers = useMemo(() => {
+  const toggleItemSupplier = (productId: string, supplierId: string) => {
+    setSelectedSupplierByProduct(prev => {
+      if (prev[productId] === supplierId) {
+        const next = { ...prev };
+        delete next[productId];
+        return next;
+      }
+      return { ...prev, [productId]: supplierId };
+    });
+  };
+
+  const allRelevantSuppliers = useMemo(() => {
     const ids = new Set(prices.filter(p => items.some(i => i.product_id === p.product_id)).map(p => p.supplier_id));
     return suppliers.filter(s => ids.has(s.id));
   }, [suppliers, prices, items]);
+
+  const relevantSuppliers = useMemo(() => {
+    if (supplierFilter.length === 0) return allRelevantSuppliers;
+    return allRelevantSuppliers.filter(s => supplierFilter.includes(s.id));
+  }, [allRelevantSuppliers, supplierFilter]);
 
   const supplierTotals = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -245,29 +280,35 @@ export default function ComparativePage() {
     setSelectedStrategy(s);
   };
 
+  const picksCount = Object.keys(selectedSupplierByProduct).length;
+
   const generateOrder = async () => {
-    if (!analysis || items.length === 0) return;
+    if (items.length === 0) return;
     setGeneratingOrder(true);
 
     try {
       const { data: numData } = await supabase.rpc('generate_order_number');
       const numero = numData || `PED-${Date.now()}`;
-      const strategy = selectedStrategy || analysis.recommendedStrategy;
+      const strategy = selectedStrategy || analysis?.recommendedStrategy || 'melhor_preco';
 
-      // Build items with supplier/price based on strategy
+      // Build items respecting per-item supplier picks first; fallback to strategy
       const sourceItems = dedupeOrderItemsByProduct(items);
       const orderItems = sourceItems.map(item => {
         let supplierId = '';
         let precoUnitario = 0;
 
-        if (strategy === 'melhor_preco') {
+        const picked = selectedSupplierByProduct[item.product_id];
+        if (picked) {
+          supplierId = picked;
+          precoUnitario = prices.find(p => p.product_id === item.product_id && p.supplier_id === picked)?.preco_unitario || 0;
+        } else if (strategy === 'melhor_preco') {
           const productPrices = prices.filter(p => p.product_id === item.product_id);
           if (productPrices.length > 0) {
             const best = productPrices.reduce((m, e) => e.preco_unitario < m.preco_unitario ? e : m);
             supplierId = best.supplier_id;
             precoUnitario = best.preco_unitario;
           }
-        } else if (strategy === 'melhor_fornecedor' && analysis.bestSingle) {
+        } else if (strategy === 'melhor_fornecedor' && analysis?.bestSingle) {
           supplierId = analysis.bestSingle.supplierId;
           precoUnitario = prices.find(p => p.product_id === item.product_id && p.supplier_id === supplierId)?.preco_unitario || 0;
         }
@@ -469,11 +510,42 @@ export default function ComparativePage() {
 
       {items.length > 0 && (
         <>
+          {/* Filtro de fornecedores + indicador de picks */}
+          <Card>
+            <CardContent className="py-3 px-4 flex items-center justify-between flex-wrap gap-3">
+              <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap">
+                <span>
+                  Exibindo <strong className="text-foreground">{relevantSuppliers.length}</strong> de {allRelevantSuppliers.length} fornecedor(es).
+                </span>
+                {picksCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-primary">
+                    <Check className="h-3.5 w-3.5" />
+                    <strong>{picksCount}</strong> item(ns) com fornecedor escolhido
+                    <button onClick={() => setSelectedSupplierByProduct({})} className="ml-1 underline hover:text-foreground">limpar</button>
+                  </span>
+                )}
+              </div>
+              <SupplierFilterPopover
+                suppliers={allRelevantSuppliers}
+                selected={supplierFilter}
+                onChange={setSupplierFilter}
+                label="Filtrar fornecedores"
+                helperText="Vazio = todos os relevantes para os itens."
+                showBadges={false}
+              />
+            </CardContent>
+          </Card>
+
           {analysis && (
             <div className="space-y-3">
               <StrategyCards analysis={analysis} selectedStrategy={selectedStrategy} onSelect={handleSelectStrategy} showSelectButton />
-              <div className="flex justify-end">
-                <Button onClick={generateOrder} disabled={generatingOrder || !selectedStrategy} className="gap-2">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-xs text-muted-foreground">
+                  {picksCount > 0
+                    ? "Itens com fornecedor escolhido usarão o fornecedor selecionado. Os demais seguem a estratégia."
+                    : "Clique em um preço para fixar o fornecedor daquele item ao gerar a ordem."}
+                </p>
+                <Button onClick={generateOrder} disabled={generatingOrder || (!selectedStrategy && picksCount === 0)} className="gap-2">
                   <ShoppingCart className="h-4 w-4" />
                   {generatingOrder ? "Gerando..." : "Gerar Ordem de Compra"}
                 </Button>
@@ -498,6 +570,7 @@ export default function ComparativePage() {
                   {[...items].map((it, i) => ({ it, i })).sort((a, b) => a.it.product_name.localeCompare(b.it.product_name, 'pt-BR')).map(({ it: item, i: idx }) => {
                     const minPrice = getMinPrice(item.product_id);
                     const hasAnyPrice = prices.some(p => p.product_id === item.product_id);
+                    const pickedSupplier = selectedSupplierByProduct[item.product_id];
                     return (
                       <tr key={item.product_id} className="border-b last:border-0 hover:bg-muted/50">
                         <td className="py-3 px-4 sticky left-0 bg-card">
@@ -505,6 +578,12 @@ export default function ComparativePage() {
                           {!hasAnyPrice && (
                             <span className="flex items-center gap-1 text-warning text-xs mt-1">
                               <AlertTriangle className="h-3 w-3" />Sem preço cadastrado
+                            </span>
+                          )}
+                          {pickedSupplier && (
+                            <span className="flex items-center gap-1 text-primary text-[11px] mt-1">
+                              <Check className="h-3 w-3" />
+                              Escolhido: {allRelevantSuppliers.find(s => s.id === pickedSupplier)?.razao_social || '—'}
                             </span>
                           )}
                         </td>
@@ -519,10 +598,26 @@ export default function ComparativePage() {
                         {relevantSuppliers.map(s => {
                           const price = getPrice(item.product_id, s.id);
                           const isMin = price !== undefined && price === minPrice;
+                          const isPicked = pickedSupplier === s.id;
+                          const clickable = price !== undefined;
                           return (
-                            <td key={s.id} className={`py-3 px-4 text-right ${isMin ? 'text-success font-bold' : 'text-muted-foreground'}`}>
+                            <td
+                              key={s.id}
+                              onClick={clickable ? () => toggleItemSupplier(item.product_id, s.id) : undefined}
+                              title={clickable ? (isPicked ? "Clique para remover a escolha" : "Clique para usar este fornecedor na ordem") : undefined}
+                              className={cn(
+                                "py-3 px-4 text-right transition-colors",
+                                clickable && "cursor-pointer hover:bg-accent/40",
+                                isPicked && "bg-primary/15 ring-1 ring-primary/40",
+                                isMin ? "text-success font-bold" : "text-muted-foreground",
+                              )}
+                            >
                               {price !== undefined ? (
-                                <span>{isMin && <TrendingDown className="h-3 w-3 inline mr-1" />}{formatCurrency(price)}</span>
+                                <span className="inline-flex items-center justify-end gap-1">
+                                  {isPicked && <Check className="h-3 w-3 text-primary" />}
+                                  {isMin && !isPicked && <TrendingDown className="h-3 w-3" />}
+                                  {formatCurrency(price)}
+                                </span>
                               ) : (
                                 <span className="text-muted-foreground/50 text-xs">Sem preço</span>
                               )}
@@ -557,6 +652,7 @@ export default function ComparativePage() {
             </CardContent>
           </Card>
         </>
+
       )}
     </div>
   );

@@ -15,6 +15,8 @@ interface DraftData {
   unidadeSolicitante: string;
   showSaldo: boolean;
   selectedRequisitionId: string | null;
+  selectedSupplierByProduct?: Record<string, string>;
+  supplierFilter?: string[];
   savedAt: number;
 }
 
