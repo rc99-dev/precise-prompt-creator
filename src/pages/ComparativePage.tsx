@@ -510,11 +510,42 @@ export default function ComparativePage() {
 
       {items.length > 0 && (
         <>
+          {/* Filtro de fornecedores + indicador de picks */}
+          <Card>
+            <CardContent className="py-3 px-4 flex items-center justify-between flex-wrap gap-3">
+              <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap">
+                <span>
+                  Exibindo <strong className="text-foreground">{relevantSuppliers.length}</strong> de {allRelevantSuppliers.length} fornecedor(es).
+                </span>
+                {picksCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-primary">
+                    <Check className="h-3.5 w-3.5" />
+                    <strong>{picksCount}</strong> item(ns) com fornecedor escolhido
+                    <button onClick={() => setSelectedSupplierByProduct({})} className="ml-1 underline hover:text-foreground">limpar</button>
+                  </span>
+                )}
+              </div>
+              <SupplierFilterPopover
+                suppliers={allRelevantSuppliers}
+                selected={supplierFilter}
+                onChange={setSupplierFilter}
+                label="Filtrar fornecedores"
+                helperText="Vazio = todos os relevantes para os itens."
+                showBadges={false}
+              />
+            </CardContent>
+          </Card>
+
           {analysis && (
             <div className="space-y-3">
               <StrategyCards analysis={analysis} selectedStrategy={selectedStrategy} onSelect={handleSelectStrategy} showSelectButton />
-              <div className="flex justify-end">
-                <Button onClick={generateOrder} disabled={generatingOrder || !selectedStrategy} className="gap-2">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-xs text-muted-foreground">
+                  {picksCount > 0
+                    ? "Itens com fornecedor escolhido usarão o fornecedor selecionado. Os demais seguem a estratégia."
+                    : "Clique em um preço para fixar o fornecedor daquele item ao gerar a ordem."}
+                </p>
+                <Button onClick={generateOrder} disabled={generatingOrder || (!selectedStrategy && picksCount === 0)} className="gap-2">
                   <ShoppingCart className="h-4 w-4" />
                   {generatingOrder ? "Gerando..." : "Gerar Ordem de Compra"}
                 </Button>
@@ -539,6 +570,7 @@ export default function ComparativePage() {
                   {[...items].map((it, i) => ({ it, i })).sort((a, b) => a.it.product_name.localeCompare(b.it.product_name, 'pt-BR')).map(({ it: item, i: idx }) => {
                     const minPrice = getMinPrice(item.product_id);
                     const hasAnyPrice = prices.some(p => p.product_id === item.product_id);
+                    const pickedSupplier = selectedSupplierByProduct[item.product_id];
                     return (
                       <tr key={item.product_id} className="border-b last:border-0 hover:bg-muted/50">
                         <td className="py-3 px-4 sticky left-0 bg-card">
@@ -546,6 +578,12 @@ export default function ComparativePage() {
                           {!hasAnyPrice && (
                             <span className="flex items-center gap-1 text-warning text-xs mt-1">
                               <AlertTriangle className="h-3 w-3" />Sem preço cadastrado
+                            </span>
+                          )}
+                          {pickedSupplier && (
+                            <span className="flex items-center gap-1 text-primary text-[11px] mt-1">
+                              <Check className="h-3 w-3" />
+                              Escolhido: {allRelevantSuppliers.find(s => s.id === pickedSupplier)?.razao_social || '—'}
                             </span>
                           )}
                         </td>
@@ -560,10 +598,26 @@ export default function ComparativePage() {
                         {relevantSuppliers.map(s => {
                           const price = getPrice(item.product_id, s.id);
                           const isMin = price !== undefined && price === minPrice;
+                          const isPicked = pickedSupplier === s.id;
+                          const clickable = price !== undefined;
                           return (
-                            <td key={s.id} className={`py-3 px-4 text-right ${isMin ? 'text-success font-bold' : 'text-muted-foreground'}`}>
+                            <td
+                              key={s.id}
+                              onClick={clickable ? () => toggleItemSupplier(item.product_id, s.id) : undefined}
+                              title={clickable ? (isPicked ? "Clique para remover a escolha" : "Clique para usar este fornecedor na ordem") : undefined}
+                              className={cn(
+                                "py-3 px-4 text-right transition-colors",
+                                clickable && "cursor-pointer hover:bg-accent/40",
+                                isPicked && "bg-primary/15 ring-1 ring-primary/40",
+                                isMin ? "text-success font-bold" : "text-muted-foreground",
+                              )}
+                            >
                               {price !== undefined ? (
-                                <span>{isMin && <TrendingDown className="h-3 w-3 inline mr-1" />}{formatCurrency(price)}</span>
+                                <span className="inline-flex items-center justify-end gap-1">
+                                  {isPicked && <Check className="h-3 w-3 text-primary" />}
+                                  {isMin && !isPicked && <TrendingDown className="h-3 w-3" />}
+                                  {formatCurrency(price)}
+                                </span>
                               ) : (
                                 <span className="text-muted-foreground/50 text-xs">Sem preço</span>
                               )}
@@ -598,6 +652,7 @@ export default function ComparativePage() {
             </CardContent>
           </Card>
         </>
+
       )}
     </div>
   );
