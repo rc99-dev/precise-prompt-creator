@@ -145,7 +145,7 @@ export default function SuppliersPage() {
                   {filtered.length === 0 ? (
                     <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum fornecedor encontrado.</td></tr>
                   ) : filtered.map(s => (
-                    <tr key={s.id} className="border-b last:border-0 hover:bg-muted/50">
+                    <tr key={s.id} className="border-b last:border-0 hover:bg-muted/50 cursor-pointer" onClick={() => setDetailsSupplier(s)}>
                       <td className="py-3 px-4 font-medium">{s.razao_social}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{s.nome_fantasia || '—'}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{s.cnpj || '—'}</td>
@@ -154,7 +154,7 @@ export default function SuppliersPage() {
                         <Badge variant={s.status === 'ativo' ? 'default' : 'secondary'}>{s.status === 'ativo' ? 'Ativo' : 'Inativo'}</Badge>
                       </td>
                       {isAdmin && (
-                        <td className="py-3 px-4 text-right space-x-1">
+                        <td className="py-3 px-4 text-right space-x-1" onClick={e => e.stopPropagation()}>
                           <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                         </td>
