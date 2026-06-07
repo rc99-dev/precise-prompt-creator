@@ -111,14 +111,30 @@ export default function TriagemPage() {
       );
   }, [requisitions, search, destinoFilter]);
 
+  // Build lookup of items that can still be triaged (sem destino)
+  const triablesById = useMemo(() => {
+    const map = new Map<string, ReqItem>();
+    requisitions.forEach(r => (r.requisition_items || []).forEach(i => {
+      if (!i.destino) map.set(i.id, i);
+    }));
+    return map;
+  }, [requisitions]);
+
   const toggleItem = (id: string) => {
+    if (!triablesById.has(id)) {
+      toast.error("Este item já foi triado e não pode ser alterado.");
+      return;
+    }
     const next = new Set(selectedItems);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelectedItems(next);
   };
 
   const toggleReq = (req: Requisition) => {
-    const ids = (req.requisition_items || []).map(i => i.id);
+    const ids = (req.requisition_items || [])
+      .filter(i => !i.destino)
+      .map(i => i.id);
+    if (ids.length === 0) return;
     const allSelected = ids.every(id => selectedItems.has(id));
     const next = new Set(selectedItems);
     if (allSelected) ids.forEach(id => next.delete(id));
@@ -128,28 +144,33 @@ export default function TriagemPage() {
 
   const clearSelection = () => setSelectedItems(new Set());
 
-  const assignDestino = async (destino: 'comprador' | 'pcp' | null) => {
+  const assignDestino = async (destino: 'comprador' | 'pcp') => {
     if (selectedItems.size === 0) {
       toast.error("Selecione ao menos um item.");
       return;
     }
-    const ids = Array.from(selectedItems);
+    // Safety: never include already-triaged items
+    const ids = Array.from(selectedItems).filter(id => triablesById.has(id));
+    if (ids.length === 0) {
+      toast.error("Os itens selecionados já foram triados.");
+      return;
+    }
     const { data: { user } } = await supabase.auth.getUser();
     const payload: any = {
       destino,
-      triagem_em: destino ? new Date().toISOString() : null,
-      triagem_por: destino ? user?.id : null,
+      triagem_em: new Date().toISOString(),
+      triagem_por: user?.id,
     };
-    const { error } = await supabase.from('requisition_items').update(payload).in('id', ids);
+    const { error } = await supabase.from('requisition_items')
+      .update(payload)
+      .in('id', ids)
+      .is('destino', null); // extra guard at DB level
     if (error) { toast.error(error.message); return; }
-    toast.success(
-      destino
-        ? `${ids.length} item(ns) enviados para ${destinoLabels[destino]}.`
-        : `${ids.length} item(ns) tiveram a triagem removida.`
-    );
+    toast.success(`${ids.length} item(ns) enviados para ${destinoLabels[destino]}.`);
     clearSelection();
     queryClient.invalidateQueries({ queryKey: ['triagem-list'] });
   };
+
 
   const totalSelected = selectedItems.size;
 
