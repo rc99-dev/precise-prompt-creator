@@ -20,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 type ReqItem = {
   id: string; product_id: string; saldo: number; pedido: number; observacoes: string | null;
+  destino?: string | null; triagem_em?: string | null;
   products?: { nome: string; unidade_medida: string } | null;
 };
 
