@@ -97,6 +97,7 @@ const defaultPermissions: Record<string, AppRole[]> = {
   'nova-ordem': ['comprador', 'estoquista', 'master'],
   historico: ['comprador', 'aprovador', 'estoquista', 'financeiro', 'master'],
   'analise-consumo': ['comprador', 'aprovador', 'estoquista', 'financeiro', 'master'],
+  'comparativo-financeiro': ['comprador', 'aprovador', 'financeiro', 'master'],
   comparativo: ['comprador', 'estoquista', 'master'],
   aprovacoes: ['aprovador', 'master'],
   recebimentos: ['estoquista', 'master'],
