@@ -40,6 +40,7 @@ export default function SuppliersPage() {
   const [form, setForm] = useState(emptySupplier);
   const [loading, setLoading] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
+  const [detailsSupplier, setDetailsSupplier] = useState<Supplier | null>(null);
 
   const { data: suppliers = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['suppliers', statusFilter],
