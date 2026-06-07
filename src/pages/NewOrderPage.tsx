@@ -18,13 +18,12 @@ import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import { useOrderDraft, DraftOrderItem } from "@/hooks/useOrderDraft";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
-import { AlertTriangle, Trash2, RotateCcw, ClipboardList, TrendingDown, Trophy, Filter, X } from "lucide-react";
+import { AlertTriangle, Trash2, RotateCcw, ClipboardList, TrendingDown, Trophy, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { focusRowField } from "@/lib/keyboardFlow";
 import { dedupeOrderItemsByProduct } from "@/lib/orderItems";
+import SupplierFilterPopover from "@/components/SupplierFilterPopover";
+import SupplierSearchableSelect from "@/components/SupplierSearchableSelect";
 
 type Product = { id: string; nome: string; codigo_interno: string | null; unidade_medida: string };
 type Supplier = { id: string; razao_social: string };
