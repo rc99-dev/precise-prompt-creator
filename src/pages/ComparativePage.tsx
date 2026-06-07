@@ -67,6 +67,8 @@ export default function ComparativePage() {
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState<"melhor_preco" | "melhor_fornecedor" | null>(null);
   const [generatingOrder, setGeneratingOrder] = useState(false);
+  const [supplierFilter, setSupplierFilter] = useState<string[]>([]);
+  const [selectedSupplierByProduct, setSelectedSupplierByProduct] = useState<Record<string, string>>({});
   const draftRestored = useRef(false);
   const { hasDraft, saveDraft, loadDraft, clearDraft } = useComparativeDraft();
 
