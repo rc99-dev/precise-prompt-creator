@@ -57,7 +57,7 @@ export default function RequisitionsPage() {
 
       const [{ data: profiles }, { data: items }] = await Promise.all([
         userIds.length > 0 ? supabase.from('profiles').select('user_id, full_name').in('user_id', userIds) : { data: [] },
-        reqIds.length > 0 ? supabase.from('requisition_items').select('id, requisition_id, product_id, saldo, pedido, observacoes, products(nome, unidade_medida)').in('requisition_id', reqIds) : { data: [] },
+        reqIds.length > 0 ? supabase.from('requisition_items').select('id, requisition_id, product_id, saldo, pedido, observacoes, destino, triagem_em, products(nome, unidade_medida)').in('requisition_id', reqIds) : { data: [] },
       ]);
 
       const profileMap: Record<string, string> = {};
