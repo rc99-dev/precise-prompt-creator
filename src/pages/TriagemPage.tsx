@@ -219,7 +219,8 @@ export default function TriagemPage() {
         <div className="space-y-4">
           {filtered.map(req => {
             const items = req.requisition_items || [];
-            const allSel = items.length > 0 && items.every(i => selectedItems.has(i.id));
+            const triables = items.filter(i => !i.destino);
+            const allSel = triables.length > 0 && triables.every(i => selectedItems.has(i.id));
             const someSel = items.some(i => selectedItems.has(i.id));
             return (
               <Card key={req.id}>
@@ -228,6 +229,7 @@ export default function TriagemPage() {
                     <div className="flex items-center gap-3">
                       <Checkbox
                         checked={allSel}
+                        disabled={triables.length === 0}
                         onCheckedChange={() => toggleReq(req)}
                         aria-label="Selecionar todos"
                       />
@@ -239,7 +241,9 @@ export default function TriagemPage() {
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {items.length} item(ns){someSel && !allSel ? ` · ${items.filter(i => selectedItems.has(i.id)).length} sel.` : ''}
+                      {items.length} item(ns)
+                      {triables.length < items.length ? ` · ${items.length - triables.length} triado(s)` : ''}
+                      {someSel && !allSel ? ` · ${items.filter(i => selectedItems.has(i.id)).length} sel.` : ''}
                     </div>
                   </div>
                   <div className="overflow-x-auto">
@@ -256,29 +260,35 @@ export default function TriagemPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {items.map(i => (
-                          <tr key={i.id} className="border-b last:border-0 hover:bg-muted/30">
-                            <td className="py-2 px-3">
-                              <Checkbox
-                                checked={selectedItems.has(i.id)}
-                                onCheckedChange={() => toggleItem(i.id)}
-                                aria-label="Selecionar item"
-                              />
-                            </td>
-                            <td className="py-2 px-3">{i.products?.nome || '—'}</td>
-                            <td className="py-2 px-3 text-muted-foreground hidden md:table-cell">{i.products?.unidade_medida || '—'}</td>
-                            <td className="py-2 px-3 text-right">{i.saldo}</td>
-                            <td className="py-2 px-3 text-right">{i.pedido || '—'}</td>
-                            <td className="py-2 px-3 text-muted-foreground text-xs hidden md:table-cell">{i.observacoes || '—'}</td>
-                            <td className="py-2 px-3 text-center">
-                              {i.destino ? (
-                                <Badge className={destinoColors[i.destino]}>{destinoLabels[i.destino]}</Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {items.map(i => {
+                          const locked = !!i.destino;
+                          return (
+                            <tr key={i.id} className={`border-b last:border-0 ${locked ? 'opacity-70' : 'hover:bg-muted/30'}`}>
+                              <td className="py-2 px-3">
+                                <Checkbox
+                                  checked={selectedItems.has(i.id)}
+                                  disabled={locked}
+                                  onCheckedChange={() => toggleItem(i.id)}
+                                  aria-label="Selecionar item"
+                                />
+                              </td>
+                              <td className="py-2 px-3">{i.products?.nome || '—'}</td>
+                              <td className="py-2 px-3 text-muted-foreground hidden md:table-cell">{i.products?.unidade_medida || '—'}</td>
+                              <td className="py-2 px-3 text-right">{i.saldo}</td>
+                              <td className="py-2 px-3 text-right">{i.pedido || '—'}</td>
+                              <td className="py-2 px-3 text-muted-foreground text-xs hidden md:table-cell">{i.observacoes || '—'}</td>
+                              <td className="py-2 px-3 text-center">
+                                {i.destino ? (
+                                  <Badge className={destinoColors[i.destino]} title="Triagem definitiva">
+                                    {destinoLabels[i.destino]}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -286,6 +296,7 @@ export default function TriagemPage() {
               </Card>
             );
           })}
+
         </div>
       )}
 
