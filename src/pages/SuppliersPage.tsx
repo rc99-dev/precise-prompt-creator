@@ -202,6 +202,13 @@ export default function SuppliersPage() {
       </Dialog>
 
       <CsvImportModal config={suppliersImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={invalidate} />
+
+      <SupplierDetailsDialog
+        supplierId={detailsSupplier?.id || null}
+        supplierName={detailsSupplier?.nome_fantasia || detailsSupplier?.razao_social || ''}
+        open={!!detailsSupplier}
+        onOpenChange={(v) => !v && setDetailsSupplier(null)}
+      />
     </div>
   );
 }
