@@ -16,6 +16,7 @@ import CsvImportModal from "@/components/CsvImportModal";
 import { suppliersImportConfig } from "@/lib/csvConfigs";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
+import SupplierDetailsDialog from "@/components/SupplierDetailsDialog";
 
 type Supplier = {
   id: string; razao_social: string; nome_fantasia: string | null; cnpj: string | null;
@@ -39,6 +40,7 @@ export default function SuppliersPage() {
   const [form, setForm] = useState(emptySupplier);
   const [loading, setLoading] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
+  const [detailsSupplier, setDetailsSupplier] = useState<Supplier | null>(null);
 
   const { data: suppliers = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['suppliers', statusFilter],
@@ -143,7 +145,7 @@ export default function SuppliersPage() {
                   {filtered.length === 0 ? (
                     <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum fornecedor encontrado.</td></tr>
                   ) : filtered.map(s => (
-                    <tr key={s.id} className="border-b last:border-0 hover:bg-muted/50">
+                    <tr key={s.id} className="border-b last:border-0 hover:bg-muted/50 cursor-pointer" onClick={() => setDetailsSupplier(s)}>
                       <td className="py-3 px-4 font-medium">{s.razao_social}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{s.nome_fantasia || '—'}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{s.cnpj || '—'}</td>
@@ -152,7 +154,7 @@ export default function SuppliersPage() {
                         <Badge variant={s.status === 'ativo' ? 'default' : 'secondary'}>{s.status === 'ativo' ? 'Ativo' : 'Inativo'}</Badge>
                       </td>
                       {isAdmin && (
-                        <td className="py-3 px-4 text-right space-x-1">
+                        <td className="py-3 px-4 text-right space-x-1" onClick={e => e.stopPropagation()}>
                           <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                         </td>
@@ -200,6 +202,13 @@ export default function SuppliersPage() {
       </Dialog>
 
       <CsvImportModal config={suppliersImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={invalidate} />
+
+      <SupplierDetailsDialog
+        supplierId={detailsSupplier?.id || null}
+        supplierName={detailsSupplier?.nome_fantasia || detailsSupplier?.razao_social || ''}
+        open={!!detailsSupplier}
+        onOpenChange={(v) => !v && setDetailsSupplier(null)}
+      />
     </div>
   );
 }

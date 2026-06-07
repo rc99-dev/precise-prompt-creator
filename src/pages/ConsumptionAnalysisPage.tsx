@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, TrendingDown } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-const STATUSES_VALIDAS = ['aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
+const STATUSES_VALIDAS = ['aguardando_aprovacao', 'aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
 
 type OrderRow = {
   id: string;
@@ -255,7 +255,7 @@ export default function ConsumptionAnalysisPage() {
           <CardContent className="pt-6 text-sm space-y-1 text-muted-foreground">
             <p><strong className="text-primary">Saldo Inicial</strong> (1ª ordem) = saldo no momento da ordem + quantidade pedida (aprovada).</p>
             <p><strong className="text-warning">Consumo</strong> (ordens seguintes) = (saldo anterior + quantidade comprada anterior) − saldo atual.</p>
-            <p>Ordens consideradas: aprovadas, emitidas e recebidas (com alterações do aprovador já contabilizadas).</p>
+            <p>Ordens consideradas: aguardando aprovação, aprovadas, emitidas e recebidas (com alterações do aprovador já contabilizadas).</p>
           </CardContent>
         </Card>
       </div>
