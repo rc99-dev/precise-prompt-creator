@@ -59,6 +59,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { to: "/inventarios", label: "Inventários", icon: Boxes, page: "inventarios" },
     { to: "/historico-inventarios", label: "Histórico de Inventários", icon: History, page: "historico-inventarios" },
     { to: "/solicitacoes", label: "Solicitações", icon: ClipboardList, page: "solicitacoes", badge: pendingReqs },
+    { to: "/triagem", label: "Triagem", icon: ClipboardList, page: "triagem" },
     { to: "/nova-ordem", label: "Nova Ordem", icon: ShoppingCart, page: "nova-ordem" },
     { to: "/comparativo", label: "Comparativo", icon: BarChart3, page: "comparativo" },
     { to: "/aprovacoes", label: "Aprovações", icon: CheckCircle, page: "aprovacoes", badge: pendingApprovals },

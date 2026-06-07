@@ -16,6 +16,7 @@ import ConsumptionAnalysisPage from "@/pages/ConsumptionAnalysisPage";
 import ComparativePage from "@/pages/ComparativePage";
 import MyRequisitionsPage from "@/pages/MyRequisitionsPage";
 import RequisitionsPage from "@/pages/RequisitionsPage";
+import TriagemPage from "@/pages/TriagemPage";
 import ApprovalsPage from "@/pages/ApprovalsPage";
 import ReceiptsPage from "@/pages/ReceiptsPage";
 import UsersPage from "@/pages/UsersPage";
@@ -69,6 +70,7 @@ function ProtectedRoutes() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/minhas-solicitacoes" element={<MyRequisitionsPage />} />
         {canOrLoading('solicitacoes') && <Route path="/solicitacoes" element={<RequisitionsPage />} />}
+        {canOrLoading('triagem') && <Route path="/triagem" element={<TriagemPage />} />}
         {canOrLoading('fornecedores') && <Route path="/fornecedores" element={<SuppliersPage />} />}
         {canOrLoading('produtos') && <Route path="/produtos" element={<ProductsPage />} />}
         {canOrLoading('precos') && <Route path="/precos" element={<PricesPage />} />}
