@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Trash2, TrendingDown, AlertTriangle, FileText, RotateCcw, ShoppingCart } from "lucide-react";
+import { Search, Plus, Trash2, TrendingDown, AlertTriangle, FileText, RotateCcw, ShoppingCart, Check } from "lucide-react";
 import { formatCurrency } from "@/lib/helpers";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,6 +21,8 @@ import { useComparativeDraft, DraftCompItem } from "@/hooks/useComparativeDraft"
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 import { toast } from "sonner";
 import { dedupeOrderItemsByProduct } from "@/lib/orderItems";
+import SupplierFilterPopover from "@/components/SupplierFilterPopover";
+import { cn } from "@/lib/utils";
 
 type Product = { id: string; nome: string; unidade_medida: string; codigo_interno: string | null };
 type Supplier = { id: string; razao_social: string };
