@@ -147,13 +147,13 @@ export default function ApprovalsPage() {
     if (!returnDialog || !returnReason.trim()) { toast.error("Informe o motivo da devolução."); return; }
     const motivo = `[Devolvido para edição] ${returnReason}`;
     const { error } = await supabase.from('purchase_orders').update({
-      status: 'rejeitado', rejected_reason: motivo,
+      status: 'rascunho', rejected_reason: motivo, approved_by: null, approved_at: null,
     } as any).eq('id', returnDialog);
     if (error) { toast.error(error.message); return; }
     await supabase.from('approval_log').insert({
       order_id: returnDialog, user_id: user!.id, action: 'devolvido_para_edicao', motivo,
     } as any);
-    toast.success("Pedido devolvido ao solicitante para edição.");
+    toast.success("Pedido devolvido como rascunho — itens preservados para edição.");
     setReturnDialog(null); setReturnReason(""); setDetailOrder(null);
     invalidate();
   };
