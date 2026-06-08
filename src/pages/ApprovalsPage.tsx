@@ -375,7 +375,7 @@ export default function ApprovalsPage() {
           <DialogHeader><DialogTitle>Devolver para edição</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              O pedido voltará ao solicitante como <span className="font-medium text-foreground">rejeitado</span> com a observação de devolução, permitindo ajustes e reenvio para aprovação — sem duplicar itens.
+              O pedido voltará ao solicitante como <span className="font-medium text-foreground">rascunho</span>, preservando todos os itens e edições já feitas. O solicitante poderá ajustar e reenviar para aprovação.
             </p>
             <div className="space-y-2">
               <Label>O que precisa ser ajustado? *</Label>
