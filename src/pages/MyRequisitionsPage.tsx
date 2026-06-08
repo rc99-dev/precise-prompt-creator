@@ -259,14 +259,17 @@ export default function MyRequisitionsPage() {
 
       // Delete old items and re-insert
       await supabase.from('requisition_items').delete().eq('requisition_id', editingId);
-      const itemsToInsert = validItems.map(i => ({
-        requisition_id: editingId,
-        product_id: i.product_id,
-        saldo: parseFloat(i.saldo) || 0,
-        pedido: parseFloat(i.pedido) || 0,
-        observacoes: i.observacoes || null,
-      }));
-      await supabase.from('requisition_items').insert(itemsToInsert);
+      const itemsToInsert = validItems
+        .filter(i => i.product_id)
+        .map(i => ({
+          requisition_id: editingId,
+          product_id: i.product_id,
+          saldo: parseFloat(i.saldo) || 0,
+          pedido: parseFloat(i.pedido) || 0,
+          observacoes: i.observacoes || null,
+        }));
+      const { error: upItemsErr } = await supabase.from('requisition_items').insert(itemsToInsert);
+      if (upItemsErr) { toast.error("Erro ao salvar itens: " + upItemsErr.message); setSaving(false); return; }
 
       toast.success("Solicitação atualizada!");
     } else {
