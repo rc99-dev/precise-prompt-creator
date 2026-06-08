@@ -259,14 +259,17 @@ export default function MyRequisitionsPage() {
 
       // Delete old items and re-insert
       await supabase.from('requisition_items').delete().eq('requisition_id', editingId);
-      const itemsToInsert = validItems.map(i => ({
-        requisition_id: editingId,
-        product_id: i.product_id,
-        saldo: parseFloat(i.saldo) || 0,
-        pedido: parseFloat(i.pedido) || 0,
-        observacoes: i.observacoes || null,
-      }));
-      await supabase.from('requisition_items').insert(itemsToInsert);
+      const itemsToInsert = validItems
+        .filter(i => i.product_id)
+        .map(i => ({
+          requisition_id: editingId,
+          product_id: i.product_id,
+          saldo: parseFloat(i.saldo) || 0,
+          pedido: parseFloat(i.pedido) || 0,
+          observacoes: i.observacoes || null,
+        }));
+      const { error: upItemsErr } = await supabase.from('requisition_items').insert(itemsToInsert);
+      if (upItemsErr) { toast.error("Erro ao salvar itens: " + upItemsErr.message); setSaving(false); return; }
 
       toast.success("Solicitação atualizada!");
     } else {
@@ -285,14 +288,22 @@ export default function MyRequisitionsPage() {
 
       if (error || !req) { toast.error(error?.message || "Erro ao criar solicitação."); setSaving(false); return; }
 
-      const itemsToInsert = validItems.map(i => ({
-        requisition_id: req.id,
-        product_id: i.product_id,
-        saldo: parseFloat(i.saldo) || 0,
-        pedido: parseFloat(i.pedido) || 0,
-        observacoes: i.observacoes || null,
-      }));
-      await supabase.from('requisition_items').insert(itemsToInsert);
+      const itemsToInsert = validItems
+        .filter(i => i.product_id)
+        .map(i => ({
+          requisition_id: req.id,
+          product_id: i.product_id,
+          saldo: parseFloat(i.saldo) || 0,
+          pedido: parseFloat(i.pedido) || 0,
+          observacoes: i.observacoes || null,
+        }));
+      const { error: itemsErr } = await supabase.from('requisition_items').insert(itemsToInsert);
+      if (itemsErr) {
+        toast.error("Erro ao salvar itens: " + itemsErr.message);
+        await supabase.from('requisitions').delete().eq('id', req.id);
+        setSaving(false);
+        return;
+      }
 
       const { data: buyers } = await supabase.from('user_roles').select('user_id').in('role', ['comprador', 'master']);
       if (buyers?.length) {
