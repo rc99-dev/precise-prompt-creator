@@ -513,14 +513,18 @@ export default function NewOrderPage() {
               try {
                 const results = await Promise.all(divergent.map(it =>
                   supabase.from('supplier_prices')
-                    .update({ preco_unitario: it.preco_unitario })
-                    .eq('product_id', it.product_id)
-                    .eq('supplier_id', it.supplier_id!)
+                    .upsert({
+                      product_id: it.product_id,
+                      supplier_id: it.supplier_id!,
+                      preco_unitario: it.preco_unitario,
+                    } as any, { onConflict: 'supplier_id,product_id' })
+                    .select('id')
                 ));
-                const failed = results.filter(r => r.error).length;
+                const failed = results.filter(r => r.error);
                 toast.dismiss(t);
-                if (failed > 0) {
-                  toast.error(`Falha ao atualizar ${failed} preço(s).`);
+                if (failed.length > 0) {
+                  console.error('Price update errors:', failed.map(f => f.error));
+                  toast.error(`Falha ao atualizar ${failed.length} preço(s): ${failed[0].error?.message || ''}`);
                 } else {
                   toast.success(`${divergent.length} preço(s) atualizado(s) na tabela!`);
                 }
@@ -531,6 +535,7 @@ export default function NewOrderPage() {
                 toast.error(`Erro: ${e?.message || 'desconhecido'}`);
               }
             },
+
           },
           cancel: { label: "Manter", onClick: () => {} },
         });
