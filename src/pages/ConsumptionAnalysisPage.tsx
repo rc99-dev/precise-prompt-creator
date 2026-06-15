@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, TrendingDown } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-const STATUSES_VALIDAS = ['aguardando_aprovacao', 'aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
+const STATUSES_VALIDAS = ['rascunho', 'aguardando_aprovacao', 'aprovado', 'emitido', 'recebido', 'recebido_com_ocorrencia'];
 
 type OrderRow = {
   id: string;
