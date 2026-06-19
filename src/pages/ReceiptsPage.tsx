@@ -13,8 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Truck, Package, CheckCircle, AlertTriangle, Clock, Ban, Eye } from "lucide-react";
+import { Truck, Package, CheckCircle, AlertTriangle, Clock, Ban, Eye, FileDown } from "lucide-react";
 import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
+import { generateOrderPDF } from "@/lib/pdfGenerator";
+import { resolveUserName } from "@/lib/userNames";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
