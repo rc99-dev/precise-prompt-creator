@@ -337,6 +337,7 @@ export default function ReceiptsPage() {
               >
                 <Eye className="h-4 w-4" />
               </Button>
+              <OrderAttachmentsButton orderId={o.id} orderNumero={o.numero} />
             </div>
           )}
         </div>
