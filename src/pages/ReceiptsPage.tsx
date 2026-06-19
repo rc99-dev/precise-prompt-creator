@@ -344,6 +344,15 @@ export default function ReceiptsPage() {
               >
                 <Eye className="h-4 w-4" />
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={(e) => { e.stopPropagation(); downloadOrderPDF(o); }}
+                title="Baixar PDF da ordem"
+              >
+                <FileDown className="h-4 w-4" />
+              </Button>
               <OrderAttachmentsButton orderId={o.id} orderNumero={o.numero} />
               {canCancel && (
                 <Button
