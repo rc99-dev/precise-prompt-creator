@@ -72,7 +72,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { to: "/precos", label: "Preços", icon: DollarSign, page: "precos" },
     { to: "/usuarios", label: "Usuários", icon: Users, page: "usuarios" },
     { to: "/relatorios", label: "Relatórios", icon: FileText, page: "relatorios" },
-    { to: "/pcp", label: "PCP - Produção", icon: Factory, page: "pcp" },
+    { to: "/admin/suprimentos/pcp", label: "PCP - Dashboard", icon: Factory, page: "pcp" },
+    { to: "/admin/suprimentos/pcp/compras", label: "PCP · Compras", icon: Factory, page: "pcp" },
+    { to: "/admin/suprimentos/pcp/rendimento", label: "PCP · Rendimento", icon: Factory, page: "pcp" },
+    { to: "/admin/suprimentos/pcp/estoque", label: "PCP · Estoque CDP", icon: Factory, page: "pcp" },
+    { to: "/admin/suprimentos/pcp/distribuicao", label: "PCP · Distribuição", icon: Factory, page: "pcp" },
+    { to: "/admin/suprimentos/pcp/rateio", label: "PCP · Rateio", icon: Factory, page: "pcp" },
+    { to: "/admin/suprimentos/pcp/reembolsos", label: "PCP · Reembolsos", icon: Factory, page: "pcp" },
+    { to: "/admin/suprimentos/pcp/validades", label: "PCP · Validades", icon: Factory, page: "pcp" },
+    { to: "/admin/suprimentos/pcp/producao", label: "PCP · Produção", icon: Factory, page: "pcp" },
+    { to: "/admin/suprimentos/pcp/relatorios", label: "PCP · Relatórios", icon: Factory, page: "pcp" },
   ];
 
   const navItems = allNavItems.filter(item => canAccess(role, item.page, customPermissions));
