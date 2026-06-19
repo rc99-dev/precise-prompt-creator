@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Building2, Package, DollarSign,
   ShoppingCart, History, BarChart3, LogOut, Menu,
   ClipboardList, CheckCircle, Truck, Users, FileText,
-  Bell, ChevronLeft, Boxes,
+  Bell, ChevronLeft, Boxes, Factory,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 
@@ -72,6 +72,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { to: "/precos", label: "Preços", icon: DollarSign, page: "precos" },
     { to: "/usuarios", label: "Usuários", icon: Users, page: "usuarios" },
     { to: "/relatorios", label: "Relatórios", icon: FileText, page: "relatorios" },
+    { to: "/pcp", label: "PCP - Produção", icon: Factory, page: "pcp" },
   ];
 
   const navItems = allNavItems.filter(item => canAccess(role, item.page, customPermissions));
