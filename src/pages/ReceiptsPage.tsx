@@ -19,6 +19,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import OrderDetailDialog from "@/components/order/OrderDetailDialog";
+import OrderAttachmentsButton from "@/components/order/OrderAttachmentsButton";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 
 type ReceiptOrder = {
@@ -308,6 +309,7 @@ export default function ReceiptsPage() {
               >
                 <Eye className="h-4 w-4" />
               </Button>
+              <OrderAttachmentsButton orderId={o.id} orderNumero={o.numero} />
               {canCancel && (
                 <Button
                   variant="ghost"
@@ -335,6 +337,7 @@ export default function ReceiptsPage() {
               >
                 <Eye className="h-4 w-4" />
               </Button>
+              <OrderAttachmentsButton orderId={o.id} orderNumero={o.numero} />
             </div>
           )}
         </div>

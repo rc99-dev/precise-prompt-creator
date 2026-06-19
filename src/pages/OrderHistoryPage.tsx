@@ -15,6 +15,7 @@ import { UNIDADES, TITULOS_SOLICITACAO } from "@/lib/constants";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import OrderDetailDialog from "@/components/order/OrderDetailDialog";
+import OrderAttachmentsButton from "@/components/order/OrderAttachmentsButton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -804,6 +805,9 @@ export default function OrderHistoryPage() {
                           </DropdownMenu>
                           <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)} title="Duplicar"><Copy className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => exportCSV(o)} title="CSV"><Download className="h-4 w-4" /></Button>
+                          {['aprovado','emitido','recebido','recebido_com_ocorrencia'].includes(o.status) && (
+                            <OrderAttachmentsButton orderId={o.id} orderNumero={o.numero} />
+                          )}
                           {o.status === 'emitido' && (
                             <Button variant="ghost" size="icon" onClick={() => { setPrevisaoTarget(o); setPrevisaoData(""); setPrevisaoObs(""); }} title="Registrar previsão de entrega">
                               <Calendar className="h-4 w-4 text-amber-400" />
