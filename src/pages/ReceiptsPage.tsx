@@ -19,6 +19,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import OrderDetailDialog from "@/components/order/OrderDetailDialog";
+import OrderAttachmentsButton from "@/components/order/OrderAttachmentsButton";
 import { invalidateOrderQueries } from "@/lib/queryInvalidation";
 
 type ReceiptOrder = {
