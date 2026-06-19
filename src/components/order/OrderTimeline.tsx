@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, formatDateTime } from "@/lib/helpers";
+import { resolveUserNames } from "@/lib/userNames";
 import {
   FileText, Send, CheckCircle2, XCircle, Ban, CalendarClock,
   PackageCheck, AlertTriangle, ClipboardList, Edit3,
