@@ -200,7 +200,7 @@ export default function PcpCrudTab({ config }: Props) {
       <Card>
         <CardContent className="p-0 overflow-x-auto">
           {isLoading ? (
-            <div className="p-4"><TableSkeleton rows={5} cols={tableCols.length + 1} /></div>
+            <div className="p-4"><TableSkeleton rows={5} columns={tableCols.length + 1} /></div>
           ) : filteredRows.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground text-sm">Nenhum registro encontrado.</div>
           ) : (
