@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { resolveUserNames } from "@/lib/userNames";
+import { resolveUserNames, resolveUserName } from "@/lib/userNames";
 import { UNIDADES } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
