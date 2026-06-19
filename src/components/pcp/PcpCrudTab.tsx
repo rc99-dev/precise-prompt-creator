@@ -22,7 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
-import { TableSkeleton } from "@/components/TableSkeleton";
+import TableSkeleton from "@/components/TableSkeleton";
 import { formatCurrency, formatDate } from "@/lib/helpers";
 import type { PcpCrudConfig, PcpField } from "@/lib/pcpConfig";
 
@@ -85,12 +85,13 @@ export default function PcpCrudTab({ config }: Props) {
           payload[f.name] = Boolean(payload[f.name]);
         }
       }
+      const client = supabase as any;
       if (editing) {
-        const { error } = await supabase.from(config.table).update(payload).eq("id", editing.id);
+        const { error } = await client.from(config.table).update(payload).eq("id", editing.id);
         if (error) throw error;
       } else {
         payload.user_id = user?.id;
-        const { error } = await supabase.from(config.table).insert(payload);
+        const { error } = await client.from(config.table).insert(payload);
         if (error) throw error;
       }
     },
