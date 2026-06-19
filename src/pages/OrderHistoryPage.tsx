@@ -805,6 +805,9 @@ export default function OrderHistoryPage() {
                           </DropdownMenu>
                           <Button variant="ghost" size="icon" onClick={() => duplicateOrder(o)} title="Duplicar"><Copy className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => exportCSV(o)} title="CSV"><Download className="h-4 w-4" /></Button>
+                          {['aprovado','emitido','recebido','recebido_com_ocorrencia'].includes(o.status) && (
+                            <OrderAttachmentsButton orderId={o.id} orderNumero={o.numero} />
+                          )}
                           {o.status === 'emitido' && (
                             <Button variant="ghost" size="icon" onClick={() => { setPrevisaoTarget(o); setPrevisaoData(""); setPrevisaoObs(""); }} title="Registrar previsão de entrega">
                               <Calendar className="h-4 w-4 text-amber-400" />
