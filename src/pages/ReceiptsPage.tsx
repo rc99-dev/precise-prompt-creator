@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { resolveUserNames } from "@/lib/userNames";
+import { resolveUserNames, resolveUserName } from "@/lib/userNames";
 import { UNIDADES } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,8 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Truck, Package, CheckCircle, AlertTriangle, Clock, Ban, Eye } from "lucide-react";
+import { Truck, Package, CheckCircle, AlertTriangle, Clock, Ban, Eye, FileDown } from "lucide-react";
 import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
+import { generateOrderPDF } from "@/lib/pdfGenerator";
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
@@ -265,6 +267,39 @@ export default function ReceiptsPage() {
     setDetailOpen(true);
   };
 
+  const downloadOrderPDF = async (o: ReceiptOrder) => {
+    const { data: items } = await supabase.from('purchase_order_items')
+      .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social, cnpj, telefone, cidade)')
+      .eq('order_id', o.id);
+    if (!items || items.length === 0) { toast.error("Sem itens para gerar PDF."); return; }
+    const buyerName = await resolveUserName(o.user_id);
+    const mainSupplier = (items[0] as any)?.suppliers;
+    generateOrderPDF({
+      numero: o.numero,
+      created_at: o.created_at,
+      observacoes: o.observacoes,
+      total: o.total,
+      unidadeSolicitante: (o as any).unidade_setor || o.unidade_comprador || undefined,
+      supplier: mainSupplier ? {
+        razao_social: mainSupplier.razao_social,
+        cnpj: mainSupplier.cnpj,
+        telefone: mainSupplier.telefone,
+        cidade: mainSupplier.cidade,
+      } : null,
+      items: (items as any[]).map(i => ({
+        codigo: i.products?.codigo_interno,
+        descricao: i.products?.nome || "",
+        unidade: i.products?.unidade_medida || "",
+        quantidade: i.quantidade,
+        preco_unitario: i.preco_unitario,
+        subtotal: i.subtotal,
+      })),
+      comprador: buyerName,
+    });
+    toast.success("PDF gerado!");
+  };
+
+
   const statusLabel = (s: string) => {
     const m: Record<string, string> = {
       rascunho: 'Rascunho', aguardando_aprovacao: 'Aguardando Aprovação',
@@ -309,6 +344,15 @@ export default function ReceiptsPage() {
               >
                 <Eye className="h-4 w-4" />
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={(e) => { e.stopPropagation(); downloadOrderPDF(o); }}
+                title="Baixar PDF da ordem"
+              >
+                <FileDown className="h-4 w-4" />
+              </Button>
               <OrderAttachmentsButton orderId={o.id} orderNumero={o.numero} />
               {canCancel && (
                 <Button
@@ -336,6 +380,15 @@ export default function ReceiptsPage() {
                 title="Ver detalhes e histórico"
               >
                 <Eye className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={(e) => { e.stopPropagation(); downloadOrderPDF(o); }}
+                title="Baixar PDF da ordem"
+              >
+                <FileDown className="h-4 w-4" />
               </Button>
               <OrderAttachmentsButton orderId={o.id} orderNumero={o.numero} />
             </div>
