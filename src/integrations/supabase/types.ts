@@ -201,6 +201,431 @@ export type Database = {
         }
         Relationships: []
       }
+      pcp_compras: {
+        Row: {
+          categoria: string
+          created_at: string
+          custo_geral: number | null
+          data: string
+          fornecedor: string | null
+          gelo: number | null
+          id: string
+          peso_bruto_kg: number | null
+          preco_unitario_kg: number | null
+          produto: string
+          servico_compra: number | null
+          servico_filetamento: number | null
+          servico_transporte: number | null
+          total_pecas: number | null
+          unidade_origem: string | null
+          updated_at: string
+          user_id: string | null
+          valor_total_compra: number | null
+        }
+        Insert: {
+          categoria: string
+          created_at?: string
+          custo_geral?: number | null
+          data: string
+          fornecedor?: string | null
+          gelo?: number | null
+          id?: string
+          peso_bruto_kg?: number | null
+          preco_unitario_kg?: number | null
+          produto: string
+          servico_compra?: number | null
+          servico_filetamento?: number | null
+          servico_transporte?: number | null
+          total_pecas?: number | null
+          unidade_origem?: string | null
+          updated_at?: string
+          user_id?: string | null
+          valor_total_compra?: number | null
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          custo_geral?: number | null
+          data?: string
+          fornecedor?: string | null
+          gelo?: number | null
+          id?: string
+          peso_bruto_kg?: number | null
+          preco_unitario_kg?: number | null
+          produto?: string
+          servico_compra?: number | null
+          servico_filetamento?: number | null
+          servico_transporte?: number | null
+          total_pecas?: number | null
+          unidade_origem?: string | null
+          updated_at?: string
+          user_id?: string | null
+          valor_total_compra?: number | null
+        }
+        Relationships: []
+      }
+      pcp_distribuicao: {
+        Row: {
+          created_at: string
+          custo_total: number | null
+          custo_unitario_kg: number | null
+          data: string
+          id: string
+          produto: string
+          quantidade_kg: number
+          unidade_destino: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          custo_total?: number | null
+          custo_unitario_kg?: number | null
+          data: string
+          id?: string
+          produto: string
+          quantidade_kg: number
+          unidade_destino: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          custo_total?: number | null
+          custo_unitario_kg?: number | null
+          data?: string
+          id?: string
+          produto?: string
+          quantidade_kg?: number
+          unidade_destino?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      pcp_estoque_cdp: {
+        Row: {
+          created_at: string
+          data: string
+          entrada_kg: number | null
+          estoque_final_kg: number | null
+          estoque_inicial_kg: number | null
+          id: string
+          inventario_kg: number | null
+          produto: string
+          saida_kg: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          data: string
+          entrada_kg?: number | null
+          estoque_final_kg?: number | null
+          estoque_inicial_kg?: number | null
+          id?: string
+          inventario_kg?: number | null
+          produto: string
+          saida_kg?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          data?: string
+          entrada_kg?: number | null
+          estoque_final_kg?: number | null
+          estoque_inicial_kg?: number | null
+          id?: string
+          inventario_kg?: number | null
+          produto?: string
+          saida_kg?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      pcp_producao: {
+        Row: {
+          cmv_total: number | null
+          cmv_unitario: number | null
+          created_at: string
+          data: string
+          id: string
+          observacoes: string | null
+          pct_perda: number | null
+          produto: string
+          quantidade_descartada_kg: number | null
+          quantidade_produzida_kg: number | null
+          quantidade_vendida_kg: number | null
+          unidade: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          cmv_total?: number | null
+          cmv_unitario?: number | null
+          created_at?: string
+          data: string
+          id?: string
+          observacoes?: string | null
+          pct_perda?: number | null
+          produto: string
+          quantidade_descartada_kg?: number | null
+          quantidade_produzida_kg?: number | null
+          quantidade_vendida_kg?: number | null
+          unidade: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          cmv_total?: number | null
+          cmv_unitario?: number | null
+          created_at?: string
+          data?: string
+          id?: string
+          observacoes?: string | null
+          pct_perda?: number | null
+          produto?: string
+          quantidade_descartada_kg?: number | null
+          quantidade_produzida_kg?: number | null
+          quantidade_vendida_kg?: number | null
+          unidade?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      pcp_rateio: {
+        Row: {
+          created_at: string
+          custo_chapa: number | null
+          custo_file: number | null
+          custo_final: number | null
+          custo_frita: number | null
+          custo_isca: number | null
+          data_ref: string
+          enviou_rateio: boolean | null
+          file_kg: number | null
+          id: string
+          isca_kg: number | null
+          posta_chapa_kg: number | null
+          posta_frita_kg: number | null
+          produto: string
+          total_enviado_kg: number | null
+          unidade_devedora: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          custo_chapa?: number | null
+          custo_file?: number | null
+          custo_final?: number | null
+          custo_frita?: number | null
+          custo_isca?: number | null
+          data_ref: string
+          enviou_rateio?: boolean | null
+          file_kg?: number | null
+          id?: string
+          isca_kg?: number | null
+          posta_chapa_kg?: number | null
+          posta_frita_kg?: number | null
+          produto: string
+          total_enviado_kg?: number | null
+          unidade_devedora: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          custo_chapa?: number | null
+          custo_file?: number | null
+          custo_final?: number | null
+          custo_frita?: number | null
+          custo_isca?: number | null
+          data_ref?: string
+          enviou_rateio?: boolean | null
+          file_kg?: number | null
+          id?: string
+          isca_kg?: number | null
+          posta_chapa_kg?: number | null
+          posta_frita_kg?: number | null
+          produto?: string
+          total_enviado_kg?: number | null
+          unidade_devedora?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      pcp_reembolsos: {
+        Row: {
+          created_at: string
+          custo_final: number | null
+          data_ref: string
+          data_solicitacao: string | null
+          descritivo: string
+          enviou_rateio: boolean | null
+          id: string
+          quantidade: string | null
+          unidade_devedora: string
+          unidade_origem: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          custo_final?: number | null
+          data_ref: string
+          data_solicitacao?: string | null
+          descritivo: string
+          enviou_rateio?: boolean | null
+          id?: string
+          quantidade?: string | null
+          unidade_devedora: string
+          unidade_origem: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          custo_final?: number | null
+          data_ref?: string
+          data_solicitacao?: string | null
+          descritivo?: string
+          enviou_rateio?: boolean | null
+          id?: string
+          quantidade?: string | null
+          unidade_devedora?: string
+          unidade_origem?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      pcp_rendimento: {
+        Row: {
+          casca_apara_kg: number | null
+          created_at: string
+          data: string
+          fornecedor: string | null
+          id: string
+          liquido_total_kg: number | null
+          pcp_compra_id: string | null
+          pct_acrescimo_valor: number | null
+          pct_casca: number | null
+          pct_perda: number | null
+          pct_rendimento: number | null
+          perda_kg: number | null
+          peso_bruto_kg: number | null
+          peso_liquido_kg: number | null
+          rejeito_final_kg: number | null
+          tipo_produto: string | null
+          unidade: string | null
+          updated_at: string
+          user_id: string | null
+          valor_final_kg: number | null
+          valor_inicial_kg: number | null
+        }
+        Insert: {
+          casca_apara_kg?: number | null
+          created_at?: string
+          data: string
+          fornecedor?: string | null
+          id?: string
+          liquido_total_kg?: number | null
+          pcp_compra_id?: string | null
+          pct_acrescimo_valor?: number | null
+          pct_casca?: number | null
+          pct_perda?: number | null
+          pct_rendimento?: number | null
+          perda_kg?: number | null
+          peso_bruto_kg?: number | null
+          peso_liquido_kg?: number | null
+          rejeito_final_kg?: number | null
+          tipo_produto?: string | null
+          unidade?: string | null
+          updated_at?: string
+          user_id?: string | null
+          valor_final_kg?: number | null
+          valor_inicial_kg?: number | null
+        }
+        Update: {
+          casca_apara_kg?: number | null
+          created_at?: string
+          data?: string
+          fornecedor?: string | null
+          id?: string
+          liquido_total_kg?: number | null
+          pcp_compra_id?: string | null
+          pct_acrescimo_valor?: number | null
+          pct_casca?: number | null
+          pct_perda?: number | null
+          pct_rendimento?: number | null
+          perda_kg?: number | null
+          peso_bruto_kg?: number | null
+          peso_liquido_kg?: number | null
+          rejeito_final_kg?: number | null
+          tipo_produto?: string | null
+          unidade?: string | null
+          updated_at?: string
+          user_id?: string | null
+          valor_final_kg?: number | null
+          valor_inicial_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pcp_rendimento_pcp_compra_id_fkey"
+            columns: ["pcp_compra_id"]
+            isOneToOne: false
+            referencedRelation: "pcp_compras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pcp_validades: {
+        Row: {
+          created_at: string
+          data_producao: string | null
+          data_validade: string
+          id: string
+          lote: string | null
+          produto: string
+          quantidade_kg: number | null
+          status: string
+          unidade: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          data_producao?: string | null
+          data_validade: string
+          id?: string
+          lote?: string | null
+          produto: string
+          quantidade_kg?: number | null
+          status?: string
+          unidade: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          data_producao?: string | null
+          data_validade?: string
+          id?: string
+          lote?: string | null
+          produto?: string
+          quantidade_kg?: number | null
+          status?: string
+          unidade?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       price_history: {
         Row: {
           changed_at: string
