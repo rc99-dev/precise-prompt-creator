@@ -1,11 +1,13 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Factory, LayoutDashboard, ShoppingCart, Scale, Boxes, Truck, Calculator, RefreshCcw, Clock, ChefHat, FileBarChart } from "lucide-react";
+import { Factory, LayoutDashboard, ShoppingCart, Scale, Boxes, Truck, Calculator, RefreshCcw, Clock, ChefHat, FileBarChart, Split, Warehouse } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const SUB_NAV = [
   { to: "", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "compras", label: "Compras", icon: ShoppingCart },
   { to: "rendimento", label: "Rendimento", icon: Scale },
+  { to: "cdp", label: "CDP", icon: Warehouse },
+  { to: "triagem", label: "Triagem", icon: Split },
   { to: "estoque", label: "Estoque CDP", icon: Boxes },
   { to: "distribuicao", label: "Distribuição", icon: Truck },
   { to: "rateio", label: "Rateio", icon: Calculator },
