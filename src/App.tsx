@@ -107,6 +107,8 @@ function ProtectedRoutes() {
             <Route path="compras" element={<PcpComprasPage />} />
             <Route path="rendimento" element={<PcpRendimentoPage />} />
             <Route path="estoque" element={<PcpEstoquePage />} />
+            <Route path="cdp" element={<PcpCdpPage />} />
+            <Route path="triagem" element={<PcpTriagemPage />} />
             <Route path="distribuicao" element={<PcpDistribuicaoPage />} />
             <Route path="rateio" element={<PcpRateioPage />} />
             <Route path="reembolsos" element={<PcpReembolsosPage />} />
