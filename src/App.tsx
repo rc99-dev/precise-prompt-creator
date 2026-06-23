@@ -38,6 +38,8 @@ import PcpReembolsosPage from "@/pages/admin/suprimentos/PcpReembolsosPage";
 import PcpValidadesPage from "@/pages/admin/suprimentos/PcpValidadesPage";
 import PcpProducaoPage from "@/pages/admin/suprimentos/PcpProducaoPage";
 import PcpRelatoriosPage from "@/pages/admin/suprimentos/PcpRelatoriosPage";
+import PcpTriagemPage from "@/pages/admin/suprimentos/PcpTriagemPage";
+import PcpCdpPage from "@/pages/admin/suprimentos/PcpCdpPage";
 import { canAccess } from "@/lib/helpers";
 
 const queryClient = new QueryClient();
