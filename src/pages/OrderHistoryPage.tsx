@@ -123,6 +123,30 @@ export default function OrderHistoryPage() {
     staleTime: 30 * 1000,
   });
 
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers-list-history'],
+    queryFn: async () => {
+      const { data } = await supabase.from('suppliers').select('id, razao_social').order('razao_social');
+      return (data || []) as { id: string; razao_social: string }[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: orderSupplierMap } = useQuery({
+    queryKey: ['order-supplier-map'],
+    queryFn: async () => {
+      const { data } = await supabase.from('purchase_order_items').select('order_id, supplier_id');
+      const map: Record<string, Set<string>> = {};
+      (data || []).forEach((row: any) => {
+        if (!row.supplier_id) return;
+        if (!map[row.order_id]) map[row.order_id] = new Set();
+        map[row.order_id].add(row.supplier_id);
+      });
+      return map;
+    },
+    staleTime: 30 * 1000,
+  });
+
   const titulosDisponiveis = useMemo(() => {
     const set = new Set<string>();
     orders.forEach(o => { if (o.titulo) set.add(o.titulo); });
@@ -134,6 +158,10 @@ export default function OrderHistoryPage() {
     if (search && !o.numero.toLowerCase().includes(search.toLowerCase())) return false;
     if (tituloFilter && o.titulo !== tituloFilter) return false;
     if (unidadeFilter !== 'todos' && o.unidade_setor !== unidadeFilter) return false;
+    if (supplierFilter !== 'todos') {
+      const set = orderSupplierMap?.[o.id];
+      if (!set || !set.has(supplierFilter)) return false;
+    }
     if (dateFrom && new Date(o.created_at) < new Date(`${dateFrom}T00:00:00`)) return false;
     if (dateTo && new Date(o.created_at) > new Date(`${dateTo}T23:59:59`)) return false;
     if (valorMin && o.total < parseFloat(valorMin)) return false;
