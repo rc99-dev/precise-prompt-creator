@@ -742,6 +742,18 @@ export default function OrderHistoryPage() {
               </Select>
             </div>
             <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Fornecedor</label>
+              <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent className="max-h-80">
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {suppliers.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.razao_social}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Buscar por NF</label>
               <Input placeholder="Nº da nota fiscal" value={nfSearch} onChange={e => setNfSearch(e.target.value)} />
             </div>
@@ -762,7 +774,7 @@ export default function OrderHistoryPage() {
             </div>
             <div className="flex items-end">
               <Button variant="ghost" size="sm" onClick={() => {
-                setTituloFilter(''); setUnidadeFilter('todos'); setNfSearch('');
+                setTituloFilter(''); setUnidadeFilter('todos'); setSupplierFilter('todos'); setNfSearch('');
                 setDateFrom(''); setDateTo(''); setValorMin(''); setValorMax('');
               }}>Limpar filtros</Button>
             </div>
