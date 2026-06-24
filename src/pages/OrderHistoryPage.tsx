@@ -46,16 +46,32 @@ type OrderItem = {
 };
 
 const fetchOrders = async () => {
-  const [{ data: orders, error }, { data: profiles }, { data: linkedReqs }] = await Promise.all([
-    supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }),
+  // Paginate purchase_orders to bypass PostgREST default 1000-row cap
+  const pageSize = 1000;
+  let from = 0;
+  const allOrders: any[] = [];
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data, error } = await supabase
+      .from('purchase_orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const rows = data || [];
+    allOrders.push(...rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  const [{ data: profiles }, { data: linkedReqs }] = await Promise.all([
     supabase.from('profiles').select('user_id, full_name'),
     supabase.from('requisitions').select('order_id').not('order_id', 'is', null),
   ]);
-  if (error) throw error;
   const profileMap: Record<string, string> = {};
   (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p.full_name; });
   const reqOrderIds = new Set((linkedReqs || []).map((r: any) => r.order_id));
-  return (orders || []).map((o: any) => ({
+  return allOrders.map((o: any) => ({
     ...o,
     comprador_nome: profileMap[o.user_id] || '—',
     has_requisition: reqOrderIds.has(o.id),
@@ -135,16 +151,31 @@ export default function OrderHistoryPage() {
   const { data: orderSupplierMap } = useQuery({
     queryKey: ['order-supplier-map'],
     queryFn: async () => {
-      const { data } = await supabase.from('purchase_order_items').select('order_id, supplier_id');
       const map: Record<string, Set<string>> = {};
-      (data || []).forEach((row: any) => {
-        if (!row.supplier_id) return;
-        if (!map[row.order_id]) map[row.order_id] = new Set();
-        map[row.order_id].add(row.supplier_id);
-      });
+      const pageSize = 1000;
+      let from = 0;
+      // Paginate to bypass PostgREST default 1000-row cap
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await supabase
+          .from('purchase_order_items')
+          .select('order_id, supplier_id')
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const rows = data || [];
+        rows.forEach((row: any) => {
+          if (!row.supplier_id) return;
+          if (!map[row.order_id]) map[row.order_id] = new Set();
+          map[row.order_id].add(row.supplier_id);
+        });
+        if (rows.length < pageSize) break;
+        from += pageSize;
+      }
       return map;
     },
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const titulosDisponiveis = useMemo(() => {
