@@ -135,16 +135,31 @@ export default function OrderHistoryPage() {
   const { data: orderSupplierMap } = useQuery({
     queryKey: ['order-supplier-map'],
     queryFn: async () => {
-      const { data } = await supabase.from('purchase_order_items').select('order_id, supplier_id');
       const map: Record<string, Set<string>> = {};
-      (data || []).forEach((row: any) => {
-        if (!row.supplier_id) return;
-        if (!map[row.order_id]) map[row.order_id] = new Set();
-        map[row.order_id].add(row.supplier_id);
-      });
+      const pageSize = 1000;
+      let from = 0;
+      // Paginate to bypass PostgREST default 1000-row cap
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await supabase
+          .from('purchase_order_items')
+          .select('order_id, supplier_id')
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const rows = data || [];
+        rows.forEach((row: any) => {
+          if (!row.supplier_id) return;
+          if (!map[row.order_id]) map[row.order_id] = new Set();
+          map[row.order_id].add(row.supplier_id);
+        });
+        if (rows.length < pageSize) break;
+        from += pageSize;
+      }
       return map;
     },
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const titulosDisponiveis = useMemo(() => {
