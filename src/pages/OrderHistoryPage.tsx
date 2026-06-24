@@ -71,6 +71,7 @@ export default function OrderHistoryPage() {
   const [nfSearch, setNfSearch] = useState("");
   const [tituloFilter, setTituloFilter] = useState("");
   const [unidadeFilter, setUnidadeFilter] = useState("todos");
+  const [supplierFilter, setSupplierFilter] = useState("todos");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [valorMin, setValorMin] = useState("");
