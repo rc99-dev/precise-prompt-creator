@@ -50,6 +50,7 @@ export default function MyRequisitionsPage() {
   const [saving, setSaving] = useState(false);
   const [invImportOpen, setInvImportOpen] = useState(false);
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
+  const [detailReq, setDetailReq] = useState<Requisition | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-requisitions', user?.id],
@@ -69,10 +70,19 @@ export default function MyRequisitionsPage() {
       const reqIds = (reqs || []).map(r => r.id);
       let reqItems: any[] = [];
       if (reqIds.length > 0) {
-        const { data: ri } = await supabase.from('requisition_items')
-          .select('id, requisition_id, product_id, saldo, pedido, observacoes, products(nome, unidade_medida)')
-          .in('requisition_id', reqIds);
-        reqItems = ri || [];
+        // Paginate to bypass PostgREST 1000-row cap
+        const pageSize = 1000;
+        let from = 0;
+        while (true) {
+          const { data: page } = await supabase.from('requisition_items')
+            .select('id, requisition_id, product_id, saldo, pedido, observacoes, products(nome, unidade_medida)')
+            .in('requisition_id', reqIds)
+            .range(from, from + pageSize - 1);
+          const rows = page || [];
+          reqItems.push(...rows);
+          if (rows.length < pageSize) break;
+          from += pageSize;
+        }
       }
 
       const enriched = (reqs || []).map((r: any) => ({
@@ -87,7 +97,9 @@ export default function MyRequisitionsPage() {
       };
     },
     enabled: !!user,
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const requisitions = data?.requisitions || [];
@@ -98,24 +110,26 @@ export default function MyRequisitionsPage() {
   useEffect(() => {
     if (!editId || !data) return;
     const req = requisitions.find(r => r.id === editId);
-    if (!req) {
+    (async () => {
+      if (req) {
+        loadReqIntoForm(req, req.requisition_items || []);
+        setSearchParams({}, { replace: true });
+        return;
+      }
       // Requisition might belong to another user — try fetching it
-      (async () => {
-        const { data: reqData } = await supabase.from('requisitions')
-          .select('id, titulo, unidade, setor, observacoes')
-          .eq('id', editId).single();
-        const { data: reqItems } = await supabase.from('requisition_items')
-          .select('product_id, saldo, pedido, observacoes, products(nome, unidade_medida)')
-          .eq('requisition_id', editId);
-        if (reqData) {
-          loadReqIntoForm(reqData, reqItems || []);
-        }
-      })();
-    } else {
-      loadReqIntoForm(req, req.requisition_items || []);
-    }
-    // Clear edit param from URL
-    setSearchParams({}, { replace: true });
+      const { data: reqData } = await supabase.from('requisitions')
+        .select('id, titulo, unidade, setor, observacoes')
+        .eq('id', editId).single();
+      const { data: reqItems } = await supabase.from('requisition_items')
+        .select('product_id, saldo, pedido, observacoes, products(nome, unidade_medida)')
+        .eq('requisition_id', editId);
+      if (reqData) {
+        loadReqIntoForm(reqData, reqItems || []);
+      } else {
+        toast.error("Solicitação não encontrada ou sem permissão.");
+      }
+      setSearchParams({}, { replace: true });
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, data]);
 
