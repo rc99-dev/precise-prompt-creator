@@ -256,7 +256,14 @@ export default function RequisitionsPage() {
                         </Badge>
                       </td>
                       <td className="py-3 px-4 text-right space-x-1">
-                        <Button size="sm" variant="ghost" onClick={() => setDetailReq(r)} title="Ver itens">
+                        <Button size="sm" variant="ghost" onClick={async () => {
+                          setDetailReq(r);
+                          // Always fetch fresh items so the modal never shows a stale/empty snapshot
+                          const { data: fresh } = await supabase.from('requisition_items')
+                            .select('id, requisition_id, product_id, saldo, pedido, observacoes, destino, triagem_em, products(nome, unidade_medida)')
+                            .eq('requisition_id', r.id);
+                          setDetailReq({ ...r, requisition_items: (fresh || []) as any });
+                        }} title="Ver itens">
                           <Eye className="h-3 w-3" />
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => handlePDF(r)} title="Gerar PDF">
