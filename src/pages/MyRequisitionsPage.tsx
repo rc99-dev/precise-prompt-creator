@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, ClipboardList, X, Search, FileText, Boxes } from "lucide-react";
+import { Plus, ClipboardList, X, Search, FileText, Boxes, Eye, Pencil } from "lucide-react";
 import InventoryImportDialog from "@/components/InventoryImportDialog";
 import { formatDate, statusLabels } from "@/lib/helpers";
 import { generateRequisitionPDF } from "@/lib/pdfGenerator";
@@ -50,6 +50,7 @@ export default function MyRequisitionsPage() {
   const [saving, setSaving] = useState(false);
   const [invImportOpen, setInvImportOpen] = useState(false);
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
+  const [detailReq, setDetailReq] = useState<Requisition | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-requisitions', user?.id],
@@ -69,10 +70,19 @@ export default function MyRequisitionsPage() {
       const reqIds = (reqs || []).map(r => r.id);
       let reqItems: any[] = [];
       if (reqIds.length > 0) {
-        const { data: ri } = await supabase.from('requisition_items')
-          .select('id, requisition_id, product_id, saldo, pedido, observacoes, products(nome, unidade_medida)')
-          .in('requisition_id', reqIds);
-        reqItems = ri || [];
+        // Paginate to bypass PostgREST 1000-row cap
+        const pageSize = 1000;
+        let from = 0;
+        while (true) {
+          const { data: page } = await supabase.from('requisition_items')
+            .select('id, requisition_id, product_id, saldo, pedido, observacoes, products(nome, unidade_medida)')
+            .in('requisition_id', reqIds)
+            .range(from, from + pageSize - 1);
+          const rows = page || [];
+          reqItems.push(...rows);
+          if (rows.length < pageSize) break;
+          from += pageSize;
+        }
       }
 
       const enriched = (reqs || []).map((r: any) => ({
@@ -87,7 +97,9 @@ export default function MyRequisitionsPage() {
       };
     },
     enabled: !!user,
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const requisitions = data?.requisitions || [];
@@ -98,24 +110,26 @@ export default function MyRequisitionsPage() {
   useEffect(() => {
     if (!editId || !data) return;
     const req = requisitions.find(r => r.id === editId);
-    if (!req) {
+    (async () => {
+      if (req) {
+        loadReqIntoForm(req, req.requisition_items || []);
+        setSearchParams({}, { replace: true });
+        return;
+      }
       // Requisition might belong to another user — try fetching it
-      (async () => {
-        const { data: reqData } = await supabase.from('requisitions')
-          .select('id, titulo, unidade, setor, observacoes')
-          .eq('id', editId).single();
-        const { data: reqItems } = await supabase.from('requisition_items')
-          .select('product_id, saldo, pedido, observacoes, products(nome, unidade_medida)')
-          .eq('requisition_id', editId);
-        if (reqData) {
-          loadReqIntoForm(reqData, reqItems || []);
-        }
-      })();
-    } else {
-      loadReqIntoForm(req, req.requisition_items || []);
-    }
-    // Clear edit param from URL
-    setSearchParams({}, { replace: true });
+      const { data: reqData } = await supabase.from('requisitions')
+        .select('id, titulo, unidade, setor, observacoes')
+        .eq('id', editId).single();
+      const { data: reqItems } = await supabase.from('requisition_items')
+        .select('product_id, saldo, pedido, observacoes, products(nome, unidade_medida)')
+        .eq('requisition_id', editId);
+      if (reqData) {
+        loadReqIntoForm(reqData, reqItems || []);
+      } else {
+        toast.error("Solicitação não encontrada ou sem permissão.");
+      }
+      setSearchParams({}, { replace: true });
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, data]);
 
@@ -560,7 +574,21 @@ export default function MyRequisitionsPage() {
                       <td className="py-3 px-4 text-center">{r.requisition_items?.length || 0}</td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{formatDate(r.created_at)}</td>
                       <td className="py-3 px-4 text-center">{statusBadge(r.status)}</td>
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3 px-4 text-right space-x-1">
+                        <Button size="sm" variant="ghost" onClick={async () => {
+                          // Always refetch items fresh so the modal never shows a stale/empty snapshot
+                          const { data: fresh } = await supabase.from('requisition_items')
+                            .select('id, requisition_id, product_id, saldo, pedido, observacoes, products(nome, unidade_medida)')
+                            .eq('requisition_id', r.id);
+                          setDetailReq({ ...r, requisition_items: (fresh || []) as any });
+                        }} title="Ver itens">
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                        {r.status === 'pendente' && (
+                          <Button size="sm" variant="ghost" onClick={() => setSearchParams({ edit: r.id }, { replace: true })} title="Editar">
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        )}
                         <Button size="sm" variant="ghost" onClick={async () => {
                           if (!r.requisition_items?.length) { toast.error("Solicitação sem itens."); return; }
                           const { data: profile } = await supabase.from('profiles').select('full_name').eq('user_id', user!.id).single();
@@ -618,18 +646,45 @@ export default function MyRequisitionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog open={confirmSubmitOpen} onOpenChange={setConfirmSubmitOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Confirmar envio da solicitação</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Confirma o envio da solicitação <strong>{titulo}</strong> para <strong>{unidade}</strong>?
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmSubmitOpen(false)}>Cancelar</Button>
-            <Button onClick={executeSubmit} disabled={saving}>
-              {saving ? "Enviando..." : "Confirmar envio"}
-            </Button>
-          </DialogFooter>
+      <Dialog open={!!detailReq} onOpenChange={() => setDetailReq(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{detailReq?.titulo || 'Solicitação'}</DialogTitle></DialogHeader>
+          {detailReq && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="text-muted-foreground">Unidade:</span> {detailReq.unidade}</div>
+                <div><span className="text-muted-foreground">Setor:</span> {detailReq.setor}</div>
+                <div><span className="text-muted-foreground">Data:</span> {formatDate(detailReq.created_at)}</div>
+                <div><span className="text-muted-foreground">Status:</span> {statusLabels[detailReq.status] || detailReq.status}</div>
+              </div>
+              {(detailReq.requisition_items || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Solicitação sem itens.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 font-medium text-muted-foreground">Produto</th>
+                      <th className="text-left py-2 font-medium text-muted-foreground">Unidade</th>
+                      <th className="text-right py-2 font-medium text-muted-foreground">Saldo</th>
+                      <th className="text-right py-2 font-medium text-muted-foreground">Pedido</th>
+                      <th className="text-left py-2 font-medium text-muted-foreground">Obs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(detailReq.requisition_items || []).map(i => (
+                      <tr key={i.id} className="border-b last:border-0">
+                        <td className="py-2">{(i.products as any)?.nome || '—'}</td>
+                        <td className="py-2 text-muted-foreground">{(i.products as any)?.unidade_medida || '—'}</td>
+                        <td className="py-2 text-right">{i.saldo}</td>
+                        <td className="py-2 text-right">{i.pedido || '—'}</td>
+                        <td className="py-2 text-muted-foreground text-xs">{i.observacoes || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
       <InventoryImportDialog
