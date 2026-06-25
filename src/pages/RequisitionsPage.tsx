@@ -35,7 +35,7 @@ export default function RequisitionsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [statusFilter, setStatusFilter] = useState("pendente");
+  const [statusFilter, setStatusFilter] = useState("todos");
   const [search, setSearch] = useState("");
   const [rejectDialog, setRejectDialog] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -55,9 +55,30 @@ export default function RequisitionsPage() {
       const userIds = [...new Set(reqs.map(r => r.user_id))];
       const reqIds = reqs.map(r => r.id);
 
-      const [{ data: profiles }, { data: items }] = await Promise.all([
-        userIds.length > 0 ? supabase.from('profiles').select('user_id, full_name').in('user_id', userIds) : { data: [] },
-        reqIds.length > 0 ? supabase.from('requisition_items').select('id, requisition_id, product_id, saldo, pedido, observacoes, destino, triagem_em, products(nome, unidade_medida)').in('requisition_id', reqIds) : { data: [] },
+      // Paginate requisition_items to bypass PostgREST 1000-row default cap
+      const fetchAllItems = async () => {
+        if (reqIds.length === 0) return [];
+        const pageSize = 1000;
+        let from = 0;
+        const all: any[] = [];
+        while (true) {
+          const { data: page, error: pErr } = await supabase
+            .from('requisition_items')
+            .select('id, requisition_id, product_id, saldo, pedido, observacoes, destino, triagem_em, products(nome, unidade_medida)')
+            .in('requisition_id', reqIds)
+            .range(from, from + pageSize - 1);
+          if (pErr) throw pErr;
+          const rows = page || [];
+          all.push(...rows);
+          if (rows.length < pageSize) break;
+          from += pageSize;
+        }
+        return all;
+      };
+
+      const [{ data: profiles }, items] = await Promise.all([
+        userIds.length > 0 ? supabase.from('profiles').select('user_id, full_name').in('user_id', userIds) : Promise.resolve({ data: [] }),
+        fetchAllItems(),
       ]);
 
       const profileMap: Record<string, string> = {};
@@ -69,7 +90,9 @@ export default function RequisitionsPage() {
         requisition_items: (items || []).filter((i: any) => i.requisition_id === r.id),
       })) as Requisition[];
     },
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const filtered = requisitions.filter(r =>
