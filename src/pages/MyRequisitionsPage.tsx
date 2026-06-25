@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, ClipboardList, X, Search, FileText, Boxes } from "lucide-react";
+import { Plus, ClipboardList, X, Search, FileText, Boxes, Eye, Pencil } from "lucide-react";
 import InventoryImportDialog from "@/components/InventoryImportDialog";
 import { formatDate, statusLabels } from "@/lib/helpers";
 import { generateRequisitionPDF } from "@/lib/pdfGenerator";
