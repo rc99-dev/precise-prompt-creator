@@ -35,6 +35,8 @@ type Order = {
   unidade_setor?: string | null;
   has_requisition?: boolean;
   titulo?: string | null;
+  previsao_entrega?: string | null;
+  obs_estoquista?: string | null;
 };
 
 type OrderItem = {
@@ -322,7 +324,13 @@ export default function OrderHistoryPage() {
     const events: TimelineEntry[] = [];
     events.push({ date: order.created_at, user: nameMap[order.user_id] || '—', action: 'Pedido criado' });
     (logs || []).forEach((l: any) => {
-      const map: Record<string, string> = { aprovado: 'Aprovado', aprovado_com_alteracao: 'Aprovado com alteração', rejeitado: 'Rejeitado', cancelado: 'Cancelado', enviado: 'Enviado para aprovação', aguardando_aprovacao: 'Enviado para aprovação' };
+      const map: Record<string, string> = {
+        aprovado: 'Aprovado', aprovado_com_alteracao: 'Aprovado com alteração',
+        rejeitado: 'Rejeitado', cancelado: 'Cancelado',
+        enviado: 'Enviado para aprovação', aguardando_aprovacao: 'Enviado para aprovação',
+        previsao_registrada: 'Previsão de entrega registrada',
+        previsao_alterada: 'Previsão de entrega alterada',
+      };
       events.push({ date: l.created_at, user: nameMap[l.user_id] || '—', action: map[l.action] || l.action, detail: l.motivo || undefined });
     });
     if (receipt) {
@@ -508,33 +516,37 @@ export default function OrderHistoryPage() {
   const handleSalvarPrevisao = async () => {
     if (!previsaoTarget || !previsaoData) { toast.error("Informe a data prevista."); return; }
     setSavingPrevisao(true);
-    console.info('[previsao] salvando', {
-      orderId: previsaoTarget.id,
-      numero: previsaoTarget.numero,
-      previsaoData,
-      previsaoObs,
-    });
+    const isUpdate = !!previsaoTarget.previsao_entrega;
+    const dataAnterior = previsaoTarget.previsao_entrega || null;
     const { error: updErr } = await supabase.from('purchase_orders').update({
       previsao_entrega: previsaoData,
       obs_estoquista: previsaoObs || null,
       previsao_registrada_por: user?.id || null,
     } as any).eq('id', previsaoTarget.id);
     if (updErr) {
-      console.error('[previsao] erro ao salvar', updErr);
       toast.error(`Erro ao salvar previsão: ${updErr.message}`);
       setSavingPrevisao(false);
       return;
     }
+    // Log no histórico (aparece no PDF e na timeline)
+    await supabase.from('approval_log').insert({
+      order_id: previsaoTarget.id,
+      user_id: user?.id,
+      action: isUpdate ? 'previsao_alterada' : 'previsao_registrada',
+      motivo: isUpdate
+        ? `Previsão alterada de ${dataAnterior ? new Date(dataAnterior + 'T00:00:00').toLocaleDateString('pt-BR') : '—'} para ${new Date(previsaoData + 'T00:00:00').toLocaleDateString('pt-BR')}${previsaoObs ? ` — ${previsaoObs}` : ''}`
+        : `Previsão registrada para ${new Date(previsaoData + 'T00:00:00').toLocaleDateString('pt-BR')}${previsaoObs ? ` — ${previsaoObs}` : ''}`,
+    } as any);
     const { data: estoquistas } = await supabase.from('user_roles').select('user_id').eq('role', 'estoquista');
     if (estoquistas?.length) {
       await supabase.from('notifications').insert(estoquistas.map(e => ({
         user_id: e.user_id,
-        titulo: 'Previsão de entrega registrada',
-        mensagem: `Pedido ${previsaoTarget.numero} — Entrega prevista para ${new Date(previsaoData).toLocaleDateString('pt-BR')}. ${previsaoObs || ''}`,
+        titulo: isUpdate ? 'Previsão de entrega alterada' : 'Previsão de entrega registrada',
+        mensagem: `Pedido ${previsaoTarget.numero} — Entrega prevista para ${new Date(previsaoData + 'T00:00:00').toLocaleDateString('pt-BR')}. ${previsaoObs || ''}`,
         tipo: 'info', lida: false,
       })));
     }
-    toast.success("Previsão registrada! Assistente de suprimentos notificado.");
+    toast.success(isUpdate ? "Previsão atualizada!" : "Previsão registrada! Assistente de suprimentos notificado.");
     setSavingPrevisao(false);
     setPrevisaoTarget(null);
     setPrevisaoData("");
@@ -881,8 +893,19 @@ export default function OrderHistoryPage() {
                             <OrderAttachmentsButton orderId={o.id} orderNumero={o.numero} />
                           )}
                           {o.status === 'emitido' && (
-                            <Button variant="ghost" size="icon" onClick={() => { setPrevisaoTarget(o); setPrevisaoData(""); setPrevisaoObs(""); }} title="Registrar previsão de entrega">
-                              <Calendar className="h-4 w-4 text-amber-400" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setPrevisaoTarget(o);
+                                setPrevisaoData(o.previsao_entrega || "");
+                                setPrevisaoObs(o.obs_estoquista || "");
+                              }}
+                              title={o.previsao_entrega
+                                ? `Previsão já registrada: ${new Date(o.previsao_entrega + 'T00:00:00').toLocaleDateString('pt-BR')} — clique para alterar`
+                                : "Registrar previsão de entrega"}
+                            >
+                              <Calendar className={`h-4 w-4 ${o.previsao_entrega ? 'text-success' : 'text-amber-400'}`} />
                             </Button>
                           )}
                           {o.status === 'rascunho' && (
@@ -928,9 +951,25 @@ export default function OrderHistoryPage() {
 
       <Dialog open={!!previsaoTarget} onOpenChange={(open) => !open && setPrevisaoTarget(null)}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Registrar previsão de entrega</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>
+              {previsaoTarget?.previsao_entrega ? "Alterar previsão de entrega" : "Registrar previsão de entrega"}
+            </DialogTitle>
+          </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="text-sm text-muted-foreground">Pedido: <span className="font-medium text-foreground">{previsaoTarget?.numero}</span></div>
+            {previsaoTarget?.previsao_entrega && (
+              <div className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm">
+                <p className="font-medium text-success">Previsão já registrada</p>
+                <p className="text-foreground/80">
+                  Data atual: <strong>{new Date(previsaoTarget.previsao_entrega + 'T00:00:00').toLocaleDateString('pt-BR')}</strong>
+                </p>
+                {previsaoTarget.obs_estoquista && (
+                  <p className="text-xs text-muted-foreground mt-1">Obs: {previsaoTarget.obs_estoquista}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">Você pode alterar a data abaixo se necessário.</p>
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Data prevista de entrega *</label>
               <Input type="date" value={previsaoData} onChange={e => setPrevisaoData(e.target.value)} />
@@ -942,7 +981,7 @@ export default function OrderHistoryPage() {
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setPrevisaoTarget(null)}>Cancelar</Button>
               <Button onClick={handleSalvarPrevisao} disabled={savingPrevisao}>
-                {savingPrevisao ? "Salvando..." : "Confirmar e notificar assistente"}
+                {savingPrevisao ? "Salvando..." : (previsaoTarget?.previsao_entrega ? "Atualizar previsão" : "Confirmar e notificar")}
               </Button>
             </div>
           </div>

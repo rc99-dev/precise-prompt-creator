@@ -10,13 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Pencil, Trash2, Upload, Download } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Upload, Download, History } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CsvImportModal from "@/components/CsvImportModal";
 import { productsImportConfig } from "@/lib/csvConfigs";
 import TableSkeleton from "@/components/TableSkeleton";
 import QueryError from "@/components/QueryError";
 import ProductsExportDialog from "@/components/ProductsExportDialog";
+import ProductPriceHistoryDialog from "@/components/ProductPriceHistoryDialog";
 
 type Product = {
   id: string; nome: string; codigo_interno: string | null; categoria: string | null;
@@ -38,6 +39,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [historyTarget, setHistoryTarget] = useState<Product | null>(null);
 
   const { data: products = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['products', statusFilter],
@@ -142,7 +144,7 @@ export default function ProductsPage() {
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Categoria</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Unidade</th>
                     <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
-                    {isAdmin && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>}
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -157,10 +159,19 @@ export default function ProductsPage() {
                       <td className="py-3 px-4 text-center">
                         <Badge variant={p.status === 'ativo' ? 'default' : 'secondary'}>{p.status === 'ativo' ? 'Ativo' : 'Inativo'}</Badge>
                       </td>
-                      {isAdmin && (
+                      {isAdmin ? (
                         <td className="py-3 px-4 text-right space-x-1">
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => setHistoryTarget(p)} title="Histórico de preços">
+                            <History className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(p)} title="Editar"><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </td>
+                      ) : (
+                        <td className="py-3 px-4 text-right">
+                          <Button variant="ghost" size="icon" onClick={() => setHistoryTarget(p)} title="Histórico de preços">
+                            <History className="h-4 w-4" />
+                          </Button>
                         </td>
                       )}
                     </tr>
@@ -239,6 +250,12 @@ export default function ProductsPage() {
 
       <CsvImportModal config={productsImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={invalidate} />
       <ProductsExportDialog open={exportOpen} onOpenChange={setExportOpen} categories={categories} />
+      <ProductPriceHistoryDialog
+        open={!!historyTarget}
+        onOpenChange={(o) => { if (!o) setHistoryTarget(null); }}
+        productId={historyTarget?.id || null}
+        productName={historyTarget?.nome || ""}
+      />
     </div>
   );
 }

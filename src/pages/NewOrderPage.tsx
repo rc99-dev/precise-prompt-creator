@@ -68,6 +68,8 @@ export default function NewOrderPage() {
   const [observacoes, setObservacoes] = useState("");
   const [unidadeSolicitante, setUnidadeSolicitante] = useState("");
   const [titulo, setTitulo] = useState("");
+  const [previsaoEntrega, setPrevisaoEntrega] = useState("");
+  const [previsaoRegistrada, setPrevisaoRegistrada] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const [confirmApprovalOpen, setConfirmApprovalOpen] = useState(false);
@@ -165,7 +167,7 @@ export default function NewOrderPage() {
             .eq('order_id', editOrderId),
           supabase
             .from('purchase_orders')
-            .select('observacoes, modo, unidade_setor, titulo')
+            .select('observacoes, modo, unidade_setor, titulo, previsao_entrega')
             .eq('id', editOrderId)
             .single(),
           supabase
@@ -207,6 +209,10 @@ export default function NewOrderPage() {
           if (order?.observacoes) setObservacoes(order.observacoes);
           if (order?.unidade_setor) setUnidadeSolicitante(order.unidade_setor);
           if ((order as any)?.titulo) setTitulo((order as any).titulo);
+          if ((order as any)?.previsao_entrega) {
+            setPrevisaoEntrega((order as any).previsao_entrega);
+            setPrevisaoRegistrada(true);
+          }
           if (order?.modo === 'melhor_preco' || order?.modo === 'melhor_fornecedor') {
             setActiveStrategy(order.modo as any);
           }
@@ -448,9 +454,11 @@ export default function NewOrderPage() {
         }
       }
 
-      const { error: updateErr } = await supabase.from('purchase_orders').update({
+      const updatePayload: any = {
         modo, status, observacoes, total, unidade_setor: unidadeSolicitante || null, titulo,
-      } as any).eq('id', editOrderId);
+      };
+      if (previsaoEntrega) updatePayload.previsao_entrega = previsaoEntrega;
+      const { error: updateErr } = await supabase.from('purchase_orders').update(updatePayload).eq('id', editOrderId);
       if (updateErr) { toast.error(updateErr.message); setSaving(false); return; }
 
       const orderItems = dedupeOrderItemsByProduct(items).map(i => ({
@@ -465,10 +473,12 @@ export default function NewOrderPage() {
       const { data: numData } = await supabase.rpc('generate_order_number');
       const numero = numData || `PED-${Date.now()}`;
       const modo = activeStrategy || 'manual';
-      const { data: order, error: orderError } = await supabase.from('purchase_orders').insert({
+      const insertPayload: any = {
         numero, user_id: user!.id, modo, status, observacoes, total,
         unidade_setor: unidadeSolicitante || null, titulo,
-      } as any).select().single();
+      };
+      if (previsaoEntrega) insertPayload.previsao_entrega = previsaoEntrega;
+      const { data: order, error: orderError } = await supabase.from('purchase_orders').insert(insertPayload).select().single();
       if (orderError) { toast.error(orderError.message); setSaving(false); return; }
       const orderItems = dedupeOrderItemsByProduct(items).map(i => ({
         order_id: order.id, product_id: i.product_id, supplier_id: i.supplier_id || null,
@@ -785,8 +795,29 @@ export default function NewOrderPage() {
 
       <Card>
         <CardHeader className="py-3 px-4"><CardTitle className="text-base">Observações Gerais</CardTitle></CardHeader>
-        <CardContent className="px-4 pb-4 pt-0">
+        <CardContent className="px-4 pb-4 pt-0 space-y-3">
           <Textarea placeholder="Observações sobre o pedido..." value={observacoes} onChange={e => setObservacoes(e.target.value)} rows={3} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium flex items-center gap-2">
+                Previsão de entrega
+                {previsaoRegistrada && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/15 text-success font-medium">
+                    já registrada
+                  </span>
+                )}
+              </label>
+              <input
+                type="date"
+                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                value={previsaoEntrega}
+                onChange={e => setPrevisaoEntrega(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Opcional. Se preenchida, será mostrada na tela de emitido com indicação verde e seguirá para o recebimento.
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
