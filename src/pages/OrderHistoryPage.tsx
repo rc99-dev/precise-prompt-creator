@@ -324,7 +324,13 @@ export default function OrderHistoryPage() {
     const events: TimelineEntry[] = [];
     events.push({ date: order.created_at, user: nameMap[order.user_id] || '—', action: 'Pedido criado' });
     (logs || []).forEach((l: any) => {
-      const map: Record<string, string> = { aprovado: 'Aprovado', aprovado_com_alteracao: 'Aprovado com alteração', rejeitado: 'Rejeitado', cancelado: 'Cancelado', enviado: 'Enviado para aprovação', aguardando_aprovacao: 'Enviado para aprovação' };
+      const map: Record<string, string> = {
+        aprovado: 'Aprovado', aprovado_com_alteracao: 'Aprovado com alteração',
+        rejeitado: 'Rejeitado', cancelado: 'Cancelado',
+        enviado: 'Enviado para aprovação', aguardando_aprovacao: 'Enviado para aprovação',
+        previsao_registrada: 'Previsão de entrega registrada',
+        previsao_alterada: 'Previsão de entrega alterada',
+      };
       events.push({ date: l.created_at, user: nameMap[l.user_id] || '—', action: map[l.action] || l.action, detail: l.motivo || undefined });
     });
     if (receipt) {
