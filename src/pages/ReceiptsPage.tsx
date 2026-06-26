@@ -373,15 +373,18 @@ export default function ReceiptsPage() {
               >
                 <Eye className="h-4 w-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2"
-                onClick={(e) => { e.stopPropagation(); downloadOrderPDF(o); }}
-                title="Baixar PDF da ordem"
-              >
-                <FileDown className="h-4 w-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={e => e.stopPropagation()} title="Baixar PDF">
+                    <FileDown className="h-4 w-4" />
+                    <ChevronDown className="h-3 w-3 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                  <DropdownMenuItem onClick={() => downloadOrderPDF(o, false)}>PDF consolidado</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => downloadOrderPDF(o, true)}>PDF por fornecedor</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <OrderAttachmentsButton orderId={o.id} orderNumero={o.numero} />
               {canCancel && (
                 <Button
@@ -410,15 +413,18 @@ export default function ReceiptsPage() {
               >
                 <Eye className="h-4 w-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2"
-                onClick={(e) => { e.stopPropagation(); downloadOrderPDF(o); }}
-                title="Baixar PDF da ordem"
-              >
-                <FileDown className="h-4 w-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={e => e.stopPropagation()} title="Baixar PDF">
+                    <FileDown className="h-4 w-4" />
+                    <ChevronDown className="h-3 w-3 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                  <DropdownMenuItem onClick={() => downloadOrderPDF(o, false)}>PDF consolidado</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => downloadOrderPDF(o, true)}>PDF por fornecedor</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <OrderAttachmentsButton orderId={o.id} orderNumero={o.numero} />
             </div>
           )}
