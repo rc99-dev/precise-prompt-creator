@@ -795,8 +795,29 @@ export default function NewOrderPage() {
 
       <Card>
         <CardHeader className="py-3 px-4"><CardTitle className="text-base">Observações Gerais</CardTitle></CardHeader>
-        <CardContent className="px-4 pb-4 pt-0">
+        <CardContent className="px-4 pb-4 pt-0 space-y-3">
           <Textarea placeholder="Observações sobre o pedido..." value={observacoes} onChange={e => setObservacoes(e.target.value)} rows={3} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium flex items-center gap-2">
+                Previsão de entrega
+                {previsaoRegistrada && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/15 text-success font-medium">
+                    já registrada
+                  </span>
+                )}
+              </label>
+              <input
+                type="date"
+                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                value={previsaoEntrega}
+                onChange={e => setPrevisaoEntrega(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Opcional. Se preenchida, será mostrada na tela de emitido com indicação verde e seguirá para o recebimento.
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
