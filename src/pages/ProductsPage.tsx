@@ -144,7 +144,7 @@ export default function ProductsPage() {
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Categoria</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Unidade</th>
                     <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
-                    {isAdmin && <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>}
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -250,6 +250,12 @@ export default function ProductsPage() {
 
       <CsvImportModal config={productsImportConfig} open={csvOpen} onOpenChange={setCsvOpen} onComplete={invalidate} />
       <ProductsExportDialog open={exportOpen} onOpenChange={setExportOpen} categories={categories} />
+      <ProductPriceHistoryDialog
+        open={!!historyTarget}
+        onOpenChange={(o) => { if (!o) setHistoryTarget(null); }}
+        productId={historyTarget?.id || null}
+        productName={historyTarget?.nome || ""}
+      />
     </div>
   );
 }
