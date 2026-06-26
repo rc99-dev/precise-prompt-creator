@@ -65,6 +65,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { to: "/aprovacoes", label: "Aprovações", icon: CheckCircle, page: "aprovacoes", badge: pendingApprovals },
     { to: "/recebimentos", label: "Recebimentos", icon: Truck, page: "recebimentos" },
     { to: "/historico", label: "Histórico", icon: History, page: "historico" },
+    { to: "/historico-produto", label: "Histórico por Produto", icon: Package, page: "historico-produto" },
     { to: "/analise-consumo", label: "Análise de Consumo", icon: BarChart3, page: "analise-consumo" },
     { to: "/comparativo-financeiro", label: "Comparativo Financeiro", icon: DollarSign, page: "comparativo-financeiro" },
     { to: "/fornecedores", label: "Fornecedores", icon: Building2, page: "fornecedores" },
