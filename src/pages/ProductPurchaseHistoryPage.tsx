@@ -310,7 +310,7 @@ export default function ProductPurchaseHistoryPage() {
                 Selecione pelo menos um produto para ver o histórico de compras.
               </div>
             ) : loadingRows || isFetching ? (
-              <TableSkeleton rows={6} cols={7} />
+              <TableSkeleton rows={6} />
             ) : rows.length === 0 ? (
               <div className="text-center text-muted-foreground py-16">
                 Nenhuma compra encontrada com os filtros aplicados.
