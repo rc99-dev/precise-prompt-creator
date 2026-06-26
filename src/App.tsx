@@ -12,6 +12,7 @@ import ProductsPage from "@/pages/ProductsPage";
 import PricesPage from "@/pages/PricesPage";
 import NewOrderPage from "@/pages/NewOrderPage";
 import OrderHistoryPage from "@/pages/OrderHistoryPage";
+import ProductPurchaseHistoryPage from "@/pages/ProductPurchaseHistoryPage";
 import ConsumptionAnalysisPage from "@/pages/ConsumptionAnalysisPage";
 import FinancialComparisonPage from "@/pages/FinancialComparisonPage";
 import ComparativePage from "@/pages/ComparativePage";
@@ -91,6 +92,7 @@ function ProtectedRoutes() {
         {canOrLoading('precos') && <Route path="/precos" element={<PricesPage />} />}
         {canOrLoading('nova-ordem') && <Route path="/nova-ordem" element={<NewOrderPage />} />}
         {canOrLoading('historico') && <Route path="/historico" element={<OrderHistoryPage />} />}
+        {canOrLoading('historico-produto') && <Route path="/historico-produto" element={<ProductPurchaseHistoryPage />} />}
         {canOrLoading('analise-consumo') && <Route path="/analise-consumo" element={<ConsumptionAnalysisPage />} />}
         {canOrLoading('comparativo-financeiro') && <Route path="/comparativo-financeiro" element={<FinancialComparisonPage />} />}
         {canOrLoading('comparativo') && <Route path="/comparativo" element={<ComparativePage />} />}
