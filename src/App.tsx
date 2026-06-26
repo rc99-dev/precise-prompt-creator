@@ -12,6 +12,7 @@ import ProductsPage from "@/pages/ProductsPage";
 import PricesPage from "@/pages/PricesPage";
 import NewOrderPage from "@/pages/NewOrderPage";
 import OrderHistoryPage from "@/pages/OrderHistoryPage";
+import ProductPurchaseHistoryPage from "@/pages/ProductPurchaseHistoryPage";
 import ConsumptionAnalysisPage from "@/pages/ConsumptionAnalysisPage";
 import FinancialComparisonPage from "@/pages/FinancialComparisonPage";
 import ComparativePage from "@/pages/ComparativePage";
