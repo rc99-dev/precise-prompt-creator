@@ -13,9 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Truck, Package, CheckCircle, AlertTriangle, Clock, Ban, Eye, FileDown } from "lucide-react";
+import { Truck, Package, CheckCircle, AlertTriangle, Clock, Ban, Eye, FileDown, ChevronDown } from "lucide-react";
 import { formatCurrency, formatDate, statusColors } from "@/lib/helpers";
-import { generateOrderPDF } from "@/lib/pdfGenerator";
+import { generateOrderPDF, generateOrderPDFBySupplier } from "@/lib/pdfGenerator";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
@@ -267,12 +268,40 @@ export default function ReceiptsPage() {
     setDetailOpen(true);
   };
 
-  const downloadOrderPDF = async (o: ReceiptOrder) => {
+  const downloadOrderPDF = async (o: ReceiptOrder, bySupplier = false) => {
     const { data: items } = await supabase.from('purchase_order_items')
       .select('*, products(nome, unidade_medida, codigo_interno), suppliers(razao_social, cnpj, telefone, cidade)')
       .eq('order_id', o.id);
     if (!items || items.length === 0) { toast.error("Sem itens para gerar PDF."); return; }
     const buyerName = await resolveUserName(o.user_id);
+
+    if (bySupplier) {
+      generateOrderPDFBySupplier({
+        numero: o.numero,
+        created_at: o.created_at,
+        observacoes: o.observacoes,
+        unidadeSolicitante: (o as any).unidade_setor || o.unidade_comprador || undefined,
+        items: (items as any[]).map(i => ({
+          codigo: i.products?.codigo_interno,
+          descricao: i.products?.nome || "",
+          unidade: i.products?.unidade_medida || "",
+          quantidade: i.quantidade,
+          preco_unitario: i.preco_unitario,
+          subtotal: i.subtotal,
+          supplier_id: i.supplier_id,
+          supplier_info: i.suppliers ? {
+            razao_social: i.suppliers.razao_social,
+            cnpj: i.suppliers.cnpj,
+            telefone: i.suppliers.telefone,
+            cidade: i.suppliers.cidade,
+          } : null,
+        })),
+        comprador: buyerName,
+      });
+      toast.success("PDF por fornecedor gerado!");
+      return;
+    }
+
     const mainSupplier = (items[0] as any)?.suppliers;
     generateOrderPDF({
       numero: o.numero,
