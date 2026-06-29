@@ -148,6 +148,27 @@ export default function UsersPage() {
     setShowCleanupConfirm(false);
   };
 
+  const handleDeleteUser = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { user_id: deleteTarget.user_id },
+      });
+      if (error || (data as any)?.error) {
+        toast.error(`Erro ao excluir: ${(data as any)?.error || error?.message}`);
+      } else {
+        toast.success(`Usuário ${deleteTarget.full_name} excluído.`);
+        queryClient.invalidateQueries({ queryKey: ['users-list'] });
+        setDeleteTarget(null);
+      }
+    } catch (e: any) {
+      toast.error(`Erro ao excluir: ${e?.message || e}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
