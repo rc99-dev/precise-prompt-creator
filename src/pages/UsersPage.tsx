@@ -34,6 +34,8 @@ export default function UsersPage() {
   const [editPermissions, setEditPermissions] = useState<Record<string, boolean>>({});
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
   const [cleaningUp, setCleaningUp] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [approveRole, setApproveRole] = useState<AppRole>('solicitante');
 
   const { data: users = [], isLoading, isError, refetch } = useQuery({
