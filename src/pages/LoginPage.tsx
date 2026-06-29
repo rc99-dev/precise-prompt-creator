@@ -56,6 +56,33 @@ export default function LoginPage() {
     setLoading(false);
   };
 
+  const handleQuickLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data: resolvedEmail, error: rpcError } = await supabase.rpc(
+        'get_email_by_name' as any,
+        { _name: quickName.trim() }
+      );
+      if (rpcError) { toast.error(rpcError.message); return; }
+      if (!resolvedEmail) { toast.error("Usuário não encontrado"); return; }
+      const { error } = await supabase.auth.signInWithPassword({
+        email: resolvedEmail as string,
+        password: quickPassword,
+      });
+      if (error) {
+        const msg = (error.message || '').toLowerCase();
+        if (msg.includes('invalid') || msg.includes('credenc')) {
+          toast.error("Senha incorreta");
+        } else {
+          toast.error(error.message);
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
