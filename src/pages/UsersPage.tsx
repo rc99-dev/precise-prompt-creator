@@ -54,7 +54,7 @@ export default function UsersPage() {
   });
 
   const pendingUsers = users.filter(u => u.status === 'pendente');
-  const activeUsers = users.filter(u => u.status !== 'pendente');
+  const activeUsers = users.filter(u => u.status === 'ativo');
   const filtered = activeUsers.filter(u =>
     u.full_name.toLowerCase().includes(search.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(search.toLowerCase())
@@ -152,13 +152,14 @@ export default function UsersPage() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('delete-user', {
-        body: { user_id: deleteTarget.user_id },
-      });
-      if (error || (data as any)?.error) {
-        toast.error(`Erro ao excluir: ${(data as any)?.error || error?.message}`);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: 'inativo' } as any)
+        .eq('user_id', deleteTarget.user_id);
+      if (error) {
+        toast.error(`Erro ao excluir: ${error.message}`);
       } else {
-        toast.success(`Usuário ${deleteTarget.full_name} excluído.`);
+        toast.success(`Usuário ${deleteTarget.full_name} desativado.`);
         queryClient.invalidateQueries({ queryKey: ['users-list'] });
         setDeleteTarget(null);
       }
