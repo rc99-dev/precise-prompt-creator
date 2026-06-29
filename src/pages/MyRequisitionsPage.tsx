@@ -70,18 +70,21 @@ export default function MyRequisitionsPage() {
       const reqIds = (reqs || []).map(r => r.id);
       let reqItems: any[] = [];
       if (reqIds.length > 0) {
-        // Paginate to bypass PostgREST 1000-row cap
+        const idChunkSize = 100;
         const pageSize = 1000;
-        let from = 0;
-        while (true) {
-          const { data: page } = await supabase.from('requisition_items')
-            .select('id, requisition_id, product_id, saldo, pedido, observacoes, products(nome, unidade_medida)')
-            .in('requisition_id', reqIds)
-            .range(from, from + pageSize - 1);
-          const rows = page || [];
-          reqItems.push(...rows);
-          if (rows.length < pageSize) break;
-          from += pageSize;
+        for (let i = 0; i < reqIds.length; i += idChunkSize) {
+          const chunk = reqIds.slice(i, i + idChunkSize);
+          let from = 0;
+          while (true) {
+            const { data: page } = await supabase.from('requisition_items')
+              .select('id, requisition_id, product_id, saldo, pedido, observacoes, products(nome, unidade_medida)')
+              .in('requisition_id', chunk)
+              .range(from, from + pageSize - 1);
+            const rows = page || [];
+            reqItems.push(...rows);
+            if (rows.length < pageSize) break;
+            from += pageSize;
+          }
         }
       }
 
