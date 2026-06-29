@@ -34,6 +34,8 @@ export default function UsersPage() {
   const [editPermissions, setEditPermissions] = useState<Record<string, boolean>>({});
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
   const [cleaningUp, setCleaningUp] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [approveRole, setApproveRole] = useState<AppRole>('solicitante');
 
   const { data: users = [], isLoading, isError, refetch } = useQuery({
@@ -146,6 +148,27 @@ export default function UsersPage() {
     setShowCleanupConfirm(false);
   };
 
+  const handleDeleteUser = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { user_id: deleteTarget.user_id },
+      });
+      if (error || (data as any)?.error) {
+        toast.error(`Erro ao excluir: ${(data as any)?.error || error?.message}`);
+      } else {
+        toast.success(`Usuário ${deleteTarget.full_name} excluído.`);
+        queryClient.invalidateQueries({ queryKey: ['users-list'] });
+        setDeleteTarget(null);
+      }
+    } catch (e: any) {
+      toast.error(`Erro ao excluir: ${e?.message || e}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -239,7 +262,10 @@ export default function UsersPage() {
                         <Badge variant="outline">{roleLabels[u.role || 'solicitante']}</Badge>
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(u)}><Pencil className="h-4 w-4" /></Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(u)} title="Editar"><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(u)} title="Excluir usuário" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -319,6 +345,23 @@ export default function UsersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá excluir permanentemente <strong>{deleteTarget?.full_name}</strong> ({deleteTarget?.email}), incluindo seu acesso, perfil e permissões. Os registros históricos (solicitações, ordens, etc.) são preservados. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUser} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={showCleanupConfirm} onOpenChange={setShowCleanupConfirm}>
         <AlertDialogContent>
