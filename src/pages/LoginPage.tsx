@@ -102,8 +102,9 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="login">Entrar</TabsTrigger>
+              <TabsTrigger value="quick">Acesso Rápido</TabsTrigger>
               <TabsTrigger value="register">Criar conta</TabsTrigger>
             </TabsList>
             <TabsContent value="login">
