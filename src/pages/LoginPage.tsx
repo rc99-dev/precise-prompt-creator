@@ -149,6 +149,35 @@ export default function LoginPage() {
                 </Button>
               </form>
             </TabsContent>
+            <TabsContent value="quick">
+              <form onSubmit={handleQuickLogin} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="quick-name">Nome de usuário</Label>
+                  <Input
+                    id="quick-name"
+                    value={quickName}
+                    onChange={e => setQuickName(e.target.value)}
+                    required
+                    placeholder="Ex: EMILLY SILVA"
+                    autoComplete="username"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="quick-password">Senha</Label>
+                  <Input
+                    id="quick-password"
+                    type="password"
+                    value={quickPassword}
+                    onChange={e => setQuickPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Entrando..." : "Entrar"}
+                </Button>
+              </form>
+            </TabsContent>
             <TabsContent value="register">
               <form onSubmit={handleSignUp} className="space-y-4 mt-4">
                 <div className="space-y-2">
