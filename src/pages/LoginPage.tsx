@@ -14,6 +14,22 @@ const SIGNUP_SETORES = [
   'DIRETORIA', 'GENTE & GESTÃO', 'FINANCEIRO', 'MARKETING', 'PROCESSOS & CONTROLADORIA',
 ] as const;
 
+const buildQuickLoginEmailCandidates = (resolvedEmail: string) => {
+  const normalizedEmail = resolvedEmail.trim().toLowerCase();
+  const [localPart, domain] = normalizedEmail.split('@');
+  const candidates = [normalizedEmail];
+
+  if (localPart && domain === 'pointdoacai.com.br') {
+    candidates.push(`${localPart}@grupopointdoacai.com.br`);
+  }
+
+  if (localPart && domain === 'grupopointdoacai.com.br') {
+    candidates.push(`${localPart}@pointdoacai.com.br`);
+  }
+
+  return Array.from(new Set(candidates));
+};
+
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -75,18 +91,34 @@ export default function LoginPage() {
         toast.error("Usuário não encontrado");
         return;
       }
-      const emailRetornado = (resolvedEmail as string).trim();
-      const { error } = await supabase.auth.signInWithPassword({
-        email: emailRetornado,
-        password: quickPassword,
-      });
-      if (error) {
-        console.error('[login] erro signIn:', error);
+      const emailCandidates = buildQuickLoginEmailCandidates(resolvedEmail as string);
+      let lastError: any = null;
+
+      for (const emailRetornado of emailCandidates) {
+        console.log('[login] tentando email:', emailRetornado);
+        const { error } = await supabase.auth.signInWithPassword({
+          email: emailRetornado,
+          password: quickPassword,
+        });
+
+        if (!error) return;
+
+        lastError = error;
         const msg = (error.message || '').toLowerCase();
-        if (msg.includes('invalid') || msg.includes('credenc')) {
+        const code = String((error as any).code || '').toLowerCase();
+        if (!msg.includes('invalid') && !msg.includes('credenc') && code !== 'invalid_credentials') {
+          break;
+        }
+      }
+
+      if (lastError) {
+        console.error('[login] erro signIn:', lastError);
+        const msg = (lastError.message || '').toLowerCase();
+        const code = String(lastError.code || '').toLowerCase();
+        if (msg.includes('invalid') || msg.includes('credenc') || code === 'invalid_credentials') {
           toast.error("Senha incorreta");
         } else {
-          toast.error(error.message);
+          toast.error(lastError.message);
         }
       }
     } finally {
