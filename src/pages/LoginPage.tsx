@@ -18,6 +18,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [quickName, setQuickName] = useState("");
+  const [quickPassword, setQuickPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [unidade, setUnidade] = useState("");
   const [setor, setSetor] = useState("");
@@ -52,6 +54,33 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) toast.error(error.message);
     setLoading(false);
+  };
+
+  const handleQuickLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data: resolvedEmail, error: rpcError } = await supabase.rpc(
+        'get_email_by_name' as any,
+        { _name: quickName.trim() }
+      );
+      if (rpcError) { toast.error(rpcError.message); return; }
+      if (!resolvedEmail) { toast.error("Usuário não encontrado"); return; }
+      const { error } = await supabase.auth.signInWithPassword({
+        email: resolvedEmail as string,
+        password: quickPassword,
+      });
+      if (error) {
+        const msg = (error.message || '').toLowerCase();
+        if (msg.includes('invalid') || msg.includes('credenc')) {
+          toast.error("Senha incorreta");
+        } else {
+          toast.error(error.message);
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -100,8 +129,9 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="login">Entrar</TabsTrigger>
+              <TabsTrigger value="quick">Acesso Rápido</TabsTrigger>
               <TabsTrigger value="register">Criar conta</TabsTrigger>
             </TabsList>
             <TabsContent value="login">
@@ -113,6 +143,35 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <Label htmlFor="login-password">Senha</Label>
                   <Input id="login-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Entrando..." : "Entrar"}
+                </Button>
+              </form>
+            </TabsContent>
+            <TabsContent value="quick">
+              <form onSubmit={handleQuickLogin} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="quick-name">Nome de usuário</Label>
+                  <Input
+                    id="quick-name"
+                    value={quickName}
+                    onChange={e => setQuickName(e.target.value)}
+                    required
+                    placeholder="Ex: EMILLY SILVA"
+                    autoComplete="username"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="quick-password">Senha</Label>
+                  <Input
+                    id="quick-password"
+                    type="password"
+                    value={quickPassword}
+                    onChange={e => setQuickPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Entrando..." : "Entrar"}
