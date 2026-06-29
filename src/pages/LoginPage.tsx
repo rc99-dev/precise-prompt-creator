@@ -60,17 +60,28 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      const nome = quickName.trim();
       const { data: resolvedEmail, error: rpcError } = await supabase.rpc(
         'get_email_by_name' as any,
-        { _name: quickName.trim() }
+        { _name: nome }
       );
-      if (rpcError) { toast.error(rpcError.message); return; }
-      if (!resolvedEmail) { toast.error("Usuário não encontrado"); return; }
+      console.log('[login] email resolvido:', resolvedEmail);
+      if (rpcError) {
+        console.error('[login] erro RPC:', rpcError);
+        toast.error(rpcError.message);
+        return;
+      }
+      if (!resolvedEmail || typeof resolvedEmail !== 'string') {
+        toast.error("Usuário não encontrado");
+        return;
+      }
+      const emailRetornado = (resolvedEmail as string).trim();
       const { error } = await supabase.auth.signInWithPassword({
-        email: resolvedEmail as string,
+        email: emailRetornado,
         password: quickPassword,
       });
       if (error) {
+        console.error('[login] erro signIn:', error);
         const msg = (error.message || '').toLowerCase();
         if (msg.includes('invalid') || msg.includes('credenc')) {
           toast.error("Senha incorreta");
