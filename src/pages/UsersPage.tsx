@@ -346,6 +346,23 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá excluir permanentemente <strong>{deleteTarget?.full_name}</strong> ({deleteTarget?.email}), incluindo seu acesso, perfil e permissões. Os registros históricos (solicitações, ordens, etc.) são preservados. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUser} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={showCleanupConfirm} onOpenChange={setShowCleanupConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
