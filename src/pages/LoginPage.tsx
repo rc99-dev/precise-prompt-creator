@@ -18,6 +18,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [quickName, setQuickName] = useState("");
+  const [quickPassword, setQuickPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [unidade, setUnidade] = useState("");
   const [setor, setSetor] = useState("");
