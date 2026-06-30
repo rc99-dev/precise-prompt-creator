@@ -32,7 +32,8 @@ type Requisition = {
 };
 
 export default function RequisitionsPage() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isSolicitante = role === 'solicitante';
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("todos");
@@ -275,23 +276,29 @@ export default function RequisitionsPage() {
                         </Button>
                         {r.status === 'pendente' && (
                           <>
-                            <Button size="sm" variant="outline" onClick={() => handleInclude(r.id)}>
-                              <ShoppingCart className="h-3 w-3 mr-1" />Incluir
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => handleEdit(r.id)} title="Editar">
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setRejectDialog(r.id)}>
-                              <X className="h-3 w-3 mr-1" />Recusar
-                            </Button>
+                            {!isSolicitante && (
+                              <Button size="sm" variant="outline" onClick={() => handleInclude(r.id)}>
+                                <ShoppingCart className="h-3 w-3 mr-1" />Incluir
+                              </Button>
+                            )}
+                            {(!isSolicitante || r.user_id === user?.id) && (
+                              <>
+                                <Button size="sm" variant="ghost" onClick={() => handleEdit(r.id)} title="Editar">
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setRejectDialog(r.id)}>
+                                  <X className="h-3 w-3 mr-1" />Recusar
+                                </Button>
+                              </>
+                            )}
                           </>
                         )}
-                        {r.status === 'recusada' && (
+                        {r.status === 'recusada' && (!isSolicitante || r.user_id === user?.id) && (
                           <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(r.id)} title="Excluir">
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         )}
-                        {r.status === 'incluida_no_pedido' && (
+                        {(r.status === 'incluida_no_pedido' || isSolicitante) && (
                           <Button size="sm" variant="ghost" onClick={() => handleDuplicate(r)} title="Duplicar">
                             <Copy className="h-3 w-3 mr-1" />Duplicar
                           </Button>
