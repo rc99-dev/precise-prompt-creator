@@ -96,6 +96,7 @@ export default function UsersPage() {
   const openEdit = (u: UserProfile) => {
     setEditDialog(u);
     setEditName(u.full_name || '');
+    setEditEmail(u.email || '');
     setEditRole(u.role || 'solicitante');
     setEditSetor(u.unidade_setor || '');
     setEditUnidade(u.unidade || '');
