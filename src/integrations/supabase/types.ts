@@ -1403,6 +1403,10 @@ export type Database = {
         }
         Returns: string
       }
+      admin_update_email: {
+        Args: { _new_email: string; _user_id: string }
+        Returns: undefined
+      }
       admin_update_password: {
         Args: { _new_password: string; _user_id: string }
         Returns: undefined

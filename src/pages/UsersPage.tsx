@@ -44,6 +44,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [editDialog, setEditDialog] = useState<UserProfile | null>(null);
   const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editRole, setEditRole] = useState<AppRole>('solicitante');
   const [editSetor, setEditSetor] = useState("");
   const [editUnidade, setEditUnidade] = useState("");
@@ -95,6 +96,7 @@ export default function UsersPage() {
   const openEdit = (u: UserProfile) => {
     setEditDialog(u);
     setEditName(u.full_name || '');
+    setEditEmail(u.email || '');
     setEditRole(u.role || 'solicitante');
     setEditSetor(u.unidade_setor || '');
     setEditUnidade(u.unidade || '');
@@ -127,6 +129,14 @@ export default function UsersPage() {
         hasCustom = true;
       }
     });
+
+    const trimmedEmail = editEmail.trim().toLowerCase();
+    if (trimmedEmail && trimmedEmail !== (editDialog.email || '').toLowerCase()) {
+      const { error: emailErr } = await supabase.rpc('admin_update_email' as any, {
+        _user_id: editDialog.user_id, _new_email: trimmedEmail,
+      });
+      if (emailErr) { toast.error(`Erro ao alterar e-mail: ${emailErr.message}`); return; }
+    }
 
     await supabase.from('user_roles').update({ role: editRole } as any).eq('user_id', editDialog.user_id);
     await supabase.from('profiles').update({
@@ -419,7 +429,7 @@ export default function UsersPage() {
           <DialogHeader><DialogTitle>Editar Usuário</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2"><Label>Nome completo</Label><Input value={editName} onChange={e => setEditName(e.target.value)} /></div>
-            <div className="space-y-2"><Label>E-mail</Label><Input value={editDialog?.email || ''} disabled /></div>
+            <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} /></div>
             <div className="space-y-2">
               <Label>Perfil de Acesso</Label>
               <Select value={editRole} onValueChange={v => handleRoleChangeInEdit(v as AppRole)}>
