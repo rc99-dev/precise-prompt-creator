@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, X, Search, Trash2, Boxes, Send, FileDown, Pencil, ShieldCheck, KeyRound } from "lucide-react";
+import { Plus, X, Search, Trash2, Boxes, Send, FileDown, Pencil, ShieldCheck, KeyRound, Copy } from "lucide-react";
 import { formatDate } from "@/lib/helpers";
 import { generateInventoryPDF } from "@/lib/pdfGenerator";
 import { resolveUserNames } from "@/lib/userNames";
