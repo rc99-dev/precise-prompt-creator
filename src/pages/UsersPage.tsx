@@ -265,7 +265,7 @@ export default function UsersPage() {
           setor: String(r['Setor'] || '').trim() || null,
           role,
           status: String(r['Status'] || 'ativo').trim() || 'ativo',
-          action: existing ? 'update' : 'create',
+          action: (existing ? 'update' : 'create') as 'create' | 'update',
           existing,
         };
       }).filter(r => r.email && r.full_name);
