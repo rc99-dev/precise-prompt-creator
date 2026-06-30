@@ -130,6 +130,14 @@ export default function UsersPage() {
       }
     });
 
+    const trimmedEmail = editEmail.trim().toLowerCase();
+    if (trimmedEmail && trimmedEmail !== (editDialog.email || '').toLowerCase()) {
+      const { error: emailErr } = await supabase.rpc('admin_update_email' as any, {
+        _user_id: editDialog.user_id, _new_email: trimmedEmail,
+      });
+      if (emailErr) { toast.error(`Erro ao alterar e-mail: ${emailErr.message}`); return; }
+    }
+
     await supabase.from('user_roles').update({ role: editRole } as any).eq('user_id', editDialog.user_id);
     await supabase.from('profiles').update({
       full_name: editName.trim() || editDialog.full_name,
