@@ -32,7 +32,8 @@ type Requisition = {
 };
 
 export default function RequisitionsPage() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isSolicitante = role === 'solicitante';
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("todos");
