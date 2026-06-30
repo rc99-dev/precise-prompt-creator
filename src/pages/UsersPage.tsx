@@ -44,6 +44,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [editDialog, setEditDialog] = useState<UserProfile | null>(null);
   const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editRole, setEditRole] = useState<AppRole>('solicitante');
   const [editSetor, setEditSetor] = useState("");
   const [editUnidade, setEditUnidade] = useState("");
