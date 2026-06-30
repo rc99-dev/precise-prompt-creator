@@ -14,6 +14,17 @@ export const TITULOS_SOLICITACAO = [
   'Pedido de Artesanato', 'Pedido de Sobremesa', 'Pedido de Sorvete', 'Pedido de Vinhos',
 ] as const;
 
+// Títulos usados especificamente para inventários — mesmo mapeamento de categoria dos pedidos.
+export const TITULOS_INVENTARIO = [
+  'Inventário de Açaí', 'Inventário de Aves', 'Inventário de Bebidas Alcoólicas', 'Inventário de Bebidas Não Alcoólicas',
+  'Inventário de Cervejas e Chopp', 'Inventário de Congelados', 'Inventário de Descartáveis e Embalagens',
+  'Inventário de Equipamentos', 'Inventário de EPIs', 'Inventário de Estoque Seco', 'Inventário de Farinhas',
+  'Inventário de Frutos do Mar', 'Inventário de Gás', 'Inventário de Gelo', 'Inventário de Hortfruit',
+  'Inventário de Mat. Escritório', 'Inventário de Mat. Higiene e Limpeza', 'Inventário de Peixe',
+  'Inventário de Polpas', 'Inventário de Processados', 'Inventário de Proteína', 'Inventário de Utensílios',
+  'Inventário de Artesanato', 'Inventário de Sobremesa', 'Inventário de Sorvete', 'Inventário de Vinhos',
+] as const;
+
 // Maps a título de solicitação para a categoria correspondente em products.categoria
 // (categorias armazenadas em maiúsculo). Apenas pré-seleciona a categoria.
 export const TITULO_TO_CATEGORIA: Record<string, string> = {
@@ -43,4 +54,34 @@ export const TITULO_TO_CATEGORIA: Record<string, string> = {
   'Pedido de Sobremesa': 'SOBREMESA',
   'Pedido de Sorvete': 'SORVETE',
   'Pedido de Vinhos': 'VINHOS',
+};
+
+// Maps a título de inventário para a categoria correspondente em products.categoria.
+export const TITULO_INVENTARIO_TO_CATEGORIA: Record<string, string> = {
+  'Inventário de Açaí': 'AÇAÍ',
+  'Inventário de Aves': 'AVES',
+  'Inventário de Bebidas Alcoólicas': 'BEBIDAS ALCOÓLICAS',
+  'Inventário de Bebidas Não Alcoólicas': 'BEBIDAS NÃO ALCOÓLICAS',
+  'Inventário de Cervejas e Chopp': 'CERVEJAS E CHOPP',
+  'Inventário de Congelados': 'CONGELADOS',
+  'Inventário de Descartáveis e Embalagens': 'DESCARTÁVEIS E EMBALAGENS',
+  'Inventário de Equipamentos': 'EQUIPAMENTOS',
+  'Inventário de EPIs': 'EPIs',
+  'Inventário de Estoque Seco': 'ESTOQUE SECO',
+  'Inventário de Farinhas': 'FARINHAS',
+  'Inventário de Frutos do Mar': 'FRUTOS DO MAR',
+  'Inventário de Gás': 'GÁS',
+  'Inventário de Gelo': 'GELO',
+  'Inventário de Hortfruit': 'HORTFRUIT',
+  'Inventário de Mat. Escritório': 'MAT. ESCRITÓRIO',
+  'Inventário de Mat. Higiene e Limpeza': 'MAT. HIGIENE E LIMPEZA',
+  'Inventário de Peixe': 'PEIXE',
+  'Inventário de Polpas': 'POLPAS',
+  'Inventário de Processados': 'PROCESSADOS',
+  'Inventário de Proteína': 'PROTEÍNA',
+  'Inventário de Utensílios': 'UTENSÍLIOS',
+  'Inventário de Artesanato': 'ARTESANATO',
+  'Inventário de Sobremesa': 'SOBREMESA',
+  'Inventário de Sorvete': 'SORVETE',
+  'Inventário de Vinhos': 'VINHOS',
 };
