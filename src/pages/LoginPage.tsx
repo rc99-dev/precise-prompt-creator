@@ -171,7 +171,7 @@ export default function LoginPage() {
                     value={quickName}
                     onChange={e => setQuickName(e.target.value)}
                     required
-                    placeholder="Ex: EMILLY SILVA"
+                    placeholder="Ex: JOÃO SILVA"
                     autoComplete="username"
                   />
                 </div>
