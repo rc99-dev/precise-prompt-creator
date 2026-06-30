@@ -257,6 +257,30 @@ export default function InventoriesPage() {
     else { toast.success("Excluído"); queryClient.invalidateQueries({ queryKey: ['inventories-page'] }); }
   };
 
+  const duplicateInventory = async (inv: Inventory) => {
+    if (!user) return;
+    const { data: its } = await (supabase as any).from('inventory_items')
+      .select('product_id, saldo, observacoes, solicitar_compra')
+      .eq('inventory_id', inv.id);
+    const { data: numData } = await (supabase as any).rpc('generate_inventory_number');
+    const numero = numData as string;
+    const { data: newInv, error } = await (supabase as any).from('inventories').insert({
+      user_id: user.id, created_by: user.id, numero, status: 'rascunho',
+      titulo: inv.titulo, categoria: inv.categoria, unidade: inv.unidade,
+      setor: inv.setor, observacoes: inv.observacoes,
+    }).select('id').single();
+    if (error || !newInv) { toast.error(error?.message || "Erro ao duplicar"); return; }
+    if (its && its.length > 0) {
+      await (supabase as any).from('inventory_items').insert((its as any[]).map(i => ({
+        inventory_id: newInv.id, product_id: i.product_id,
+        saldo: i.saldo, observacoes: i.observacoes, solicitar_compra: i.solicitar_compra,
+      })));
+    }
+    await logEvent(newInv.id, 'criado', `Duplicado de ${inv.numero || inv.id.slice(0, 8)}`);
+    toast.success("Inventário duplicado como rascunho");
+    queryClient.invalidateQueries({ queryKey: ['inventories-page'] });
+  };
+
   const exportPDF = async (inv: Inventory) => {
     const [{ data: its }, { data: log }] = await Promise.all([
       (supabase as any).from('inventory_items').select('saldo, observacoes, solicitar_compra, products(nome, unidade_medida)').eq('inventory_id', inv.id),
