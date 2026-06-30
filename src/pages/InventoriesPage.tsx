@@ -168,7 +168,7 @@ export default function InventoriesPage() {
       const { data: numData } = await (supabase as any).rpc('generate_inventory_number');
       const numero = numData as string;
       const { data: inv, error } = await (supabase as any).from('inventories').insert({
-        user_id: user!.id, numero, status: 'rascunho',
+        user_id: user!.id, created_by: user!.id, numero, status: 'rascunho',
         titulo, categoria: categoria || null, unidade, setor: setor || null, observacoes: observacoes || null,
       }).select('id').single();
       if (error || !inv) { toast.error(error?.message || "Erro"); setSaving(false); return; }
