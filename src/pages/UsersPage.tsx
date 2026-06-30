@@ -429,7 +429,7 @@ export default function UsersPage() {
           <DialogHeader><DialogTitle>Editar Usuário</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2"><Label>Nome completo</Label><Input value={editName} onChange={e => setEditName(e.target.value)} /></div>
-            <div className="space-y-2"><Label>E-mail</Label><Input value={editDialog?.email || ''} disabled /></div>
+            <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} /></div>
             <div className="space-y-2">
               <Label>Perfil de Acesso</Label>
               <Select value={editRole} onValueChange={v => handleRoleChangeInEdit(v as AppRole)}>
