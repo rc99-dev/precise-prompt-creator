@@ -309,11 +309,11 @@ export default function InventoriesPage() {
                   <Label>Título *</Label>
                   <Select value={titulo} onValueChange={(v) => {
                     setTitulo(v);
-                    const cat = TITULO_TO_CATEGORIA[v];
+                    const cat = TITULO_INVENTARIO_TO_CATEGORIA[v];
                     if (cat && categories.includes(cat)) setCategoria(cat);
                   }}>
                     <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>{TITULOS_SOLICITACAO.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                    <SelectContent>{TITULOS_INVENTARIO.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
