@@ -1392,6 +1392,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_create_user: {
+        Args: {
+          _email: string
+          _full_name: string
+          _password: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _setor: string
+          _unidade: string
+        }
+        Returns: string
+      }
+      admin_update_password: {
+        Args: { _new_password: string; _user_id: string }
+        Returns: undefined
+      }
       cleanup_purchase_order_duplicate_items: {
         Args: { _order_id: string }
         Returns: number
