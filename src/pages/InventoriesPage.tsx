@@ -495,6 +495,9 @@ export default function InventoriesPage() {
                               <ShieldCheck className="h-4 w-4 text-primary" />
                             </Button>
                           )}
+                          <Button size="icon" variant="ghost" title="Duplicar" onClick={() => duplicateInventory(inv)}>
+                            <Copy className="h-4 w-4" />
+                          </Button>
                           {(isOwner || isMaster) && (
                             <Button size="icon" variant="ghost" title="Excluir" onClick={() => deleteInventory(inv)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
