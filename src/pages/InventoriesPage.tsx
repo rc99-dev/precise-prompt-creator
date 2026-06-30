@@ -17,7 +17,7 @@ import { Plus, X, Search, Trash2, Boxes, Send, FileDown, Pencil, ShieldCheck, Ke
 import { formatDate } from "@/lib/helpers";
 import { generateInventoryPDF } from "@/lib/pdfGenerator";
 import { resolveUserNames } from "@/lib/userNames";
-import { UNIDADES, SETORES, TITULOS_SOLICITACAO, TITULO_TO_CATEGORIA } from "@/lib/constants";
+import { UNIDADES, SETORES, TITULOS_INVENTARIO, TITULO_INVENTARIO_TO_CATEGORIA } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TableSkeleton from "@/components/TableSkeleton";
 import { rowEnterHandler, focusRowField, focusProductSearch } from "@/lib/keyboardFlow";
