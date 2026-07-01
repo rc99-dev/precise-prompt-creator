@@ -58,6 +58,14 @@ function ProtectedRoutes() {
 
   if (!session) return <Navigate to="/login" replace />;
 
+  if (!role || profileStatus === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-muted-foreground text-sm">Carregando...</div>
+      </div>
+    );
+  }
+
   // Pending approval screen
   if (profileStatus === 'pendente') {
     return <PendingApprovalPage />;
